@@ -1,0 +1,57 @@
+# Binaries
+__debug_bin*
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test & coverage
+*.test
+*.out
+coverage.*
+
+# Build output
+dist/
+bin/
+out/
+
+# Go workspace
+go.work
+go.work.sum
+
+# Environment
+*.env
+*.yml
+!*.env.example
+!*.example.yml
+
+
+# IDE & editors
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# OS artifacts
+.DS_Store
+.DS_Store?
+Thumbs.db
+desktop.ini
+
+# Logs & temp
+*.log
+*.tmp
+tmp/
+temp/
+
+# Docker
+.docker/
+
+# Debug
+*.pprof
+
+# Others
+scripts/
