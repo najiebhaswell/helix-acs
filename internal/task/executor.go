@@ -25,7 +25,7 @@ func (e *Executor) BuildSetParams(ctx context.Context, t *Task, mapper datamodel
 	_ = ctx
 	switch t.Type {
 
-	// ── WiFi ──────────────────────────────────────────────────────────────────
+	// WiFi
 	case TypeWifi:
 		var p WiFiPayload
 		if err := json.Unmarshal(t.Payload, &p); err != nil {

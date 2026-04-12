@@ -17,6 +17,7 @@ import (
 	"github.com/raykavin/helix-acs/internal/datamodel"
 	"github.com/raykavin/helix-acs/internal/device"
 	"github.com/raykavin/helix-acs/internal/logger"
+	"github.com/raykavin/helix-acs/internal/schema"
 	"github.com/raykavin/helix-acs/internal/task"
 )
 
@@ -97,6 +98,8 @@ type Handler struct {
 	acsPassword    string
 	acsURL         string
 	informInterval time.Duration
+	schemaRegistry *schema.Registry
+	schemaResolver *schema.Resolver
 }
 
 // NewHandler creates a new CWMP Handler with the given dependencies and configuration.
@@ -106,6 +109,7 @@ func NewHandler(
 	log logger.Logger,
 	username, password, acsURL string,
 	informInterval time.Duration,
+	schemaReg *schema.Registry,
 ) *Handler {
 	return &Handler{
 		deviceSvc:      deviceSvc,
@@ -116,6 +120,8 @@ func NewHandler(
 		acsPassword:    password,
 		acsURL:         acsURL,
 		informInterval: informInterval,
+		schemaRegistry: schemaReg,
+		schemaResolver: schema.NewResolver(schemaReg),
 	}
 }
 
@@ -252,9 +258,25 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 		WithField("id", dev.ID.Hex()).Debug("CWMP: Device upserted")
 
 	modelType := datamodel.DetectFromRootObject(firstRootObject(upsertReq.Parameters))
-	mapper := datamodel.NewMapper(modelType)
 	instanceMap := datamodel.DiscoverInstances(upsertReq.Parameters)
-	mapper = datamodel.ApplyInstanceMap(mapper, instanceMap)
+
+	// Resolve the schema name for this device (e.g. "tr181", "vendor/huawei/tr181").
+	schemaName := h.schemaResolver.Resolve(upsertReq.Manufacturer, upsertReq.ProductClass, upsertReq.DataModel)
+	upsertReq.Schema = schemaName
+
+	h.log.
+		WithField("serial", upsertReq.Serial).
+		WithField("schema", schemaName).
+		Debug("CWMP: resolved device schema")
+
+	// Build a schema-driven mapper; fall back to the standard mapper when
+	// the registry is empty or the schema is not found.
+	var mapper datamodel.Mapper
+	if sm := schema.NewSchemaMapper(h.schemaRegistry, schemaName, instanceMap); sm != nil {
+		mapper = sm
+	} else {
+		mapper = datamodel.ApplyInstanceMap(datamodel.NewMapper(modelType), instanceMap)
+	}
 
 	// Fetch real pending tasks.
 	pendingTasks, err := h.taskQueue.DequeuePending(ctx, upsertReq.Serial)

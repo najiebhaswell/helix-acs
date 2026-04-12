@@ -92,6 +92,7 @@ type Device struct {
 	ModelName    string             `bson:"model_name"    json:"model_name"`
 	ProductClass string             `bson:"product_class" json:"product_class"`
 	DataModel    string             `bson:"data_model"    json:"data_model"` // "tr181" or "tr098"
+	Schema       string             `bson:"schema"        json:"schema"`      // resolved schema name, e.g. "tr181" or "vendor/huawei/tr181"
 	Online       bool               `bson:"online"        json:"online"`
 	LastInform   time.Time          `bson:"last_inform"   json:"last_inform"`
 	IPAddress    string             `bson:"ip_address"    json:"ip_address"`
@@ -138,6 +139,7 @@ type UpsertRequest struct {
 	ModelName     string
 	ProductClass  string
 	DataModel     string
+	Schema        string // resolved schema name, e.g. "tr181" or "vendor/huawei/tr181"
 	IPAddress     string
 	WANIP         string
 	SWVersion     string

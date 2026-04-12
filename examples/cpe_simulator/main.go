@@ -33,7 +33,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// ── CLI flags ────────────────────────────────────────────────────────────────
+// CLI flags
 
 var (
 	flagACS          = flag.String("acs", "http://localhost:7547/acs", "ACS URL")
@@ -49,7 +49,7 @@ var (
 	flagInterval     = flag.Int("interval", 0, "Inform interval in seconds (0 = single shot)")
 )
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+// Main
 
 func main() {
 	flag.Parse()
@@ -72,7 +72,7 @@ func main() {
 	}
 }
 
-// ── Session ───────────────────────────────────────────────────────────────────
+// Session
 
 func runSession() {
 	sessionID := uuid.NewString()
@@ -115,7 +115,7 @@ func runSession() {
 	logf("=== Session complete ===")
 }
 
-// ── HTTP + Digest Auth ────────────────────────────────────────────────────────
+// HTTP + Digest Auth
 
 // doRequestWithDigest sends a POST and transparently handles the 401 → Digest
 // retry cycle. Returns the final response, body bytes, and cookies to reuse.
@@ -213,7 +213,7 @@ func newReq(method, url string, body []byte) (*http.Request, error) {
 	return req, nil
 }
 
-// ── SOAP builder ──────────────────────────────────────────────────────────────
+// SOAP builder
 
 func buildInform(sessionID string) string {
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -282,7 +282,7 @@ func buildInform(sessionID string) string {
 	)
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 
 func md5hex(s string) string {
 	h := md5.New() //nolint:gosec

@@ -23,6 +23,7 @@ import (
 	"github.com/raykavin/helix-acs/internal/config"
 	cwmpserver "github.com/raykavin/helix-acs/internal/cwmp"
 	"github.com/raykavin/helix-acs/internal/device"
+	"github.com/raykavin/helix-acs/internal/schema"
 	"github.com/raykavin/helix-acs/internal/task"
 
 	l "github.com/raykavin/helix-acs/internal/logger"
@@ -107,7 +108,8 @@ func run(ctx context.Context, cfg config.ConfigProvider, appLogger l.Logger) err
 
 	jwtSvc := initJWTService(appCfg.GetJWT())
 	taskQueue := initTaskQueue(cacheDB, appLogger, cacheCC.GetTTL(), tsk.GetMaxAttempts())
-	cwmpSrv := initCWMPServer(deviceSvc, taskQueue, acsConfig, appLogger)
+	schemaReg := initSchemaRegistry(appLogger)
+	cwmpSrv := initCWMPServer(deviceSvc, taskQueue, acsConfig, appLogger, schemaReg)
 
 	routerCfg := api.Config{
 		CORS:        apiConfig.GetCORS(),
@@ -213,8 +215,24 @@ func initJWTService(cfg config.JWTConfigProvider) *auth.JWTService {
 	return auth.NewJWTService(cfg.GetSecret(), cfg.GetExpiresIn(), cfg.GetRefreshExpiresIn())
 }
 
+// initSchemaRegistry loads TR-069 parameter schemas from the ./schemas directory.
+// On failure it logs a warning and returns an empty registry so the system falls
+// back to the built-in Go mappers.
+func initSchemaRegistry(appLogger l.Logger) *schema.Registry {
+	const schemasDir = "./schemas"
+	reg := schema.NewRegistry()
+	if err := reg.LoadDir(schemasDir); err != nil {
+		appLogger.WithError(err).
+			WithField("dir", schemasDir).
+			Warn("schema: failed to load schemas — falling back to built-in mappers")
+		return reg
+	}
+	appLogger.WithField("dir", schemasDir).Info("schema: loaded TR-069 parameter schemas")
+	return reg
+}
+
 // initCWMPServer builds the CWMP handler and returns the server.
-func initCWMPServer(deviceSvc device.Service, taskQueue *task.RedisQueue, acs config.ACSConfigProvider, appLogger l.Logger) *cwmpserver.Server {
+func initCWMPServer(deviceSvc device.Service, taskQueue *task.RedisQueue, acs config.ACSConfigProvider, appLogger l.Logger, schemaReg *schema.Registry) *cwmpserver.Server {
 	handler := cwmpserver.NewHandler(
 		deviceSvc,
 		taskQueue,
@@ -223,6 +241,7 @@ func initCWMPServer(deviceSvc device.Service, taskQueue *task.RedisQueue, acs co
 		acs.GetPassword(),
 		acs.GetURL(),
 		acs.GetInformInterval(),
+		schemaReg,
 	)
 	digestAuth := auth.NewDigestAuth(appLogger, "ACS", acs.GetUsername(), acs.GetPassword())
 	return cwmpserver.NewServer(handler, digestAuth, appLogger)
