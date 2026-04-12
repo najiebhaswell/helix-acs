@@ -1,5 +1,13 @@
 # Helix ACS
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/raykavin/helix-acs.svg)](https://pkg.go.dev/github.com/raykavin/helix-acs)
+[![Go Version](https://img.shields.io/badge/go-1.25+-blue)](https://golang.org/dl/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/raykavin/helix-acs)](https://goreportcard.com/report/github.com/raykavin/helix-acs)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
+
+### Auto Configuration Server (ACS) for CPE Management
+
+
 Servidor de configuração automática (ACS) para gerenciamento de equipamentos CPE via protocolo TR-069 (CWMP). Permite provisionar, monitorar e executar tarefas remotas em roteadores e modems de qualquer fabricante que implemente os modelos de dados TR-181 ou TR-098.
 
 ## Sumário
@@ -439,3 +447,28 @@ O Dockerfile usa multi-stage build: compila em `golang:1.25-alpine` e gera uma i
 +-- docker-compose.yml Ambiente completo com MongoDB e Redis
 +-- Dockerfile         Build e imagem de produção
 ```
+
+## Contribuindo
+
+Contribuições para o helix-acs são bem-vindas! Aqui estão algumas maneiras de você ajudar a melhorar o projeto:
+
+- **Reporte erros e sugestão de recursos** abrindo issues no GitHub
+- **Envie pull requests** com correções de erros ou novos recursos
+- **Aprimore a documentação** para ajudar outros usuários e desenvolvedores
+- **Compartilhe suas estratégias personalizadas** com a comunidade
+
+---
+
+## Licença
+O helix-acs é distribuído sob a **Licença MIT**.</br>
+Para os termos e condições completos da licença, consulte o arquivo [LICENSE](LICENSE) no repositório.
+
+---
+
+## Contato
+
+Para suporte, colaboração ou dúvidas sobre helix-acs:
+
+**E-mail**: [raykavin.meireles@gmail.com](mailto:raykavin.meireles@gmail.com)</br>
+**LinkedIn**: [@raykavin.dev](https://www.linkedin.com/in/raykavin-dev)</br>
+**GitHub**: [@raykavin](https://github.com/raykavin)
