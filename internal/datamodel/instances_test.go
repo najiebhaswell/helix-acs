@@ -104,7 +104,7 @@ func TestDiscoverTR181WiFiNonStandardIndices(t *testing.T) {
 }
 
 func TestDiscoverTR181WiFiFallbackSortedIndex(t *testing.T) {
-	// No OperatingFrequencyBand — fall back to sorted-index heuristic.
+	// No OperatingFrequencyBand  fall back to sorted-index heuristic.
 	params := map[string]string{
 		"Device.WiFi.SSID.3.SSID": "HomeNet",  // lowest → band 0
 		"Device.WiFi.SSID.5.SSID": "HomeNet5", // next   → band 1
@@ -211,7 +211,7 @@ func TestApplyInstanceMapUnknownMapper(t *testing.T) {
 	// A mapper that is not TR181Mapper or TR098Mapper must be returned as-is.
 	var m Mapper = &TR181Mapper{}
 	result := ApplyInstanceMap(m, InstanceMap{WANIPIfaceIdx: 99})
-	// Should be the resolved copy, not the original pointer — but still TR181Mapper.
+	// Should be the resolved copy, not the original pointer  but still TR181Mapper.
 	_, ok := result.(*TR181Mapper)
 	assert.True(t, ok)
 }
