@@ -65,6 +65,7 @@ func (r *mongoRepository) Upsert(ctx context.Context, req *UpsertRequest) (*Devi
 		"model_name":    req.ModelName,
 		"product_class": req.ProductClass,
 		"data_model":    req.DataModel,
+		"schema":        req.Schema,
 		"ip_address":    req.IPAddress,
 		"wan_ip":        req.WANIP,
 		"sw_version":    req.SWVersion,
