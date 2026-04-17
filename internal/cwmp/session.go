@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -636,20 +638,94 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 	session.instanceMap = instanceMap
 	session.mu.Unlock()
 
-	// Extract WAN info from summon parameters and persist to device.
-	wanInfo := extractWANInfo(params, newMapper)
+	// Extract WAN, WiFi, and LAN info from summon parameters and persist to device.
+
+	// Extract WiFi info for both bands
+	wifi24 := extractWiFiInfo(0, params, newMapper)
+	wifi5 := extractWiFiInfo(1, params, newMapper)
+
+	// Extract Band Steering status (device-level TP-Link feature)
+	bandSteeringStatus := extractBandSteeringStatus(params)
+	wifi24.BandSteeringEnabled = bandSteeringStatus
+	wifi5.BandSteeringEnabled = bandSteeringStatus
+
 	h.log.WithField("serial", serial).
-		WithField("ip", wanInfo.IPAddress).
-		WithField("status", wanInfo.LinkStatus).
-		WithField("gateway", wanInfo.Gateway).
-		WithField("conn_type", wanInfo.ConnectionType).
-		Info("CWMP: extractWANInfo from summon")
-	if wanInfo.IPAddress != "" || wanInfo.LinkStatus != "" {
-		if err := h.deviceSvc.UpdateInfo(ctx, serial, device.InfoUpdate{WAN: &wanInfo}); err != nil {
-			h.log.WithError(err).WithField("serial", serial).Error("CWMP: persist WAN info failed")
-		} else {
-			h.log.WithField("serial", serial).Info("CWMP: persist WAN info success")
+		WithField("wifi_24_ssid", wifi24.SSID).
+		WithField("wifi_24_channel", wifi24.Channel).
+		WithField("wifi_24_band_steering", bandSteeringStatus).
+		WithField("wifi_5_ssid", wifi5.SSID).
+		WithField("wifi_5_channel", wifi5.Channel).
+		Info("CWMP: extractWiFiInfo from summon")
+
+	// Extract LAN info
+	lanInfo := extractLANInfo(params, newMapper)
+	h.log.WithField("serial", serial).
+		WithField("lan_ip", lanInfo.IPAddress).
+		WithField("lan_subnet", lanInfo.SubnetMask).
+		WithField("dhcp_enabled", lanInfo.DHCPEnabled).
+		Info("CWMP: extractLANInfo from summon")
+
+	wansInfo := extractWANInfos(params, newMapper)
+	stats, _ := parseCPEStats(params, newMapper)
+
+	// Determine best WAN IP for root (prefer PPPoE, then anything non-empty).
+	// Sort wansInfo deterministically: PPPoE entries first, then others.
+	sort.SliceStable(wansInfo, func(i, j int) bool {
+		// PPPoE entries come first (higher priority)
+		iPPPoE := wansInfo[i].ConnectionType == "PPPoE"
+		jPPPoE := wansInfo[j].ConnectionType == "PPPoE"
+		if iPPPoE != jPPPoE {
+			return iPPPoE // true (PPPoE) sorts before false (non-PPPoE)
 		}
+		// Stable sort: if both are same type, maintain original order by index
+		return false
+	})
+
+	var bestWanIP string
+	for _, w := range wansInfo {
+		if w.IPAddress != "" {
+			bestWanIP = w.IPAddress
+			break // First non-empty IP (after sorting) is deterministically chosen
+		}
+	}
+
+	acsUrl := params["Device.ManagementServer.URL"]
+	var cpuUsage *int64
+	if cpuStr := params["Device.DeviceInfo.ProcessStatus.CPUUsage"]; cpuStr != "" {
+		if c, err := strconv.ParseInt(cpuStr, 10, 64); err == nil {
+			cpuUsage = &c
+		}
+	}
+
+	// Persist all collected info to device
+	infoUpdate := device.InfoUpdate{
+		WANs:          wansInfo,
+		UptimeSeconds: &stats.UptimeSeconds,
+		RAMTotal:      &stats.RAMTotalKB,
+		RAMFree:       &stats.RAMFreeKB,
+		CPUUsage:      cpuUsage,
+		ACSURL:        &acsUrl,
+	}
+	if lanInfo.IPAddress != "" {
+		infoUpdate.IPAddress = &lanInfo.IPAddress
+	}
+	if bestWanIP != "" {
+		infoUpdate.WANIP = &bestWanIP
+	}
+	if wifi24.SSID != "" || wifi24.Enabled || wifi24.Channel > 0 {
+		infoUpdate.WiFi24 = &wifi24
+	}
+	if wifi5.SSID != "" || wifi5.Enabled || wifi5.Channel > 0 {
+		infoUpdate.WiFi5 = &wifi5
+	}
+	if lanInfo.IPAddress != "" || lanInfo.DHCPEnabled {
+		infoUpdate.LAN = &lanInfo
+	}
+
+	if err := h.deviceSvc.UpdateInfo(ctx, serial, infoUpdate); err != nil {
+		h.log.WithError(err).WithField("serial", serial).Error("CWMP: persist WAN/WiFi/LAN info failed")
+	} else {
+		h.log.WithField("serial", serial).Info("CWMP: persist WAN/WiFi/LAN info success")
 	}
 
 	h.dispatchNextOrClose(ctx, w, session)
@@ -735,7 +811,7 @@ func (h *Handler) handleGetParamValuesResponse(
 		t.Status = task.StatusDone
 		t.Result = statsResult
 		_ = h.taskQueue.UpdateStatus(ctx, t)
-		_ = h.deviceSvc.UpdateInfo(ctx, t.Serial, device.InfoUpdate{WAN: &wanPartial})
+		_ = h.deviceSvc.UpdateInfo(ctx, t.Serial, device.InfoUpdate{WANs: []device.WANInfo{wanPartial}})
 
 	case task.TypePortForwarding:
 		rules := parsePortMappingRules(params, mapper)
@@ -927,7 +1003,7 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 			h.log.WithField("task_id", t.ID).
 				WithField("gpon_idx", im.FreeGPONLinkIdx).
 				WithField("vlan", p.VLAN).
-				WithField("user", p.Username).
+				WithField("user", "[REDACTED]").
 				Info("CWMP: starting full TP-Link PPPoE provisioning")
 			xmlBytes, err := wp.buildCurrentXML()
 			if err != nil {
@@ -964,8 +1040,128 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 		}
 		return BuildSetParameterValues(t.ID, params)
 
+	// WiFi task with Band Steering support
+	case task.TypeWifi:
+		var wifiPayload task.WiFiPayload
+		if err := json.Unmarshal(t.Payload, &wifiPayload); err != nil {
+			return nil, fmt.Errorf("unmarshal wifi payload: %w", err)
+		}
+
+		// Log the received WiFi payload for debugging
+		h.log.WithField("task_id", t.ID).
+			WithField("band", wifiPayload.Band).
+			WithField("ssid", wifiPayload.SSID).
+			WithField("security", wifiPayload.Security).
+			WithField("password", "***").
+			WithField("channel", wifiPayload.Channel).
+			Info("CWMP: WiFi task payload received")
+
+		params, err := exe.BuildSetParams(ctx, t, mapper)
+		if err != nil {
+			return nil, err
+		}
+		if len(params) == 0 {
+			return nil, fmt.Errorf("task %s produced no parameters", t.ID)
+		}
+
+		// Log all parameters being sent for WiFi task
+		for path, value := range params {
+			if path == mapper.WiFiPasswordPath(0) || path == mapper.WiFiPasswordPath(1) {
+				h.log.WithField("task_id", t.ID).
+					WithField("param", path).
+					WithField("value", "***").
+					Debug("CWMP: WiFi parameter to be set")
+			} else {
+				h.log.WithField("task_id", t.ID).
+					WithField("param", path).
+					WithField("value", value).
+					Debug("CWMP: WiFi parameter to be set")
+			}
+		}
+
+		// Log mapper path information for debugging
+		h.log.WithField("task_id", t.ID).
+			WithField("secPath0", mapper.WiFiSecurityModePath(0)).
+			WithField("secPath1", mapper.WiFiSecurityModePath(1)).
+			WithField("passwdPath0", mapper.WiFiPasswordPath(0)).
+			WithField("passwdPath1", mapper.WiFiPasswordPath(1)).
+			WithField("payloadSecurity", wifiPayload.Security).
+			WithField("payloadPassword", wifiPayload.Password != "").
+			Debug("CWMP: WiFi mapper paths and payload validation")
+
+		// Only sync SSID/password/security to both bands if Band Steering is EXPLICITLY being enabled in this task
+		// Don't sync based on device's current state - only if this task is turning Band Steering ON
+		bandSteeringWillBeEnabled := wifiPayload.BandSteeringEnabled != nil && *wifiPayload.BandSteeringEnabled
+
+		// If Band Steering is enabled in this task, sync SSID, password, and security mode to both bands
+		if bandSteeringWillBeEnabled && (wifiPayload.SSID != "" || wifiPayload.Password != "") {
+			ssidPath24 := mapper.WiFiSSIDPath(0)
+			ssidPath5 := mapper.WiFiSSIDPath(1)
+			passwdPath24 := mapper.WiFiPasswordPath(0)
+			passwdPath5 := mapper.WiFiPasswordPath(1)
+			secPath24 := mapper.WiFiSecurityModePath(0)
+			secPath5 := mapper.WiFiSecurityModePath(1)
+
+			if wifiPayload.SSID != "" {
+				// Sync SSID to both bands - only if paths are valid
+				if ssidPath24 != "" && ssidPath5 != "" {
+					params[ssidPath24] = wifiPayload.SSID
+					params[ssidPath5] = wifiPayload.SSID
+					h.log.WithField("task_id", t.ID).
+						WithField("ssid", wifiPayload.SSID).
+						Info("CWMP: Band Steering enabled - syncing SSID to both bands")
+				} else {
+					h.log.WithField("task_id", t.ID).
+						WithField("path24", ssidPath24).
+						WithField("path5", ssidPath5).
+						Warn("CWMP: SSID paths invalid for Band Steering sync")
+				}
+			}
+
+			if wifiPayload.Password != "" {
+				// Sync password to both bands - only if paths are valid
+				if passwdPath24 != "" && passwdPath5 != "" {
+					params[passwdPath24] = wifiPayload.Password
+					params[passwdPath5] = wifiPayload.Password
+					h.log.WithField("task_id", t.ID).
+						Info("CWMP: Band Steering enabled - syncing password to both bands")
+				} else {
+					h.log.WithField("task_id", t.ID).
+						WithField("path24", passwdPath24).
+						WithField("path5", passwdPath5).
+						Warn("CWMP: Password paths invalid for Band Steering sync")
+				}
+			}
+
+			// Also sync security mode to both bands if it was set in the payload
+			if wifiPayload.Security != "" {
+				mode := wifiPayload.Security
+				if wifiPayload.Security == "WPA2-PSK" {
+					mode = "WPA2-Personal"
+				} else if wifiPayload.Security == "WPA-WPA2-PSK" {
+					mode = "WPA-WPA2-Personal"
+				}
+
+				if secPath24 != "" && secPath5 != "" {
+					params[secPath24] = mode
+					params[secPath5] = mode
+					h.log.WithField("task_id", t.ID).
+						WithField("security_mode", mode).
+						Info("CWMP: Band Steering enabled - syncing security mode to both bands")
+				} else {
+					h.log.WithField("task_id", t.ID).
+						WithField("path24", secPath24).
+						WithField("path5", secPath5).
+						WithField("security_mode", mode).
+						Warn("CWMP: Security mode paths invalid for Band Steering sync")
+				}
+			}
+		}
+
+		return BuildSetParameterValues(t.ID, params)
+
 	// SetParameterValues-based tasks
-	case task.TypeWifi, task.TypeLAN, task.TypeSetParams,
+	case task.TypeLAN, task.TypeSetParams,
 		task.TypePingTest, task.TypeTraceroute, task.TypeSpeedTest:
 		params, err := exe.BuildSetParams(ctx, t, mapper)
 		if err != nil {
@@ -1158,7 +1354,7 @@ func (h *Handler) persistDiagToDevice(
 		}
 	case task.TypeCPEStats:
 		_, wan := parseCPEStats(params, mapper)
-		_ = h.deviceSvc.UpdateInfo(ctx, serial, device.InfoUpdate{WAN: &wan})
+		_ = h.deviceSvc.UpdateInfo(ctx, serial, device.InfoUpdate{WANs: []device.WANInfo{wan}})
 	}
 }
 

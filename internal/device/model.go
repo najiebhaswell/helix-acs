@@ -10,6 +10,7 @@ import (
 // WANInfo holds the current state of the WAN interface.
 type WANInfo struct {
 	ConnectionType string `bson:"connection_type" json:"connection_type"`
+	ServiceType    string `bson:"service_type"    json:"service_type"`
 	IPAddress      string `bson:"ip_address"      json:"ip_address"`
 	SubnetMask     string `bson:"subnet_mask"     json:"subnet_mask"`
 	Gateway        string `bson:"gateway"         json:"gateway"`
@@ -52,16 +53,17 @@ type LANInfo struct {
 
 // WiFiInfo holds the current state of a single wireless radio / SSID.
 type WiFiInfo struct {
-	Band             string `bson:"band"              json:"band"` // "2.4GHz" or "5GHz"
-	SSID             string `bson:"ssid"              json:"ssid"`
-	Enabled          bool   `bson:"enabled"           json:"enabled"`
-	BSSID            string `bson:"bssid"             json:"bssid"`
-	Channel          int    `bson:"channel"           json:"channel"`
-	ChannelWidth     string `bson:"channel_width"     json:"channel_width"`
-	Standard         string `bson:"standard"          json:"standard"`
-	SecurityMode     string `bson:"security_mode"     json:"security_mode"`
-	TXPower          int    `bson:"tx_power"          json:"tx_power"`
-	ConnectedClients int    `bson:"connected_clients" json:"connected_clients"`
+	Band                 string `bson:"band"                  json:"band"` // "2.4GHz" or "5GHz"
+	SSID                 string `bson:"ssid"                  json:"ssid"`
+	Enabled              bool   `bson:"enabled"               json:"enabled"`
+	BSSID                string `bson:"bssid"                 json:"bssid"`
+	Channel              int    `bson:"channel"               json:"channel"`
+	ChannelWidth         string `bson:"channel_width"         json:"channel_width"`
+	Standard             string `bson:"standard"              json:"standard"`
+	SecurityMode         string `bson:"security_mode"         json:"security_mode"`
+	TXPower              int    `bson:"tx_power"              json:"tx_power"`
+	ConnectedClients     int    `bson:"connected_clients"     json:"connected_clients"`
+	BandSteeringEnabled  *bool  `bson:"band_steering_enabled" json:"band_steering_enabled,omitempty"` // TP-Link specific
 
 	// Traffic counters
 	BytesSent       int64 `bson:"bytes_sent"        json:"bytes_sent"`
@@ -78,6 +80,7 @@ type ConnectedHost struct {
 	IPAddress  string `bson:"ip"        json:"ip"`
 	Hostname   string `bson:"hostname"  json:"hostname"`
 	Interface  string `bson:"interface" json:"interface"` // "LAN", "2.4GHz", "5GHz"
+	RSSI       *int   `bson:"rssi"      json:"rssi,omitempty"`
 	Active     bool   `bson:"active"    json:"active"`
 	LeaseTime  int    `bson:"lease_time" json:"lease_time"` // remaining seconds
 }
@@ -105,10 +108,11 @@ type Device struct {
 	UptimeSeconds int64  `bson:"uptime_seconds" json:"uptime_seconds,omitempty"`
 	RAMTotal      int64  `bson:"ram_total"      json:"ram_total,omitempty"`
 	RAMFree       int64  `bson:"ram_free"       json:"ram_free,omitempty"`
+	CPUUsage      int64  `bson:"cpu_usage"      json:"cpu_usage,omitempty"`
 	ACSURL        string `bson:"acs_url"        json:"acs_url,omitempty"`
 
 	// Rich sub-documents
-	WAN            *WANInfo        `bson:"wan"             json:"wan,omitempty"`
+	WANs           []WANInfo       `bson:"wans"            json:"wans,omitempty"`
 	LAN            *LANInfo        `bson:"lan"             json:"lan,omitempty"`
 	WiFi24         *WiFiInfo       `bson:"wifi_24"         json:"wifi_24,omitempty"`
 	WiFi5          *WiFiInfo       `bson:"wifi_5"          json:"wifi_5,omitempty"`
@@ -159,7 +163,15 @@ type UpdateRequest struct {
 
 // InfoUpdate carries optional rich sub-documents to be merged into a device.
 type InfoUpdate struct {
-	WAN            *WANInfo
+	UptimeSeconds *int64
+	RAMTotal      *int64
+	RAMFree       *int64
+	CPUUsage      *int64
+	ACSURL        *string
+	IPAddress     *string
+	WANIP         *string
+
+	WANs           []WANInfo
 	LAN            *LANInfo
 	WiFi24         *WiFiInfo
 	WiFi5          *WiFiInfo

@@ -5,6 +5,7 @@ package cwmp
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -201,46 +202,7 @@ func extractWANInfo(params map[string]string, mapper datamodel.Mapper) device.WA
 		subnetMask = params[smPath]
 	}
 
-	// Find gateway dynamically: scan IPv4Forwarding entries for one pointing
-	// to the WAN interface with a non-zero GatewayIPAddress.
-	gateway := ""
-	if wanIface != "" {
-		for k, v := range params {
-			if strings.HasSuffix(k, ".Interface") && v == wanIface && strings.Contains(k, "IPv4Forwarding") {
-				base := strings.TrimSuffix(k, ".Interface")
-				enabled := params[base+".Enable"]
-				if enabled == "1" || enabled == "true" || enabled == "" {
-					if gw := params[base+".GatewayIPAddress"]; gw != "" && gw != "0.0.0.0" {
-						gateway = gw
-						break
-					}
-				}
-			}
-		}
-	}
-
-	// Fallback: if no routing entry matched via Interface field, scan all
-	// forwarding entries for a non-zero, non-LAN-subnet gateway.
-	if gateway == "" {
-		wanIP := params[ipAddrPath]
-		for k, v := range params {
-			if !strings.HasSuffix(k, ".GatewayIPAddress") || !strings.Contains(k, "IPv4Forwarding") {
-				continue
-			}
-			if v == "" || v == "0.0.0.0" {
-				continue
-			}
-			// Prefer a gateway in the same address range as the WAN IP.
-			if wanIP != "" && samePrefix(wanIP, v) {
-				gateway = v
-				break
-			}
-			// Otherwise keep the first non-zero candidate.
-			if gateway == "" {
-				gateway = v
-			}
-		}
-	}
+	gateway := findGateway(wanIface, params[ipAddrPath], params)
 
 	// Parse DNS servers from PPP.IPCP.DNSServers (comma-separated)
 	dnsStr := params[mapper.WANDNS1Path()]
@@ -268,6 +230,135 @@ func extractWANInfo(params map[string]string, mapper datamodel.Mapper) device.WA
 		LinkStatus:     params[mapper.WANStatusPath()],
 		UptimeSeconds:  parseInt(mapper.WANUptimePath()),
 	}
+}
+
+func findGateway(wanIface string, wanIP string, params map[string]string) string {
+	gateway := ""
+	if wanIface != "" {
+		for k, v := range params {
+			if strings.HasSuffix(k, ".Interface") && v == wanIface && strings.Contains(k, "IPv4Forwarding") {
+				base := strings.TrimSuffix(k, ".Interface")
+				enabled := params[base+".Enable"]
+				if enabled == "1" || enabled == "true" || enabled == "" {
+					if gw := params[base+".GatewayIPAddress"]; gw != "" && gw != "0.0.0.0" {
+						gateway = gw
+						break
+					}
+				}
+			}
+		}
+	}
+	if gateway == "" {
+		for k, v := range params {
+			if !strings.HasSuffix(k, ".GatewayIPAddress") || !strings.Contains(k, "IPv4Forwarding") {
+				continue
+			}
+			if v == "" || v == "0.0.0.0" {
+				continue
+			}
+			if wanIP != "" && samePrefix(wanIP, v) {
+				gateway = v
+				break
+			}
+			if gateway == "" {
+				gateway = v
+			}
+		}
+	}
+	return gateway
+}
+
+// extractWANInfos reads all WAN interfaces (main WAN + TP-Link additional WANs)
+func extractWANInfos(params map[string]string, mapper datamodel.Mapper) []device.WANInfo {
+	var wans []device.WANInfo
+	seen := make(map[string]bool)
+
+	macAddress := params[mapper.WANMACPath()]
+
+	// Main WAN
+	mainWan := extractWANInfo(params, mapper)
+	if mainWan.IPAddress != "" || mainWan.ConnectionType != "" {
+		wans = append(wans, mainWan)
+		seen[mainWan.IPAddress] = true
+	}
+
+	// Additional WANs for TP-Link (using X_TP_ConnType)
+	for k, v := range params {
+		m := regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.X_TP_ConnType$`).FindStringSubmatch(k)
+		if m != nil && v != "LAN" && v != "Bridge" {
+			idx := m[1]
+			ipAddr := params[fmt.Sprintf("Device.IP.Interface.%s.IPv4Address.1.IPAddress", idx)]
+			
+			if ipAddr == "" || ipAddr == "0.0.0.0" || seen[ipAddr] {
+				continue
+			}
+
+			mtu, _ := strconv.Atoi(params[fmt.Sprintf("Device.IP.Interface.%s.MaxMTUSize", idx)])
+
+			wan := device.WANInfo{
+				ConnectionType: v,
+				ServiceType:    params[fmt.Sprintf("Device.IP.Interface.%s.X_TP_ServiceType", idx)],
+				IPAddress:      ipAddr,
+				SubnetMask:     params[fmt.Sprintf("Device.IP.Interface.%s.IPv4Address.1.SubnetMask", idx)],
+				LinkStatus:     params[fmt.Sprintf("Device.IP.Interface.%s.Status", idx)],
+				Gateway:        findGateway(fmt.Sprintf("Device.IP.Interface.%s.", idx), ipAddr, params),
+				MACAddress:     macAddress,
+				MTU:            mtu,
+			}
+
+			uptimeStr := params[fmt.Sprintf("Device.IP.Interface.%s.X_TP_Uptime", idx)]
+			if uptimeStr == "" {
+				uptimeStr = params[fmt.Sprintf("Device.IP.Interface.%s.LastChange", idx)]
+			}
+			if uptimeStr != "" {
+				if u, err := strconv.ParseInt(uptimeStr, 10, 64); err == nil {
+					wan.UptimeSeconds = u
+				}
+			}
+
+			if v == "PPPoE" {
+				lower := params[fmt.Sprintf("Device.IP.Interface.%s.LowerLayers", idx)]
+				if pppMatch := regexp.MustCompile(`Device\.PPP\.Interface\.(\d+)`).FindStringSubmatch(lower); pppMatch != nil {
+					pppIdx := pppMatch[1]
+					wan.PPPoEUsername = params[fmt.Sprintf("Device.PPP.Interface.%s.Username", pppIdx)]
+					
+					dnsStr := params[fmt.Sprintf("Device.PPP.Interface.%s.IPCP.DNSServers", pppIdx)]
+					if dnsStr != "" {
+						parts := strings.Split(dnsStr, ",")
+						if len(parts) > 0 {
+							wan.DNS1 = strings.TrimSpace(parts[0])
+						}
+						if len(parts) > 1 {
+							wan.DNS2 = strings.TrimSpace(parts[1])
+						}
+					}
+				}
+			} else if v == "DHCP" {
+				wanIfacePath := fmt.Sprintf("Device.IP.Interface.%s.", idx)
+				for pk, pval := range params {
+					if strings.HasSuffix(pk, ".Interface") && strings.HasPrefix(pk, "Device.DHCPv4.Client.") && pval == wanIfacePath {
+						base := strings.TrimSuffix(pk, ".Interface")
+						dnsStr := params[base+".DNSServers"]
+						if dnsStr != "" {
+							parts := strings.Split(dnsStr, ",")
+							if len(parts) > 0 {
+								wan.DNS1 = strings.TrimSpace(parts[0])
+							}
+							if len(parts) > 1 {
+								wan.DNS2 = strings.TrimSpace(parts[1])
+							}
+						}
+						break
+					}
+				}
+			}
+
+			wans = append(wans, wan)
+			seen[ipAddr] = true
+		}
+	}
+
+	return wans
 }
 
 // samePrefix returns true when the first two octets of a and b match.
@@ -320,6 +411,31 @@ func parseConnectedHosts(params map[string]string, mapper datamodel.Mapper) []de
 			h.Active = strings.EqualFold(v, "true") || v == "1"
 		case "LeaseTimeRemaining":
 			h.LeaseTime, _ = strconv.Atoi(v)
+		case "X_TP_LanConnType":
+			if v == "1" {
+				h.Interface = "Wi-Fi"
+			} else if v == "0" {
+				h.Interface = "LAN"
+			}
+		case "AssociatedDevice":
+			if v != "" {
+				if strings.Contains(v, "AccessPoint.1") {
+					h.Interface = "Wi-Fi 2.4GHz"
+				} else if strings.Contains(v, "AccessPoint.2") || strings.Contains(v, "AccessPoint.5") {
+					h.Interface = "Wi-Fi 5GHz"
+				} else {
+					h.Interface = "Wi-Fi"
+				}
+				
+				// Try to get RSSI if the tree was fetched
+				if rssiStr := params[v+"SignalStrength"]; rssiStr != "" {
+					if r, err := strconv.Atoi(rssiStr); err == nil {
+						h.RSSI = &r
+					}
+				}
+			}
+		default:
+			// ignored
 		}
 	}
 
@@ -415,4 +531,126 @@ func normaliseInterface(raw string) string {
 		return "LAN"
 	}
 	return raw
+}
+
+// extractWiFiInfo reads WiFi parameters for a single band (0=2.4GHz, 1=5GHz)
+// from the full summon parameter map and returns a WiFiInfo struct.
+func extractWiFiInfo(bandIdx int, params map[string]string, mapper datamodel.Mapper) device.WiFiInfo {
+	parseInt := func(key string) int {
+		if key == "" {
+			return 0
+		}
+		v, _ := strconv.Atoi(params[key])
+		return v
+	}
+
+	parseInt64 := func(key string) int64 {
+		if key == "" {
+			return 0
+		}
+		v, _ := strconv.ParseInt(params[key], 10, 64)
+		return v
+	}
+
+	parseBool := func(key string) bool {
+		if key == "" {
+			return false
+		}
+		return strings.EqualFold(params[key], "true") || params[key] == "1"
+	}
+
+	band := "2.4GHz"
+	if bandIdx == 1 {
+		band = "5GHz"
+	}
+
+	return device.WiFiInfo{
+		Band:             band,
+		SSID:             params[mapper.WiFiSSIDPath(bandIdx)],
+		Enabled:          parseBool(mapper.WiFiEnabledPath(bandIdx)),
+		BSSID:            params[mapper.WiFiBSSIDPath(bandIdx)],
+		Channel:          parseInt(mapper.WiFiChannelPath(bandIdx)),
+		ChannelWidth:     params[mapper.WiFiChannelWidthPath(bandIdx)],
+		Standard:         params[mapper.WiFiStandardPath(bandIdx)],
+		SecurityMode:     params[mapper.WiFiSecurityModePath(bandIdx)],
+		TXPower:          parseInt(mapper.WiFiTXPowerPath(bandIdx)),
+		ConnectedClients: parseInt(mapper.WiFiClientCountPath(bandIdx)),
+		BytesSent:        parseInt64(mapper.WiFiBytesSentPath(bandIdx)),
+		BytesReceived:    parseInt64(mapper.WiFiBytesReceivedPath(bandIdx)),
+		PacketsSent:      parseInt64(mapper.WiFiPacketsSentPath(bandIdx)),
+		PacketsReceived:  parseInt64(mapper.WiFiPacketsReceivedPath(bandIdx)),
+		ErrorsSent:       parseInt64(mapper.WiFiErrorsSentPath(bandIdx)),
+		ErrorsReceived:   parseInt64(mapper.WiFiErrorsReceivedPath(bandIdx)),
+	}
+}
+
+// extractBandSteeringStatus reads Band Steering status from the parameter map.
+// Band Steering is a device-level vendor-specific feature (TP-Link).
+// Returns a pointer to bool if found, nil otherwise.
+func extractBandSteeringStatus(params map[string]string) *bool {
+	// TP-Link Band Steering path
+	const bandSteeringPath = "Device.WiFi.X_TP_BandSteering.Enable"
+	
+	if val, exists := params[bandSteeringPath]; exists && val != "" {
+		enabled := strings.EqualFold(val, "true") || val == "1"
+		return &enabled
+	}
+	return nil
+}
+
+// extractLANInfo reads LAN/DHCP configuration from the full summon parameter map.
+func extractLANInfo(params map[string]string, mapper datamodel.Mapper) device.LANInfo {
+	parseBool := func(key string) bool {
+		if key == "" {
+			return false
+		}
+		return strings.EqualFold(params[key], "true") || params[key] == "1"
+	}
+
+	// Parse and clean up DNS servers: filter out invalid addresses like "0.0.0.0.0.0"
+	dnsRaw := params[mapper.LANDNSPath()]
+	dnsServers := cleanDNSServers(dnsRaw)
+
+	return device.LANInfo{
+		IPAddress:   params[mapper.LANIPAddressPath()],
+		SubnetMask:  params[mapper.LANSubnetMaskPath()],
+		DHCPEnabled: parseBool(mapper.DHCPServerEnablePath()),
+		DHCPStart:   params[mapper.DHCPMinAddressPath()],
+		DHCPEnd:     params[mapper.DHCPMaxAddressPath()],
+		DNSServers:  dnsServers,
+	}
+}
+
+// cleanDNSServers parses DNS servers from comma-separated format and filters out
+// invalid addresses (e.g., "0.0.0.0", "0.0.0.0.0.0", empty strings).
+func cleanDNSServers(dnsStr string) string {
+	if dnsStr == "" {
+		return ""
+	}
+
+	// Split by comma
+	parts := strings.Split(dnsStr, ",")
+	var valid []string
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" || part == "0.0.0.0" || part == "0.0.0.0.0.0" || part == "::" {
+			continue
+		}
+		// Basic validation: should look like an IP address
+		if isValidIPString(part) {
+			valid = append(valid, part)
+		}
+	}
+
+	return strings.Join(valid, ",")
+}
+
+// isValidIPString returns true if s looks like a valid IP address (v4 or v6).
+func isValidIPString(s string) bool {
+	// Check if it contains enough dots or colons
+	if strings.Count(s, ".") >= 3 || strings.Contains(s, ":") {
+		return true
+	}
+	return false
 }

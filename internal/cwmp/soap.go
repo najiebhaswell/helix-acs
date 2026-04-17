@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -375,8 +376,45 @@ func BuildGetParameterValues(id string, names []string) ([]byte, error) {
 // xsd:string; callers that need specific xsd types should build the
 // ParameterValueList directly and call BuildEnvelope.
 func BuildSetParameterValues(id string, params map[string]string) ([]byte, error) {
+	// Sort parameter names to ensure consistent ordering, with security passwords first
+	var sortedNames []string
+	for name := range params {
+		sortedNames = append(sortedNames, name)
+	}
+
+	// Custom sort: KeyPassphrase and PreSharedKey parameters come first,
+	// then other parameters, then ModeEnabled last (so security mode changes after password is set)
+	sort.Slice(sortedNames, func(i, j int) bool {
+		iName := sortedNames[i]
+		jName := sortedNames[j]
+
+		// Extract leaf parameter name
+		iParts := strings.Split(iName, ".")
+		iLeaf := iParts[len(iParts)-1]
+		jParts := strings.Split(jName, ".")
+		jLeaf := jParts[len(jParts)-1]
+
+		// Priority 1: KeyPassphrase/PreSharedKey (must be set first)
+		iIsPassword := iLeaf == "KeyPassphrase" || iLeaf == "PreSharedKey"
+		jIsPassword := jLeaf == "KeyPassphrase" || jLeaf == "PreSharedKey"
+		if iIsPassword != jIsPassword {
+			return iIsPassword // passwords come first
+		}
+
+		// Priority 2: ModeEnabled/EncryptionMode (must be set last)
+		iIsMode := iLeaf == "ModeEnabled" || iLeaf == "EncryptionMode"
+		jIsMode := jLeaf == "ModeEnabled" || jLeaf == "EncryptionMode"
+		if iIsMode != jIsMode {
+			return !iIsMode // modes come last (invert to put false first)
+		}
+
+		// Otherwise maintain consistent ordering
+		return iName < jName
+	})
+
 	pvs := make([]ParameterValueStruct, 0, len(params))
-	for name, val := range params {
+	for _, name := range sortedNames {
+		val := params[name]
 		pvs = append(pvs, ParameterValueStruct{
 			Name: name,
 			Value: Value{
@@ -405,6 +443,12 @@ func inferXSDType(paramName, value string) string {
 	parts := strings.Split(paramName, ".")
 	leaf := parts[len(parts)-1]
 
+	// String-typed parameters that contain "Enabled" but should be strings
+	// (e.g., Security.ModeEnabled is a string like "WPA2-Personal" or "None")
+	if leaf == "ModeEnabled" {
+		return "xsd:string"
+	}
+
 	// Boolean-typed parameters: anything containing "Enable" or "Mcast"
 	if strings.Contains(leaf, "Enable") || leaf == "RequestAddresses" ||
 		leaf == "RequestPrefixes" || strings.HasSuffix(leaf, "Mcast") {
@@ -414,7 +458,9 @@ func inferXSDType(paramName, value string) string {
 	// Known unsigned integer fields
 	switch leaf {
 	case "VLANID", "MaxMTUSize", "NumberOfRepetitions", "PeriodicInformInterval",
-		"MaxMTU", "Status", "X_TP_VLANMode", "Port":
+		"MaxMTU", "Status", "X_TP_VLANMode", "Port", "Channel", "TransmitPower",
+		"OperatingChannelBandwidth", "MaxBitRate", "RSSI", "X_TP_TxPower",
+		"AssociatedDeviceNumberOfEntries":
 		return "xsd:unsignedInt"
 	}
 

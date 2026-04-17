@@ -214,32 +214,38 @@ func (m *SchemaMapper) WiFiErrorsReceivedPath(bandIdx int) string {
 
 // WAN
 
-func (m *SchemaMapper) WANConnectionTypePath() string  { return m.resolvePath("wan.connection_type") }
-func (m *SchemaMapper) WANPPPoEUserPath() string       { return m.resolvePath("wan.pppoe_user") }
-func (m *SchemaMapper) WANPPPoEPassPath() string       { return m.resolvePath("wan.pppoe_pass") }
-func (m *SchemaMapper) WANIPAddressPath() string       { return m.resolvePath("wan.ip_address") }
-func (m *SchemaMapper) WANGatewayPath() string         { return m.resolvePath("wan.gateway") }
-func (m *SchemaMapper) WANDNS1Path() string            { return m.resolvePath("wan.dns1") }
-func (m *SchemaMapper) WANDNS2Path() string            { return m.resolvePath("wan.dns2") }
-func (m *SchemaMapper) WANMTUPath() string             { return m.resolvePath("wan.mtu") }
-func (m *SchemaMapper) WANUptimePath() string          { return m.resolvePath("wan.uptime") }
-func (m *SchemaMapper) WANMACPath() string             { return m.resolvePath("wan.mac") }
-func (m *SchemaMapper) WANStatusPath() string          { return m.resolvePath("wan.status") }
-func (m *SchemaMapper) WANBytesSentPath() string       { return m.resolvePath("wan.stats.bytes_sent") }
-func (m *SchemaMapper) WANBytesReceivedPath() string   { return m.resolvePath("wan.stats.bytes_received") }
-func (m *SchemaMapper) WANPacketsSentPath() string     { return m.resolvePath("wan.stats.packets_sent") }
-func (m *SchemaMapper) WANPacketsReceivedPath() string { return m.resolvePath("wan.stats.packets_received") }
-func (m *SchemaMapper) WANErrorsSentPath() string      { return m.resolvePath("wan.stats.errors_sent") }
-func (m *SchemaMapper) WANErrorsReceivedPath() string  { return m.resolvePath("wan.stats.errors_received") }
+func (m *SchemaMapper) WANConnectionTypePath() string { return m.resolvePath("wan.connection_type") }
+func (m *SchemaMapper) WANPPPoEUserPath() string      { return m.resolvePath("wan.pppoe_user") }
+func (m *SchemaMapper) WANPPPoEPassPath() string      { return m.resolvePath("wan.pppoe_pass") }
+func (m *SchemaMapper) WANIPAddressPath() string      { return m.resolvePath("wan.ip_address") }
+func (m *SchemaMapper) WANGatewayPath() string        { return m.resolvePath("wan.gateway") }
+func (m *SchemaMapper) WANDNS1Path() string           { return m.resolvePath("wan.dns1") }
+func (m *SchemaMapper) WANDNS2Path() string           { return m.resolvePath("wan.dns2") }
+func (m *SchemaMapper) WANMTUPath() string            { return m.resolvePath("wan.mtu") }
+func (m *SchemaMapper) WANUptimePath() string         { return m.resolvePath("wan.uptime") }
+func (m *SchemaMapper) WANMACPath() string            { return m.resolvePath("wan.mac") }
+func (m *SchemaMapper) WANStatusPath() string         { return m.resolvePath("wan.status") }
+func (m *SchemaMapper) WANBytesSentPath() string      { return m.resolvePath("wan.stats.bytes_sent") }
+func (m *SchemaMapper) WANBytesReceivedPath() string {
+	return m.resolvePath("wan.stats.bytes_received")
+}
+func (m *SchemaMapper) WANPacketsSentPath() string { return m.resolvePath("wan.stats.packets_sent") }
+func (m *SchemaMapper) WANPacketsReceivedPath() string {
+	return m.resolvePath("wan.stats.packets_received")
+}
+func (m *SchemaMapper) WANErrorsSentPath() string { return m.resolvePath("wan.stats.errors_sent") }
+func (m *SchemaMapper) WANErrorsReceivedPath() string {
+	return m.resolvePath("wan.stats.errors_received")
+}
 
 // LAN / DHCP
 
-func (m *SchemaMapper) LANIPAddressPath() string    { return m.resolvePath("lan.ip_address") }
-func (m *SchemaMapper) LANSubnetMaskPath() string   { return m.resolvePath("lan.subnet_mask") }
+func (m *SchemaMapper) LANIPAddressPath() string     { return m.resolvePath("lan.ip_address") }
+func (m *SchemaMapper) LANSubnetMaskPath() string    { return m.resolvePath("lan.subnet_mask") }
 func (m *SchemaMapper) DHCPServerEnablePath() string { return m.resolvePath("dhcp.server_enable") }
-func (m *SchemaMapper) DHCPMinAddressPath() string  { return m.resolvePath("dhcp.min_address") }
-func (m *SchemaMapper) DHCPMaxAddressPath() string  { return m.resolvePath("dhcp.max_address") }
-func (m *SchemaMapper) LANDNSPath() string          { return m.resolvePath("lan.dns") }
+func (m *SchemaMapper) DHCPMinAddressPath() string   { return m.resolvePath("dhcp.min_address") }
+func (m *SchemaMapper) DHCPMaxAddressPath() string   { return m.resolvePath("dhcp.max_address") }
+func (m *SchemaMapper) LANDNSPath() string           { return m.resolvePath("lan.dns") }
 
 // System
 
@@ -269,10 +275,10 @@ func (m *SchemaMapper) HostsCountPath() string { return m.resolvePath("hosts.cou
 
 // Diagnostics
 
-func (m *SchemaMapper) PingDiagBasePath() string      { return m.resolvePath("diag.ping.base") }
+func (m *SchemaMapper) PingDiagBasePath() string       { return m.resolvePath("diag.ping.base") }
 func (m *SchemaMapper) TracerouteDiagBasePath() string { return m.resolvePath("diag.traceroute.base") }
-func (m *SchemaMapper) DownloadDiagBasePath() string  { return m.resolvePath("diag.download.base") }
-func (m *SchemaMapper) UploadDiagBasePath() string    { return m.resolvePath("diag.upload.base") }
+func (m *SchemaMapper) DownloadDiagBasePath() string   { return m.resolvePath("diag.download.base") }
+func (m *SchemaMapper) UploadDiagBasePath() string     { return m.resolvePath("diag.upload.base") }
 
 // Port forwarding
 
@@ -282,3 +288,9 @@ func (m *SchemaMapper) PortMappingCountPath() string { return m.resolvePath("por
 // Web admin
 
 func (m *SchemaMapper) WebAdminPasswordPath() string { return m.resolvePath("admin.password") }
+
+// SupportsWiFiAccessPoint returns true if the underlying model supports TR-181
+// Device.WiFi.AccessPoint parameters; false for TR-098.
+func (m *SchemaMapper) SupportsWiFiAccessPoint() bool {
+	return m.modelType == datamodel.TR181
+}

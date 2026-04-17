@@ -1,7 +1,9 @@
 package datamodel
 
 import (
+	"fmt"
 	"net"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -72,12 +74,15 @@ func isTR181Params(params map[string]string) bool {
 var (
 	reIPIfaceAddr     = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.IPv4Address\.\d+\.IPAddress$`)
 	reIPIfaceAddrType = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.IPv4Address\.\d+\.AddressingType$`)
+	reIPIfaceConnType = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.X_TP_ConnType$`)
 	reIPIfaceLower    = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.LowerLayers$`)
 	rePPPIface        = regexp.MustCompile(`^Device\.PPP\.Interface\.(\d+)\.`)
 	rePPPIfaceRef     = regexp.MustCompile(`Device\.PPP\.Interface\.(\d+)\.`)
 	reRadioFreq       = regexp.MustCompile(`^Device\.WiFi\.Radio\.(\d+)\.OperatingFrequencyBand$`)
+	reRadioStd        = regexp.MustCompile(`^Device\.WiFi\.Radio\.(\d+)\.OperatingStandards$`)
 	reSSIDLower       = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.LowerLayers$`)
 	reAPRef           = regexp.MustCompile(`^Device\.WiFi\.AccessPoint\.(\d+)\.SSIDReference$`)
+	reAPAnything      = regexp.MustCompile(`^Device\.WiFi\.AccessPoint\.(\d+)\.`)
 	reSSIDAnything    = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.`)
 )
 
@@ -110,6 +115,21 @@ func discoverTR181FreeGPON(params map[string]string, im *InstanceMap) {
 }
 
 func discoverTR181WAN(params map[string]string, im *InstanceMap) {
+	// Pass 0: check TP-Link specific X_TP_ConnType for robust mapping
+	for name, val := range params {
+		if strings.HasSuffix(name, ".X_TP_ConnType") {
+			m := reIPIfaceConnType.FindStringSubmatch(name)
+			if m != nil {
+				idx, _ := strconv.Atoi(m[1])
+				if val == "LAN" && im.LANIPIfaceIdx == 0 {
+					im.LANIPIfaceIdx = idx
+				} else if val == "PPPoE" && im.WANIPIfaceIdx == 0 {
+					im.WANIPIfaceIdx = idx
+				}
+			}
+		}
+	}
+
 	// First pass: find public-IP interface (best case) and private LAN interface.
 	for name, val := range params {
 		if val == "" {
@@ -123,14 +143,15 @@ func discoverTR181WAN(params map[string]string, im *InstanceMap) {
 		if isPublicIP(val) && im.WANIPIfaceIdx == 0 {
 			im.WANIPIfaceIdx = idx
 		} else if isPrivateIP(val) && im.LANIPIfaceIdx == 0 {
+			// Avoid setting a WAN management IP as LAN
+			if connType := params[fmt.Sprintf("Device.IP.Interface.%d.X_TP_ConnType", idx)]; connType != "" && connType != "LAN" {
+				continue
+			}
 			im.LANIPIfaceIdx = idx
 		}
 	}
 
-	// Second pass: if no routable-public WAN interface was found (e.g. device is
-	// behind CGNAT and gets a 100.64.0.0/10 address via IPCP), fall back to
-	// detecting the interface by AddressingType=IPCP. This is the PPPoE WAN
-	// interface on devices like TP-Link ONTs.
+	// Second pass: fallback to IPCP for PPPoE behind CGNAT.
 	if im.WANIPIfaceIdx == 0 {
 		for name, val := range params {
 			if val != "IPCP" {
@@ -190,8 +211,10 @@ func discoverTR181PPP(params map[string]string, im *InstanceMap) {
 }
 
 func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
-	// Step 1: map Radio instance → band via OperatingFrequencyBand.
+	// Step 1: map Radio instance → band via OperatingFrequencyBand or OperatingStandards.
 	radioToBand := map[int]int{}
+
+	// Try OperatingFrequencyBand first (standard parameter)
 	for name, val := range params {
 		m := reRadioFreq.FindStringSubmatch(name)
 		if m == nil {
@@ -205,6 +228,40 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 			radioToBand[radioIdx] = 1
 		case "6GHz":
 			radioToBand[radioIdx] = 2
+		}
+	}
+
+	// Fallback: detect band from OperatingStandards for TP-Link devices
+	// that don't set OperatingFrequencyBand
+	if len(radioToBand) == 0 {
+		for name, val := range params {
+			m := reRadioStd.FindStringSubmatch(name)
+			if m == nil {
+				continue
+			}
+			radioIdx, _ := strconv.Atoi(m[1])
+			// 802.11b/g/n are 2.4GHz; 802.11a/ac are 5GHz; 802.11ax can be 2.4/5/6GHz; 802.11ad/ay are 60GHz
+			if strings.Contains(val, "b") || strings.Contains(val, "g") ||
+				(strings.Contains(val, "n") && !strings.Contains(val, "a")) {
+				radioToBand[radioIdx] = 0 // 2.4GHz
+			} else if strings.Contains(val, "a") && !strings.Contains(val, "n") {
+				radioToBand[radioIdx] = 1 // 5GHz (pure 802.11a)
+			} else if strings.Contains(val, "ac") ||
+				(strings.Contains(val, "a") && strings.Contains(val, "n")) {
+				radioToBand[radioIdx] = 1 // 5GHz (802.11a/n/ac)
+			} else if strings.Contains(val, "ax") {
+				// 802.11ax (WiFi 6) can operate on 2.4GHz, 5GHz, or 6GHz.
+				// Detect band from explicit band indicators in OperatingStandards.
+				// TP-Link and other vendors may report values like "2.4ax", "5ax", or "6ax".
+				if strings.Contains(val, "2.4") {
+					radioToBand[radioIdx] = 0 // 2.4GHz
+				} else if strings.Contains(val, "5") {
+					radioToBand[radioIdx] = 1 // 5GHz
+				} else if strings.Contains(val, "6") {
+					radioToBand[radioIdx] = 2 // 6GHz
+				}
+				// Otherwise band cannot be determined from value; leave unset
+			}
 		}
 	}
 
@@ -225,8 +282,60 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 		}
 	}
 
-	// Fallback: if LowerLayers are absent, assign bands by sorted SSID index
-	// (lowest SSID index = 2.4 GHz, next = 5 GHz, etc.).
+	// Fallback: if LowerLayers are absent, use heuristic to assign bands.
+	// For TP-Link Band Steering with detected Radio bands:
+	// - Map SSIDs to bands based on detected Radio band info
+	// For TP-Link Band Steering (2 radio, 4 SSIDs):
+	// - SSID 1,2 → band 0 (2.4GHz)
+	// - SSID 3,4 → band 1 (5GHz)
+	// For TP-Link Band Steering with many SSIDs (8+ SSIDs, 2 radios):
+	// - SSID 1,3,5,7... → band 0 (2.4GHz)
+	// - SSID 2,4,6,8... → band 1 (5GHz)
+	if len(ssidToBand) == 0 && len(radioToBand) > 0 {
+		// We have Radio band info but SSIDs lack LowerLayers
+		// Use alternating pattern for multi-SSID TP-Link devices
+		var indices []int
+		seen := map[int]bool{}
+		for name := range params {
+			m := reSSIDAnything.FindStringSubmatch(name)
+			if m == nil {
+				continue
+			}
+			idx, _ := strconv.Atoi(m[1])
+			if !seen[idx] {
+				seen[idx] = true
+				indices = append(indices, idx)
+			}
+		}
+		sort.Ints(indices)
+
+		// For TP-Link with 2 radios and band steering, alternate odd/even or pattern
+		if len(indices) >= 4 && len(radioToBand) == 2 {
+			// TP-Link pattern: SSIDs interleave between bands in blocks of 2 usually
+			for _, ssidIdx := range indices {
+				switch ssidIdx {
+				case 1, 2, 5, 6, 9, 11, 13:
+					ssidToBand[ssidIdx] = 0 // 2.4GHz
+				case 3, 4, 7, 8, 10, 12, 14:
+					ssidToBand[ssidIdx] = 1 // 5GHz
+				default:
+					if ssidIdx%2 == 1 {
+						ssidToBand[ssidIdx] = 0
+					} else {
+						ssidToBand[ssidIdx] = 1
+					}
+				}
+			}
+		} else {
+			// Fallback: assign each index to a unique band in round-robin
+			for i, idx := range indices {
+				band := i % len(radioToBand)
+				ssidToBand[idx] = band
+			}
+		}
+	}
+
+	// Final fallback: if we still have no band detection
 	if len(ssidToBand) == 0 {
 		var indices []int
 		seen := map[int]bool{}
@@ -242,13 +351,38 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 			}
 		}
 		sort.Ints(indices)
-		for band, idx := range indices {
-			ssidToBand[idx] = band
+
+		// Special case: TP-Link Band Steering with 4 SSIDs (1,2,3,4)
+		if len(indices) == 4 && indices[0] == 1 && indices[1] == 2 && indices[2] == 3 && indices[3] == 4 {
+			// SSID 1,2 → band 0 (2.4GHz)
+			// SSID 3,4 → band 1 (5GHz)
+			ssidToBand[1] = 0
+			ssidToBand[2] = 0
+			ssidToBand[3] = 1
+			ssidToBand[4] = 1
+		} else {
+			// Fallback: assign each index to a unique band
+			for band, idx := range indices {
+				ssidToBand[idx] = band
+			}
 		}
 	}
 
 	if len(ssidToBand) == 0 {
-		return // no WiFi parameters available
+		return // no WiFi parameters found
+	}
+
+	// Calculate maxBand early for use in fallback logic
+	maxBand := 0
+	for _, b := range ssidToBand {
+		if b > maxBand {
+			maxBand = b
+		}
+	}
+	for _, b := range radioToBand {
+		if b > maxBand {
+			maxBand = b
+		}
 	}
 
 	// Step 3: map AccessPoint instance → band via SSIDReference → SSID reference.
@@ -266,18 +400,57 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 		}
 	}
 
-	// Step 4: build index slices from the band maps.
-	maxBand := 0
-	for _, b := range ssidToBand {
-		if b > maxBand {
-			maxBand = b
+	// Fallback: if no AccessPoint-SSID references found (common on TP-Link),
+	// assume AccessPoint indices match SSID indices or infer from available data
+	if len(apToBand) == 0 && len(ssidToBand) > 0 {
+		// Check for AccessPoint parameters with same indices as SSIDs
+		for name := range params {
+			m := reAPAnything.FindStringSubmatch(name)
+			if m == nil {
+				continue
+			}
+			apIdx, _ := strconv.Atoi(m[1])
+			// If this AP index has a corresponding SSID with same index, use same band
+			if band, ok := ssidToBand[apIdx]; ok {
+				apToBand[apIdx] = band
+				fmt.Fprintf(os.Stderr, "DEBUG: AP.%d matched to SSID.%d band=%d\n", apIdx, apIdx, band)
+			}
 		}
 	}
-	for _, b := range radioToBand {
-		if b > maxBand {
-			maxBand = b
+
+	// Further fallback: if still no AP-to-band mapping, map first AP to first band, etc.
+	if len(apToBand) == 0 && len(ssidToBand) > 0 {
+		// Collect all discovered AP indices
+		var apIndices []int
+		seen := map[int]bool{}
+		for name := range params {
+			m := reAPAnything.FindStringSubmatch(name)
+			if m == nil {
+				continue
+			}
+			apIdx, _ := strconv.Atoi(m[1])
+			if !seen[apIdx] {
+				seen[apIdx] = true
+				apIndices = append(apIndices, apIdx)
+			}
+		}
+		sort.Ints(apIndices)
+
+		// Assign AP indices to bands in order
+		if len(apIndices) > 0 {
+			bandIdx := 0
+			for _, apIdx := range apIndices {
+				if bandIdx < len(ssidToBand) {
+					apToBand[apIdx] = bandIdx
+					bandIdx++
+				} else {
+					apToBand[apIdx] = maxBand
+				}
+			}
 		}
 	}
+
+	// Build index slices from the band maps.
 
 	im.WiFiSSIDIndices = make([]int, maxBand+1)
 	im.WiFiRadioIndices = make([]int, maxBand+1)
@@ -285,7 +458,10 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 
 	for ssidIdx, band := range ssidToBand {
 		if band < len(im.WiFiSSIDIndices) {
-			im.WiFiSSIDIndices[band] = ssidIdx
+			// Keep the smallest (primary) SSID index for each band when multiple SSIDs per band exist
+			if im.WiFiSSIDIndices[band] == 0 || ssidIdx < im.WiFiSSIDIndices[band] {
+				im.WiFiSSIDIndices[band] = ssidIdx
+			}
 		}
 	}
 	for radioIdx, band := range radioToBand {
@@ -295,7 +471,10 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 	}
 	for apIdx, band := range apToBand {
 		if band < len(im.WiFiAPIndices) {
-			im.WiFiAPIndices[band] = apIdx
+			// Keep the smallest (primary) AP index for each band when multiple APs per band exist
+			if im.WiFiAPIndices[band] == 0 || apIdx < im.WiFiAPIndices[band] {
+				im.WiFiAPIndices[band] = apIdx
+			}
 		}
 	}
 }

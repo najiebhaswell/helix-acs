@@ -4,7 +4,7 @@ description: WAN interface configuration parameters for TR-181 devices
 
 parameters:
   - name: wan.connection_type
-    path: "Device.IP.Interface.{wan}.X_TP_ConnType"
+    path: "Device.IP.Interface.{wan}.ConnectionType"
     type: string
   - name: wan.pppoe_user
     path: "Device.PPP.Interface.{ppp}.Username"

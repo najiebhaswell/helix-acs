@@ -36,7 +36,7 @@ func TestTR181Mapper(t *testing.T) {
 	assert.Equal(t, "Device.WiFi.Radio.2.Channel", m.WiFiChannelPath(1))
 
 	// WAN
-	assert.Equal(t, "Device.IP.Interface.1.IPv4Address.1.AddressingType", m.WANConnectionTypePath())
+	assert.Equal(t, "Device.IP.Interface.1.X_TP_ConnType", m.WANConnectionTypePath())
 	assert.Equal(t, "Device.PPP.Interface.1.Username", m.WANPPPoEUserPath())
 	assert.Equal(t, "Device.PPP.Interface.1.Password", m.WANPPPoEPassPath())
 	assert.Equal(t, "Device.IP.Interface.1.IPv4Address.1.IPAddress", m.WANIPAddressPath())

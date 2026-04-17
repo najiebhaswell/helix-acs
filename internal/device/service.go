@@ -140,7 +140,8 @@ func (s *service) UpdateInfo(ctx context.Context, serial string, upd InfoUpdate)
 	return nil
 }
 
-// UpdateParameters merges the given parameter map into the device's stored parameters.
+// UpdateParameters replaces the device's stored parameters with the given map.
+// It overwrites the entire parameters map (does not merge) and delegates to repo.UpdateParameters.
 func (s *service) UpdateParameters(ctx context.Context, serial string, params map[string]string) error {
 	if err := s.repo.UpdateParameters(ctx, serial, params); err != nil {
 		s.logger.WithError(err).WithField("serial", serial).Error("Failed to update device parameters")

@@ -31,17 +31,50 @@ func (e *Executor) BuildSetParams(ctx context.Context, t *Task, mapper datamodel
 		if err := json.Unmarshal(t.Payload, &p); err != nil {
 			return nil, fmt.Errorf("unmarshal wifi payload: %w", err)
 		}
+
+		params := make(map[string]string)
+
+		// If Band Steering is being set, apply it first
+		if p.BandSteeringEnabled != nil {
+			// Band Steering is device-wide setting (TP-Link specific)
+			const bandSteeringPath = "Device.WiFi.X_TP_BandSteering.Enable"
+			params[bandSteeringPath] = strconv.FormatBool(*p.BandSteeringEnabled)
+		}
+
+		// Handle SSID/password for specific band
+		// If Band Steering will be enabled, these will be synced to both bands in session.go
 		bandIdx := 0
 		if p.Band == "5" {
 			bandIdx = 1
 		}
-		params := make(map[string]string)
 		if p.SSID != "" {
 			params[mapper.WiFiSSIDPath(bandIdx)] = p.SSID
 		}
-		if p.Password != "" {
+
+		// Handle security mode and password
+		if p.Security != "" {
+			if p.Security == "None" {
+				params[mapper.WiFiSecurityModePath(bandIdx)] = "None"
+			} else {
+				// Map UI values to TR-181 standard values
+				mode := p.Security
+				if p.Security == "WPA2-PSK" {
+					mode = "WPA2-Personal"
+				} else if p.Security == "WPA-WPA2-PSK" {
+					mode = "WPA-WPA2-Personal"
+				}
+				params[mapper.WiFiSecurityModePath(bandIdx)] = mode
+				if p.Password != "" {
+					params[mapper.WiFiPasswordPath(bandIdx)] = p.Password
+				}
+			}
+		} else if p.Password != "" {
+			// If password is provided but security mode is not explicitly set,
+			// assume WPA2-Personal and set both
+			params[mapper.WiFiSecurityModePath(bandIdx)] = "WPA2-Personal"
 			params[mapper.WiFiPasswordPath(bandIdx)] = p.Password
 		}
+
 		if p.Enabled != nil {
 			params[mapper.WiFiEnabledPath(bandIdx)] = strconv.FormatBool(*p.Enabled)
 		}
@@ -238,9 +271,13 @@ func (e *Executor) BuildGetParams(ctx context.Context, t *Task, mapper datamodel
 		return names, nil
 
 	case TypeConnectedDevices:
-		// Fetch the entire Hosts sub-tree; the response will contain all
-		// Host.{i}.* parameters which we parse into ConnectedHost structs.
-		return []string{mapper.HostsBasePath()}, nil
+		// Fetch Hosts sub-tree and WiFi AccessPoints for RSSI (if supported by mapper).
+		// TR-181 has Device.WiFi.AccessPoint; TR-098 uses vendor-specific WiFi paths.
+		paths := []string{mapper.HostsBasePath()}
+		if mapper.SupportsWiFiAccessPoint() {
+			paths = append(paths, "Device.WiFi.AccessPoint.")
+		}
+		return paths, nil
 
 	case TypeCPEStats:
 		return buildCPEStatsPaths(mapper), nil

@@ -4,6 +4,9 @@ vendor: tplink
 description: WAN interface parameters for TP-Link TR-181 devices
 
 parameters:
+  - name: wan.connection_type
+    path: "Device.IP.Interface.{wan}.X_TP_ConnType"
+    type: string
   - name: wan.uptime
     path: "Device.IP.Interface.{wan}.X_TP_Uptime"
     type: unsignedInt

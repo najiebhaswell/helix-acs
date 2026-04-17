@@ -295,3 +295,8 @@ func (m *TR181Mapper) PortMappingCountPath() string {
 func (m *TR181Mapper) WebAdminPasswordPath() string {
 	return "Device.Users.User.1.Password"
 }
+
+// SupportsWiFiAccessPoint returns true for TR-181 which has Device.WiFi.AccessPoint.
+func (m *TR181Mapper) SupportsWiFiAccessPoint() bool {
+	return true
+}

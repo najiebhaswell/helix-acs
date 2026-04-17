@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Helix ACS</title>
+  <title>GMEDIA ACS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -22,19 +22,19 @@
       <div class="login-logo-wrap">
         <i class="bi bi-router login-logo"></i>
       </div>
-      <h4 class="mt-3 mb-1 fw-bold">Helix ACS</h4>
+      <h4 class="mt-3 mb-1 fw-bold">GMEDIA ACS</h4>
       <p class="text-muted small mb-0">Auto Configuration Server</p>
     </div>
     <form id="login-form">
       <div class="mb-3">
-        <label class="form-label">Usuário</label>
+        <label class="form-label">Username</label>
         <div class="input-group">
           <span class="input-group-text"><i class="bi bi-person"></i></span>
           <input type="text" class="form-control" id="login-user" placeholder="admin" autocomplete="username" required>
         </div>
       </div>
       <div class="mb-4">
-        <label class="form-label">Senha</label>
+        <label class="form-label">Password</label>
         <div class="input-group">
           <span class="input-group-text"><i class="bi bi-lock"></i></span>
           <input type="password" class="form-control" id="login-pass" placeholder="••••••••" autocomplete="current-password" required>
@@ -43,7 +43,7 @@
       <div id="login-error" class="alert alert-danger py-2 d-none"></div>
       <button type="submit" class="btn btn-primary w-100" id="login-btn">
         <span id="login-spinner" class="spinner-border spinner-border-sm me-2 d-none"></span>
-        Entrar
+        Sign In
       </button>
     </form>
   </div>
@@ -60,27 +60,27 @@
     <div class="sidebar-brand">
       <i class="bi bi-router"></i>
       <div>
-        Helix ACS
+        GMEDIA ACS
         <span class="brand-sub">Auto Config Server</span>
       </div>
-      <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Fechar menu">
+      <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close menu">
         <i class="bi bi-x-lg"></i>
       </button>
     </div>
     <div class="sidebar-nav">
-      <span class="nav-section">Principal</span>
+      <span class="nav-section">Main</span>
       <a class="nav-item" data-route="/" onclick="navigate('/')">
         <i class="bi bi-speedometer2"></i>
         <span>Dashboard</span>
       </a>
       <a class="nav-item" data-route="/devices" onclick="navigate('/devices')">
         <i class="bi bi-hdd-network"></i>
-        <span>Dispositivos</span>
+        <span>Devices</span>
       </a>
-      <span class="nav-section">Sistema</span>
+      <span class="nav-section">System</span>
       <a class="nav-item" data-route="/health" onclick="navigate('/health')">
         <i class="bi bi-heart-pulse"></i>
-        <span>Saúde do Sistema</span>
+        <span>System Health</span>
       </a>
     </div>
     <div class="sidebar-footer">
@@ -88,9 +88,9 @@
         <div class="sidebar-user-avatar"><i class="bi bi-person"></i></div>
         <div class="sidebar-user-info">
           <div class="sidebar-user-name" id="sidebar-username">Admin</div>
-          <div class="sidebar-user-role">Administrador</div>
+          <div class="sidebar-user-role">Administrator</div>
         </div>
-        <button class="sidebar-logout-btn" onclick="doLogout()" title="Sair">
+        <button class="sidebar-logout-btn" onclick="doLogout()" title="Logout">
           <i class="bi bi-box-arrow-right"></i>
         </button>
       </div>
@@ -102,7 +102,7 @@
 
     <!-- Topbar -->
     <header id="topbar">
-      <button class="topbar-toggle" onclick="toggleSidebar()" aria-label="Abrir menu">
+      <button class="topbar-toggle" onclick="toggleSidebar()" aria-label="Open menu">
         <i class="bi bi-list"></i>
       </button>
       <div id="topbar-breadcrumb">
@@ -110,14 +110,14 @@
       </div>
       <div class="topbar-spacer"></div>
       <div class="topbar-actions">
-        <button class="topbar-icon-btn" title="Atualizar" onclick="location.reload()">
+        <button class="topbar-icon-btn" title="Refresh" onclick="location.reload()">
           <i class="bi bi-arrow-clockwise"></i>
         </button>
-        <button class="topbar-icon-btn" id="theme-toggle-btn" title="Alternar tema" onclick="toggleTheme()">
+        <button class="topbar-icon-btn" id="theme-toggle-btn" title="Toggle theme" onclick="toggleTheme()">
           <i class="bi bi-moon" id="theme-toggle-icon"></i>
         </button>
         <div class="topbar-divider"></div>
-        <button class="topbar-user-btn" onclick="doLogout()" title="Sair">
+        <button class="topbar-user-btn" onclick="doLogout()" title="Logout">
           <div class="topbar-avatar"><i class="bi bi-person"></i></div>
           <span class="topbar-username" id="topbar-username">Admin</span>
           <i class="bi bi-box-arrow-right topbar-logout-icon"></i>
@@ -137,41 +137,41 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-plus-circle me-2 text-primary"></i>Criar Tarefa</h5>
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2 text-primary"></i>Create Task</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label fw-semibold">Tipo de tarefa</label>
+          <label class="form-label fw-semibold">Task Type</label>
           <select class="form-select" id="task-type-select" onchange="renderTaskForm()">
-            <optgroup label="Configuração">
-              <option value="wifi">📶 Configuração Wi-Fi</option>
-              <option value="wan">🌐 Configuração WAN</option>
-              <option value="lan">🔌 Configuração LAN / DHCP</option>
-              <option value="web-admin">🔑 Senha da Interface Web</option>
-              <option value="parameters">⚙️ Set Parameters (avançado)</option>
-              <option value="firmware">💾 Atualização de Firmware</option>
-              <option value="port-forwarding">↪️ Redirecionamento de Portas</option>
+            <optgroup label="Configuration">
+              <option value="wifi">📶 WiFi Configuration</option>
+              <option value="wan">🌐 WAN Configuration</option>
+              <option value="lan">🔌 LAN / DHCP Configuration</option>
+              <option value="web-admin">🔑 Web Interface Password</option>
+              <option value="parameters">⚙️ Set Parameters (Advanced)</option>
+              <option value="firmware">💾 Firmware Update</option>
+              <option value="port-forwarding">↪️ Port Forwarding</option>
             </optgroup>
-            <optgroup label="Diagnóstico">
+            <optgroup label="Diagnostics">
               <option value="ping">🏓 Ping Test</option>
               <option value="traceroute">🗺️ Traceroute</option>
               <option value="speed-test">⚡ Speed Test</option>
-              <option value="connected-devices">📱 Dispositivos Conectados</option>
-              <option value="cpe-stats">📊 Estatísticas CPE</option>
+              <option value="connected-devices">📱 Connected Devices</option>
+              <option value="cpe-stats">📊 CPE Statistics</option>
             </optgroup>
-            <optgroup label="Manutenção">
-              <option value="reboot">🔄 Reiniciar</option>
-              <option value="factory-reset">🏭 Reset de Fábrica</option>
+            <optgroup label="Maintenance">
+              <option value="reboot">🔄 Reboot</option>
+              <option value="factory-reset">🏭 Factory Reset</option>
             </optgroup>
           </select>
         </div>
         <div id="task-form-body"></div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button class="btn btn-primary" id="task-submit-btn" onclick="submitTask()">
-          <i class="bi bi-send me-1"></i> Enfileirar Tarefa
+          <i class="bi bi-send me-1"></i> Queue Task
         </button>
       </div>
     </div>
@@ -183,13 +183,13 @@
   <div class="modal-dialog modal-sm">
     <div class="modal-content">
       <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar</h5>
+        <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Confirm</h5>
         <button class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body pt-2" id="confirm-message">Tem certeza?</div>
+      <div class="modal-body pt-2" id="confirm-message">Are you sure?</div>
       <div class="modal-footer border-0 pt-0">
-        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-danger btn-sm" id="confirm-ok-btn">Confirmar</button>
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger btn-sm" id="confirm-ok-btn">Confirm</button>
       </div>
     </div>
   </div>
@@ -200,16 +200,16 @@
   <div class="modal-dialog modal-sm">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-tags me-2 text-primary"></i>Editar Tags</h5>
+        <h5 class="modal-title"><i class="bi bi-tags me-2 text-primary"></i>Edit Tags</h5>
         <button class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <label class="form-label small text-muted">Tags (separadas por vírgula)</label>
+        <label class="form-label small text-muted">Tags (comma separated)</label>
         <input type="text" class="form-control" id="tags-input" placeholder="tag1, tag2, tag3">
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-primary btn-sm" id="tags-save-btn">Salvar</button>
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="tags-save-btn">Save</button>
       </div>
     </div>
   </div>

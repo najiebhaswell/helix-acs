@@ -183,6 +183,9 @@ func (p *WANProvision) buildCurrentXML() ([]byte, error) {
 // onAddObject records the new instance number for the current AddObject step
 // and returns the XML for the immediately following step.
 func (p *WANProvision) onAddObject(instanceNum int) ([]byte, error) {
+	if p.done() {
+		return nil, fmt.Errorf("WANProvision: onAddObject called but all steps completed")
+	}
 	s := p.steps[p.cur]
 	if s.kind != wanStepAdd {
 		return nil, fmt.Errorf("expected AddObject at step %d", p.cur)
@@ -195,14 +198,14 @@ func (p *WANProvision) onAddObject(instanceNum int) ([]byte, error) {
 // onSetParams advances past the current SetParams step and returns the XML for
 // the next step, or nil when provisioning is complete.
 func (p *WANProvision) onSetParams() ([]byte, error) {
+	if p.done() {
+		return nil, nil
+	}
 	s := p.steps[p.cur]
 	if s.kind != wanStepSet {
 		return nil, fmt.Errorf("expected SetParams at step %d", p.cur)
 	}
 	p.cur++
-	if p.done() {
-		return nil, nil
-	}
 	return p.buildCurrentXML()
 }
 

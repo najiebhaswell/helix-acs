@@ -128,6 +128,10 @@ type Mapper interface {
 	// CPE's local web administration password. Returns "" for data-models that
 	// have no standard path (e.g. TR-098, which uses vendor-specific extensions).
 	WebAdminPasswordPath() string
+
+	// SupportsWiFiAccessPoint returns true if the mapper supports TR-181
+	// Device.WiFi.AccessPoint parameters; false for TR-098.
+	SupportsWiFiAccessPoint() bool
 }
 
 // NewMapper returns the concrete Mapper for the given ModelType. Unknown types

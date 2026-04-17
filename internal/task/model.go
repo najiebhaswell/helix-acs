@@ -78,11 +78,13 @@ type Task struct {
 // Payload types
 
 type WiFiPayload struct {
-	Band     string `json:"band"` // "2.4" or "5"
-	SSID     string `json:"ssid"`
-	Password string `json:"password"`
-	Channel  int    `json:"channel,omitempty"`
-	Enabled  *bool  `json:"enabled,omitempty"`
+	Band                 string `json:"band"` // "2.4" or "5"
+	SSID                 string `json:"ssid"`
+	Password             string `json:"password"`
+	Security             string `json:"security"` // "None", "WPA2-PSK", etc.
+	Channel              int    `json:"channel,omitempty"`
+	Enabled              *bool  `json:"enabled,omitempty"`
+	BandSteeringEnabled  *bool  `json:"band_steering_enabled,omitempty"` // Enable/disable Band Steering (TP-Link specific)
 }
 
 type WANPayload struct {

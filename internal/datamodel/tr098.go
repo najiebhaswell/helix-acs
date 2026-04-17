@@ -307,3 +307,6 @@ func (m *TR098Mapper) PortMappingCountPath() string {
 // proprietary X_ extension. Callers should fall back to TypeSetParams with
 // the vendor-specific path when this returns an empty string.
 func (m *TR098Mapper) WebAdminPasswordPath() string { return "" }
+
+// SupportsWiFiAccessPoint returns false for TR-098 which uses vendor-specific WiFi paths.
+func (m *TR098Mapper) SupportsWiFiAccessPoint() bool { return false }

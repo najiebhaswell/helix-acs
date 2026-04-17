@@ -76,6 +76,7 @@ func (r *mongoRepository) Upsert(ctx context.Context, req *UpsertRequest) (*Devi
 		"last_inform":   now,
 		"updated_at":    now,
 	}
+
 	// Only overwrite system fields when the CPE reports them.
 	if req.UptimeSeconds > 0 {
 		setFields["uptime_seconds"] = req.UptimeSeconds
@@ -117,8 +118,29 @@ func (r *mongoRepository) UpdateInfo(ctx context.Context, serial string, upd Inf
 
 	setFields := bson.M{"updated_at": time.Now().UTC()}
 
-	if upd.WAN != nil {
-		setFields["wan"] = upd.WAN
+	if upd.UptimeSeconds != nil {
+		setFields["uptime_seconds"] = *upd.UptimeSeconds
+	}
+	if upd.RAMTotal != nil {
+		setFields["ram_total"] = *upd.RAMTotal
+	}
+	if upd.RAMFree != nil {
+		setFields["ram_free"] = *upd.RAMFree
+	}
+	if upd.CPUUsage != nil {
+		setFields["cpu_usage"] = *upd.CPUUsage
+	}
+	if upd.ACSURL != nil {
+		setFields["acs_url"] = *upd.ACSURL
+	}
+	if upd.IPAddress != nil {
+		setFields["ip_address"] = *upd.IPAddress
+	}
+	if upd.WANIP != nil {
+		setFields["wan_ip"] = *upd.WANIP
+	}
+	if upd.WANs != nil {
+		setFields["wans"] = upd.WANs
 	}
 	if upd.LAN != nil {
 		setFields["lan"] = upd.LAN
