@@ -4,7 +4,7 @@ description: WAN interface configuration parameters for TR-181 devices
 
 parameters:
   - name: wan.connection_type
-    path: "Device.IP.Interface.{wan}.IPv4Address.1.AddressingType"
+    path: "Device.IP.Interface.{wan}.X_TP_ConnType"
     type: string
   - name: wan.pppoe_user
     path: "Device.PPP.Interface.{ppp}.Username"
@@ -16,14 +16,12 @@ parameters:
     path: "Device.IP.Interface.{wan}.IPv4Address.1.IPAddress"
     type: string
   - name: wan.gateway
-    path: "Device.Routing.Router.1.IPv4Forwarding.1.GatewayIPAddress"
-    type: string
+    path: ""
   - name: wan.dns1
-    path: "Device.DNS.Client.Server.1.DNSServer"
+    path: "Device.PPP.Interface.{ppp}.IPCP.DNSServers"
     type: string
   - name: wan.dns2
-    path: "Device.DNS.Client.Server.2.DNSServer"
-    type: string
+    path: ""
   - name: wan.mtu
     path: "Device.IP.Interface.{wan}.MaxMTUSize"
     type: unsignedInt

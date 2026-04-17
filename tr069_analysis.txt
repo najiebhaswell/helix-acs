@@ -1,0 +1,735 @@
+Frame 110 [ONT->ACS] Method: Inform
+    Events: ['0 BOOTSTRAP']
+
+Frame 113 [ACS->ONT] Method: InformResponse
+
+Frame 116 [ACS->ONT] Method: GetParameterNames
+
+Frame 120 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 122 [ACS->ONT] Method: GetParameterNames
+
+Frame 125 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 127 [ACS->ONT] Method: GetParameterNames
+
+Frame 133 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 135 [ACS->ONT] Method: GetParameterNames
+
+Frame 141 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 144 [ACS->ONT] Method: GetParameterNames
+
+Frame 148 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 150 [ACS->ONT] Method: GetParameterNames
+
+Frame 153 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 155 [ACS->ONT] Method: GetParameterNames
+
+Frame 158 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 160 [ACS->ONT] Method: GetParameterNames
+
+Frame 163 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 165 [ACS->ONT] Method: GetParameterNames
+
+Frame 168 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 170 [ACS->ONT] Method: GetParameterValues
+    Query: Device.IP.Interface.1.IPv4Address.1.IPAddress
+    Query: Device.IP.Interface.1.IPv4Address.2.IPAddress
+    Query: Device.IP.Interface.3.IPv4Address.1.IPAddress
+
+Frame 173 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.IP.Interface.1.IPv4Address.1.IPAddress = 192.168.1.1
+    Device.IP.Interface.1.IPv4Address.2.IPAddress = 0.0.0.0
+    Device.IP.Interface.3.IPv4Address.1.IPAddress = 0.0.0.0
+
+Frame 175 [ACS->ONT] Method: GetParameterNames
+
+Frame 181 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 183 [ACS->ONT] Method: GetParameterValues
+    Query: Device.IP.Interface.4.LowerLayers
+
+Frame 186 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.IP.Interface.4.LowerLayers = Device.Ethernet.VLANTermination.2.
+
+Frame 188 [ACS->ONT] Method: GetParameterNames
+
+Frame 196 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 200 [ACS->ONT] Method: GetParameterNames
+
+Frame 204 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 206 [ACS->ONT] Method: GetParameterNames
+
+Frame 209 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 211 [ACS->ONT] Method: GetParameterNames
+
+Frame 214 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 216 [ACS->ONT] Method: GetParameterNames
+
+Frame 220 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 221 [ACS->ONT] Method: GetParameterValues
+    Query: Device.Ethernet.VLANTermination.2.LowerLayers
+
+Frame 224 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.Ethernet.VLANTermination.2.LowerLayers = Device.Ethernet.Link.4.
+
+Frame 226 [ACS->ONT] Method: GetParameterNames
+
+Frame 229 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 231 [ACS->ONT] Method: GetParameterValues
+    Query: Device.Ethernet.Link.4.MACAddress
+
+Frame 234 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.Ethernet.Link.4.MACAddress = 58:04:4F:9F:7A:23
+
+Frame 236 [ACS->ONT] Method: GetParameterValues
+    Query: Device.ManagementServer.ConnectionRequestPassword
+    Query: Device.ManagementServer.ConnectionRequestUsername
+    Query: Device.ManagementServer.EnableCWMP
+    Query: Device.ManagementServer.PeriodicInformEnable
+    Query: Device.ManagementServer.PeriodicInformInterval
+
+Frame 239 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.ManagementServer.ConnectionRequestPassword = 
+    Device.ManagementServer.ConnectionRequestUsername = admin
+    Device.ManagementServer.EnableCWMP = 1
+    Device.ManagementServer.PeriodicInformEnable = 1
+    Device.ManagementServer.PeriodicInformInterval = 300
+
+Frame 241 [ACS->ONT] Method: SetParameterValues
+    Device.ManagementServer.ConnectionRequestPassword = 1hygql1rayq
+    Device.ManagementServer.ConnectionRequestUsername = smartolt
+    Device.ManagementServer.PeriodicInformInterval = 3600
+
+Frame 245 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 247 [ACS->ONT] Method: SetParameterValues
+    Device.DeviceInfo.ProvisioningCode = sOLTinit
+
+Frame 251 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 253 [ACS->ONT] Method: GetParameterNames
+
+Frame 259 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 262 [ACS->ONT] Method: GetParameterValues
+    Query: Device.DeviceInfo.Manufacturer
+    Query: Device.DeviceInfo.ManufacturerOUI
+
+Frame 265 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.DeviceInfo.Manufacturer = TP-Link
+    Device.DeviceInfo.ManufacturerOUI = 58044F
+
+Frame 267 [ACS->ONT] Method: GetParameterNames
+
+Frame 270 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 272 [ACS->ONT] Method: GetParameterNames
+
+Frame 275 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 277 [ACS->ONT] Method: GetParameterValues
+    Query: Device.X_TP_GPON.Link.1.Alias
+    Query: Device.X_TP_GPON.Link.1.LowerLayers
+    Query: Device.X_TP_GPON.Link.2.Alias
+    Query: Device.X_TP_GPON.Link.2.LowerLayers
+
+Frame 280 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.X_TP_GPON.Link.1.Alias = 
+    Device.X_TP_GPON.Link.1.LowerLayers = Device.Optical.Interface.1.
+    Device.X_TP_GPON.Link.2.Alias = 
+    Device.X_TP_GPON.Link.2.LowerLayers = Device.Optical.Interface.1.
+
+Frame 282 [ACS->ONT] Method: GetParameterNames
+
+Frame 285 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 287 [ACS->ONT] Method: AddObject
+    Object: Device.X_TP_GPON.Link.
+
+Frame 291 [ONT->ACS] Method: AddObjectResponse
+    InstanceNumber: 3
+
+Frame 293 [ACS->ONT] Method: GetParameterValues
+    Query: Device.X_TP_GPON.Link.3.Alias
+    Query: Device.X_TP_GPON.Link.3.LowerLayers
+
+Frame 297 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.X_TP_GPON.Link.3.Alias = 
+    Device.X_TP_GPON.Link.3.LowerLayers = 
+
+Frame 299 [ACS->ONT] Method: SetParameterValues
+    Device.X_TP_GPON.Link.3.Alias = TpLink_110
+    Device.X_TP_GPON.Link.3.LowerLayers = Device.Optical.Interface.1.
+
+Frame 303 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 305 [ACS->ONT] Method: GetParameterNames
+
+Frame 309 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 311 [ACS->ONT] Method: GetParameterNames
+
+Frame 314 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 316 [ACS->ONT] Method: GetParameterValues
+    Query: Device.X_TP_GPON.Link.3.Status
+
+Frame 319 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.X_TP_GPON.Link.3.Status = Down
+
+Frame 321 [ACS->ONT] Method: GetParameterValues
+    Query: Device.X_TP_GPON.Link.3.Enable
+
+Frame 324 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.X_TP_GPON.Link.3.Enable = 0
+
+Frame 326 [ACS->ONT] Method: GetParameterNames
+
+Frame 329 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 331 [ACS->ONT] Method: GetParameterNames
+
+Frame 334 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 336 [ACS->ONT] Method: GetParameterValues
+    Query: Device.Ethernet.Link.4.Alias
+    Query: Device.Ethernet.Link.4.Enable
+    Query: Device.Ethernet.Link.4.LowerLayers
+
+Frame 339 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.Ethernet.Link.4.Alias = cpe-ethlink
+    Device.Ethernet.Link.4.Enable = 1
+    Device.Ethernet.Link.4.LowerLayers = Device.X_TP_GPON.Link.2.
+
+Frame 341 [ACS->ONT] Method: GetParameterValues
+    Query: Device.Ethernet.Link.1.Alias
+    Query: Device.Ethernet.Link.1.Enable
+    Query: Device.Ethernet.Link.1.LowerLayers
+    Query: Device.Ethernet.Link.3.Alias
+    Query: Device.Ethernet.Link.3.Enable
+    Query: Device.Ethernet.Link.3.LowerLayers
+
+Frame 344 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.Ethernet.Link.1.Alias = cpe-ethlink
+    Device.Ethernet.Link.1.Enable = 1
+    Device.Ethernet.Link.1.LowerLayers = Device.Bridging.Bridge.1.Port.1.
+    Device.Ethernet.Link.3.Alias = cpe-ethlink
+    Device.Ethernet.Link.3.Enable = 1
+    Device.Ethernet.Link.3.LowerLayers = Device.X_TP_GPON.Link.1.
+
+Frame 346 [ACS->ONT] Method: AddObject
+    Object: Device.Ethernet.Link.
+
+Frame 350 [ONT->ACS] Method: AddObjectResponse
+    InstanceNumber: 5
+
+Frame 352 [ACS->ONT] Method: GetParameterValues
+    Query: Device.Ethernet.Link.5.Alias
+    Query: Device.Ethernet.Link.5.Enable
+    Query: Device.Ethernet.Link.5.LowerLayers
+
+Frame 356 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.Ethernet.Link.5.Alias = cpe-ethlink
+    Device.Ethernet.Link.5.Enable = 0
+    Device.Ethernet.Link.5.LowerLayers = 
+
+Frame 358 [ACS->ONT] Method: SetParameterValues
+    Device.Ethernet.Link.5.Alias = ethlink_110
+    Device.Ethernet.Link.5.Enable = 1
+    Device.Ethernet.Link.5.LowerLayers = Device.X_TP_GPON.Link.3.
+
+Frame 371 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 377 [ACS->ONT] Method: GetParameterNames
+
+Frame 382 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 387 [ACS->ONT] Method: GetParameterNames
+
+Frame 393 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 395 [ACS->ONT] Method: GetParameterValues
+    Query: Device.Ethernet.VLANTermination.2.Alias
+    Query: Device.Ethernet.VLANTermination.2.Enable
+    Query: Device.Ethernet.VLANTermination.2.VLANID
+
+Frame 398 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.Ethernet.VLANTermination.2.Alias = cpe-ethvlan
+    Device.Ethernet.VLANTermination.2.Enable = 1
+    Device.Ethernet.VLANTermination.2.VLANID = 4
+
+Frame 400 [ACS->ONT] Method: GetParameterValues
+    Query: Device.Ethernet.VLANTermination.1.Alias
+    Query: Device.Ethernet.VLANTermination.1.Enable
+    Query: Device.Ethernet.VLANTermination.1.LowerLayers
+    Query: Device.Ethernet.VLANTermination.1.VLANID
+
+Frame 403 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.Ethernet.VLANTermination.1.Alias = cpe-ethvlan
+    Device.Ethernet.VLANTermination.1.Enable = 1
+    Device.Ethernet.VLANTermination.1.LowerLayers = Device.Ethernet.Link.3.
+    Device.Ethernet.VLANTermination.1.VLANID = 0
+
+Frame 405 [ACS->ONT] Method: AddObject
+    Object: Device.Ethernet.VLANTermination.
+
+Frame 409 [ONT->ACS] Method: AddObjectResponse
+    InstanceNumber: 3
+
+Frame 411 [ACS->ONT] Method: GetParameterValues
+    Query: Device.Ethernet.VLANTermination.3.Alias
+    Query: Device.Ethernet.VLANTermination.3.Enable
+    Query: Device.Ethernet.VLANTermination.3.LowerLayers
+    Query: Device.Ethernet.VLANTermination.3.VLANID
+
+Frame 415 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.Ethernet.VLANTermination.3.Alias = cpe-ethvlan
+    Device.Ethernet.VLANTermination.3.Enable = 0
+    Device.Ethernet.VLANTermination.3.LowerLayers = 
+    Device.Ethernet.VLANTermination.3.VLANID = 0
+
+Frame 418 [ACS->ONT] Method: SetParameterValues
+    Device.Ethernet.VLANTermination.3.Alias = VLAN_110
+    Device.Ethernet.VLANTermination.3.Enable = 1
+    Device.Ethernet.VLANTermination.3.LowerLayers = Device.Ethernet.Link.5.
+    Device.Ethernet.VLANTermination.3.VLANID = 110
+
+Frame 422 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 424 [ACS->ONT] Method: GetParameterNames
+
+Frame 427 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 429 [ACS->ONT] Method: GetParameterNames
+
+Frame 433 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 434 [ACS->ONT] Method: GetParameterValues
+    Query: Device.Ethernet.VLANTermination.3.X_TP_MulticastStatus
+    Query: Device.Ethernet.VLANTermination.3.X_TP_VLANEnable
+    Query: Device.Ethernet.VLANTermination.3.X_TP_VLANMode
+    Query: Device.Ethernet.VLANTermination.3.X_TP_VLANPr
+    Query: Device.Ethernet.VLANTermination.3.X_TP_VLANPriority
+
+Frame 437 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.Ethernet.VLANTermination.3.X_TP_MulticastStatus = -1
+    Device.Ethernet.VLANTermination.3.X_TP_VLANEnable = 0
+    Device.Ethernet.VLANTermination.3.X_TP_VLANMode = 0
+    Device.Ethernet.VLANTermination.3.X_TP_VLANPr = 0
+    Device.Ethernet.VLANTermination.3.X_TP_VLANPriority = None
+
+Frame 439 [ACS->ONT] Method: SetParameterValues
+    Device.Ethernet.VLANTermination.3.X_TP_MulticastStatus = 1
+    Device.Ethernet.VLANTermination.3.X_TP_VLANEnable = 1
+    Device.Ethernet.VLANTermination.3.X_TP_VLANMode = 2
+
+Frame 443 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 445 [ACS->ONT] Method: AddObject
+    Object: Device.PPP.Interface.
+
+Frame 449 [ONT->ACS] Method: AddObjectResponse
+    InstanceNumber: 1
+
+Frame 451 [ACS->ONT] Method: GetParameterNames
+
+Frame 455 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 457 [ACS->ONT] Method: GetParameterNames
+
+Frame 463 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 466 [ACS->ONT] Method: GetParameterValues
+    Query: Device.IP.Interface.1.LowerLayers
+    Query: Device.IP.Interface.3.LowerLayers
+
+Frame 469 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.IP.Interface.1.LowerLayers = Device.Ethernet.Link.1.
+    Device.IP.Interface.3.LowerLayers = Device.Ethernet.VLANTermination.1.
+
+Frame 471 [ACS->ONT] Method: GetParameterValues
+    Query: Device.PPP.Interface.1.Alias
+    Query: Device.PPP.Interface.1.AuthenticationProtocol
+    Query: Device.PPP.Interface.1.LowerLayers
+    Query: Device.PPP.Interface.1.Name
+    Query: Device.PPP.Interface.1.Password
+    Query: Device.PPP.Interface.1.Username
+    Query: Device.PPP.Interface.1.X_TP_UsernameDomainEnable
+
+Frame 474 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.PPP.Interface.1.Alias = cpe-pppintf
+    Device.PPP.Interface.1.AuthenticationProtocol = PAP
+    Device.PPP.Interface.1.LowerLayers = 
+    Device.PPP.Interface.1.Name = 
+    Device.PPP.Interface.1.Password = 
+    Device.PPP.Interface.1.Username = 
+    Device.PPP.Interface.1.X_TP_UsernameDomainEnable = 0
+
+Frame 476 [ACS->ONT] Method: AddObject
+    Object: Device.IP.Interface.
+
+Frame 480 [ONT->ACS] Method: AddObjectResponse
+    InstanceNumber: 5
+
+Frame 482 [ACS->ONT] Method: GetParameterValues
+    Query: Device.IP.Interface.5.LowerLayers
+
+Frame 486 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.IP.Interface.5.LowerLayers = 
+
+Frame 488 [ACS->ONT] Method: SetParameterValues
+    Device.IP.Interface.5.LowerLayers = Device.PPP.Interface.1.
+
+Frame 492 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 494 [ACS->ONT] Method: GetParameterNames
+
+Frame 498 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 501 [ACS->ONT] Method: SetParameterValues
+    Device.PPP.Interface.1.Alias = Internet_PPPoE
+    Device.PPP.Interface.1.AuthenticationProtocol = AUTO_AUTH
+    Device.PPP.Interface.1.LowerLayers = Device.Ethernet.VLANTermination.3.
+    Device.PPP.Interface.1.Password = gmedia
+    Device.PPP.Interface.1.Username = gmedia445
+    Device.PPP.Interface.1.X_TP_UsernameDomainEnable = 1
+
+Frame 505 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 507 [ACS->ONT] Method: GetParameterNames
+
+Frame 513 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 515 [ACS->ONT] Method: GetParameterValues
+    Query: Device.IP.Interface.5.Alias
+    Query: Device.IP.Interface.5.IPv4Enable
+    Query: Device.IP.Interface.5.MaxMTUSize
+    Query: Device.IP.Interface.5.Name
+    Query: Device.IP.Interface.5.X_TP_ConnName
+    Query: Device.IP.Interface.5.X_TP_ConnType
+    Query: Device.IP.Interface.5.X_TP_IGMPProxyEnable
+    Query: Device.IP.Interface.5.X_TP_IPv6AddrType
+    Query: Device.IP.Interface.5.X_TP_ServiceType
+
+Frame 518 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.IP.Interface.5.Alias = cpe-ipintf
+    Device.IP.Interface.5.IPv4Enable = 0
+    Device.IP.Interface.5.MaxMTUSize = 1500
+    Device.IP.Interface.5.Name = 
+    Device.IP.Interface.5.X_TP_ConnName = 
+    Device.IP.Interface.5.X_TP_ConnType = Unknown
+    Device.IP.Interface.5.X_TP_IGMPProxyEnable = 1
+    Device.IP.Interface.5.X_TP_IPv6AddrType = Auto
+    Device.IP.Interface.5.X_TP_ServiceType = Unknown
+
+Frame 521 [ACS->ONT] Method: SetParameterValues
+    Device.IP.Interface.5.Alias = Internet_PPPoE
+    Device.IP.Interface.5.IPv4Enable = 1
+    Device.IP.Interface.5.MaxMTUSize = 1492
+    Device.IP.Interface.5.X_TP_ConnName = Internet_PPPoE
+    Device.IP.Interface.5.X_TP_ConnType = PPPoE
+    Device.IP.Interface.5.X_TP_IPv6AddrType = SLAAC
+    Device.IP.Interface.5.X_TP_ServiceType = Internet
+
+Frame 525 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 527 [ACS->ONT] Method: GetParameterNames
+
+Frame 530 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 532 [ACS->ONT] Method: GetParameterNames
+
+Frame 535 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 537 [ACS->ONT] Method: GetParameterNames
+
+Frame 540 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 542 [ACS->ONT] Method: GetParameterNames
+
+Frame 545 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 547 [ACS->ONT] Method: GetParameterValues
+    Query: Device.NAT.InterfaceSetting.1.Interface
+    Query: Device.NAT.InterfaceSetting.2.Interface
+
+Frame 550 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.NAT.InterfaceSetting.1.Interface = Device.IP.Interface.3.
+    Device.NAT.InterfaceSetting.2.Interface = Device.IP.Interface.4.
+
+Frame 552 [ACS->ONT] Method: AddObject
+    Object: Device.NAT.InterfaceSetting.
+
+Frame 556 [ONT->ACS] Method: AddObjectResponse
+    InstanceNumber: 3
+
+Frame 558 [ACS->ONT] Method: GetParameterValues
+    Query: Device.NAT.InterfaceSetting.3.Interface
+
+Frame 562 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.NAT.InterfaceSetting.3.Interface = 
+
+Frame 564 [ACS->ONT] Method: SetParameterValues
+    Device.NAT.InterfaceSetting.3.Interface = Device.IP.Interface.5.
+
+Frame 568 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 570 [ACS->ONT] Method: GetParameterNames
+
+Frame 574 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 576 [ACS->ONT] Method: GetParameterNames
+
+Frame 579 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 581 [ACS->ONT] Method: GetParameterValues
+    Query: Device.DHCPv6.Client.1.Interface
+    Query: Device.DHCPv6.Client.2.Interface
+    Query: Device.IP.Interface.5.IPv6Enable
+
+Frame 584 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.DHCPv6.Client.1.Interface = Device.IP.Interface.3.
+    Device.DHCPv6.Client.2.Interface = Device.IP.Interface.4.
+    Device.IP.Interface.5.IPv6Enable = 0
+
+Frame 586 [ACS->ONT] Method: AddObject
+    Object: Device.DHCPv6.Client.
+
+Frame 590 [ONT->ACS] Method: AddObjectResponse
+    InstanceNumber: 3
+
+Frame 592 [ACS->ONT] Method: GetParameterValues
+    Query: Device.DHCPv6.Client.3.Interface
+
+Frame 596 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.DHCPv6.Client.3.Interface = 
+
+Frame 598 [ACS->ONT] Method: SetParameterValues
+    Device.DHCPv6.Client.3.Interface = Device.IP.Interface.5.
+
+Frame 602 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 604 [ACS->ONT] Method: GetParameterNames
+
+Frame 608 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 610 [ACS->ONT] Method: SetParameterValues
+    Device.IP.Interface.5.IPv6Enable = 1
+
+Frame 614 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 616 [ACS->ONT] Method: GetParameterNames
+
+Frame 621 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 622 [ACS->ONT] Method: GetParameterValues
+    Query: Device.DHCPv6.Client.3.RequestAddresses
+    Query: Device.DHCPv6.Client.3.RequestPrefixes
+    Query: Device.DHCPv6.Client.3.RequestedOptions
+    Query: Device.DHCPv6.Client.3.X_TP_EnableRaRouter
+    Query: Device.DHCPv6.Client.3.X_TP_EnableSLAAC
+
+Frame 626 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.DHCPv6.Client.3.RequestAddresses = 1
+    Device.DHCPv6.Client.3.RequestPrefixes = 0
+    Device.DHCPv6.Client.3.RequestedOptions = 
+    Device.DHCPv6.Client.3.X_TP_EnableRaRouter = 0
+    Device.DHCPv6.Client.3.X_TP_EnableSLAAC = 0
+
+Frame 629 [ACS->ONT] Method: SetParameterValues
+    Device.DHCPv6.Client.3.RequestAddresses = 0
+    Device.DHCPv6.Client.3.RequestPrefixes = 1
+    Device.DHCPv6.Client.3.RequestedOptions = 23
+    Device.DHCPv6.Client.3.X_TP_EnableRaRouter = 1
+    Device.DHCPv6.Client.3.X_TP_EnableSLAAC = 1
+
+Frame 634 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 636 [ACS->ONT] Method: GetParameterNames
+
+Frame 640 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 642 [ACS->ONT] Method: GetParameterNames
+
+Frame 645 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 647 [ACS->ONT] Method: GetParameterValues
+    Query: Device.DHCPv6.Client.3.Enable
+    Query: Device.IP.Interface.5.Enable
+    Query: Device.PPP.Interface.1.Enable
+
+Frame 650 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.DHCPv6.Client.3.Enable = 0
+    Device.IP.Interface.5.Enable = 0
+    Device.PPP.Interface.1.Enable = 0
+
+Frame 652 [ACS->ONT] Method: GetParameterValues
+    Query: Device.NAT.InterfaceSetting.3.Enable
+
+Frame 655 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.NAT.InterfaceSetting.3.Enable = 0
+
+Frame 658 [ACS->ONT] Method: SetParameterValues
+    Device.DHCPv6.Client.3.Enable = 1
+    Device.DeviceInfo.ProvisioningCode = sOLT.rPPP
+    Device.IP.Interface.5.Enable = 1
+    Device.NAT.InterfaceSetting.3.Enable = 1
+    Device.PPP.Interface.1.Enable = 1
+    Device.X_TP_GPON.Link.3.Enable = 1
+
+Frame 662 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 664 [ACS->ONT] Method: GetParameterValues
+    Query: Device.UserInterface.RemoteAccess.Enable
+    Query: Device.UserInterface.RemoteAccess.Port
+    Query: Device.UserInterface.RemoteAccess.Protocol
+
+Frame 668 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.UserInterface.RemoteAccess.Enable = 1
+    Device.UserInterface.RemoteAccess.Port = 80
+    Device.UserInterface.RemoteAccess.Protocol = HTTP
+
+Frame 670 [ACS->ONT] Method: GetParameterValues
+    Query: Device.IP.Interface.1.Enable
+    Query: Device.IP.Interface.3.Enable
+    Query: Device.IP.Interface.4.Enable
+
+Frame 674 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.IP.Interface.1.Enable = 1
+    Device.IP.Interface.3.Enable = 1
+    Device.IP.Interface.4.Enable = 1
+
+Frame 676 [ACS->ONT] Method: GetParameterNames
+
+Frame 681 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 682 [ACS->ONT] Method: GetParameterNames
+
+Frame 686 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 688 [ACS->ONT] Method: GetParameterNames
+
+Frame 692 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 693 [ACS->ONT] Method: GetParameterNames
+
+Frame 696 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 698 [ACS->ONT] Method: GetParameterNames
+
+Frame 702 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 703 [ACS->ONT] Method: GetParameterNames
+
+Frame 707 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 708 [ACS->ONT] Method: GetParameterNames
+
+Frame 712 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 713 [ACS->ONT] Method: GetParameterNames
+
+Frame 716 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 718 [ACS->ONT] Method: GetParameterNames
+
+Frame 724 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 726 [ACS->ONT] Method: GetParameterNames
+
+Frame 731 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 734 [ACS->ONT] Method: GetParameterValues
+    Query: Device.Ethernet.Interface.1.Enable
+    Query: Device.Ethernet.Interface.2.Enable
+
+Frame 737 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.Ethernet.Interface.1.Enable = 0
+    Device.Ethernet.Interface.2.Enable = 1
+
+Frame 739 [ACS->ONT] Method: GetParameterValues
+    Query: Device.WiFi.AccessPoint.1.Enable
+    Query: Device.WiFi.Radio.1.Enable
+    Query: Device.WiFi.SSID.1.Enable
+    Query: Device.WiFi.SSID.1.SSID
+
+Frame 742 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.WiFi.AccessPoint.1.Enable = 1
+    Device.WiFi.Radio.1.Enable = 1
+    Device.WiFi.SSID.1.Enable = 1
+    Device.WiFi.SSID.1.SSID = TP-Link_7A20
+
+Frame 744 [ACS->ONT] Method: SetParameterValues
+    Device.Ethernet.Interface.1.Enable = 1
+    Device.WiFi.SSID.1.SSID = TEST-SSID
+
+Frame 747 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 750 [ACS->ONT] Method: GetParameterNames
+
+Frame 755 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 756 [ACS->ONT] Method: GetParameterValues
+    Query: Device.WiFi.AccessPoint.1.Security.ModesSupported
+
+Frame 759 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.WiFi.AccessPoint.1.Security.ModesSupported = None,WPA2-Personal,WPA-WPA2-Personal,WPA2-WPA3-Personal
+
+Frame 761 [ACS->ONT] Method: GetParameterNames
+
+Frame 764 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 766 [ACS->ONT] Method: GetParameterNames
+
+Frame 769 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 771 [ACS->ONT] Method: GetParameterNames
+
+Frame 774 [ONT->ACS] Method: GetParameterNamesResponse
+
+Frame 776 [ACS->ONT] Method: GetParameterValues
+    Query: Device.WiFi.AccessPoint.1.Security.ModeEnabled
+
+Frame 779 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.WiFi.AccessPoint.1.Security.ModeEnabled = WPA2-Personal
+
+Frame 781 [ACS->ONT] Method: GetParameterValues
+    Query: Device.WiFi.SSID.2.Enable
+    Query: Device.WiFi.SSID.3.Enable
+    Query: Device.WiFi.SSID.4.Enable
+
+Frame 784 [ONT->ACS] Method: GetParameterValuesResponse
+    Device.WiFi.SSID.2.Enable = 0
+    Device.WiFi.SSID.3.Enable = 1
+    Device.WiFi.SSID.4.Enable = 0
+
+Frame 786 [ACS->ONT] Method: SetParameterValues
+    Device.WiFi.SSID.3.Enable = 0
+
+Frame 790 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 792 [ACS->ONT] Method: SetParameterValues
+    Device.UserInterface.RemoteAccess.Port = 443
+    Device.UserInterface.RemoteAccess.Protocol = HTTPS
+
+Frame 796 [ONT->ACS] Method: SetParameterValuesResponse
+
+Frame 832 [ONT->ACS] Method: Inform
+    Events: ['4 VALUE CHANGE']
+
+Frame 835 [ACS->ONT] Method: InformResponse
+

@@ -187,4 +187,5 @@ type Service interface {
 	Delete(ctx context.Context, serial string) error
 	SetOnline(ctx context.Context, serial string, online bool) error
 	UpdateInfo(ctx context.Context, serial string, upd InfoUpdate) error
+	UpdateParameters(ctx context.Context, serial string, params map[string]string) error
 }

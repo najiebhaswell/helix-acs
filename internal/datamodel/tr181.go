@@ -155,7 +155,7 @@ func (m *TR181Mapper) WiFiErrorsReceivedPath(bandIdx int) string {
 // WAN
 
 func (m *TR181Mapper) WANConnectionTypePath() string {
-	return fmt.Sprintf("Device.IP.Interface.%d.IPv4Address.1.AddressingType", m.wanIface())
+	return fmt.Sprintf("Device.IP.Interface.%d.X_TP_ConnType", m.wanIface())
 }
 func (m *TR181Mapper) WANPPPoEUserPath() string {
 	return fmt.Sprintf("Device.PPP.Interface.%d.Username", m.pppIface())

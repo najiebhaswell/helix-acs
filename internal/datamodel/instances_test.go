@@ -60,6 +60,20 @@ func TestDiscoverTR181PPP(t *testing.T) {
 	assert.Equal(t, 3, im.PPPIfaceIdx)
 }
 
+func TestDiscoverTR181PPPPreferWANLowerLayerReference(t *testing.T) {
+	params := map[string]string{
+		// WAN IP interface is .4 and points to PPP interface .5.
+		"Device.IP.Interface.4.IPv4Address.1.IPAddress": "203.0.113.8",
+		"Device.IP.Interface.4.LowerLayers":             "Device.PPP.Interface.5.",
+		// Another PPP interface exists with lower index but is not WAN-linked.
+		"Device.PPP.Interface.2.Username": "old@isp",
+		"Device.PPP.Interface.5.Username": "new@isp",
+	}
+	im := DiscoverInstances(params)
+	assert.Equal(t, 4, im.WANIPIfaceIdx)
+	assert.Equal(t, 5, im.PPPIfaceIdx, "PPP index should follow WAN LowerLayers reference")
+}
+
 // TR-181 WiFi discovery via OperatingFrequencyBand
 
 func TestDiscoverTR181WiFiViaFrequencyBand(t *testing.T) {

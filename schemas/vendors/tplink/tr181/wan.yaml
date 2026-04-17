@@ -1,0 +1,9 @@
+id: wan
+model: tr181
+vendor: tplink
+description: WAN interface parameters for TP-Link TR-181 devices
+
+parameters:
+  - name: wan.uptime
+    path: "Device.IP.Interface.{wan}.X_TP_Uptime"
+    type: unsignedInt

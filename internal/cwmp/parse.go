@@ -28,6 +28,19 @@ type inHdrID struct {
 	Value          string `xml:",chardata"`
 }
 
+// inSOAPFault and inFaultDetail are used only for parsing normalized incoming
+// XML. After namespace-prefix stripping, <cwmp:Fault> becomes <Fault>, so the
+// inner struct must use xml:"Fault" instead of xml:"cwmp:Fault".
+type inSOAPFault struct {
+	FaultCode   string        `xml:"faultcode"`
+	FaultString string        `xml:"faultstring"`
+	Detail      inFaultDetail `xml:"detail"`
+}
+
+type inFaultDetail struct {
+	CWMPFault CWMPFault `xml:"Fault"`
+}
+
 type inBody struct {
 	Inform                     *InformRequest              `xml:"Inform,omitempty"`
 	TransferComplete           *TransferComplete           `xml:"TransferComplete,omitempty"`
@@ -50,7 +63,7 @@ type inBody struct {
 	RebootResponse             *RebootResponse             `xml:"RebootResponse,omitempty"`
 	FactoryReset               *FactoryReset               `xml:"FactoryReset,omitempty"`
 	FactoryResetResponse       *FactoryResetResponse       `xml:"FactoryResetResponse,omitempty"`
-	Fault                      *SOAPFault                  `xml:"Fault,omitempty"`
+	Fault                      *inSOAPFault                `xml:"Fault,omitempty"`
 }
 
 // ParseEnvelope
@@ -89,7 +102,18 @@ func ParseEnvelope(data []byte) (*Envelope, error) {
 			RebootResponse:             in.Body.RebootResponse,
 			FactoryReset:               in.Body.FactoryReset,
 			FactoryResetResponse:       in.Body.FactoryResetResponse,
-			Fault:                      in.Body.Fault,
+			Fault: func() *SOAPFault {
+				if in.Body.Fault == nil {
+					return nil
+				}
+				return &SOAPFault{
+					FaultCode:   in.Body.Fault.FaultCode,
+					FaultString: in.Body.Fault.FaultString,
+					Detail: FaultDetail{
+						CWMPFault: in.Body.Fault.Detail.CWMPFault,
+					},
+				}
+			}(),
 		},
 	}
 	if in.Header.ID != nil {

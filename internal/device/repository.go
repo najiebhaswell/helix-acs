@@ -244,20 +244,18 @@ func (r *mongoRepository) SetOnline(ctx context.Context, serial string, online b
 	return err
 }
 
-// UpdateParameters merges the given parameters map into the device's stored parameters.
+// UpdateParameters replaces the device's stored parameters map with the given map.
 func (r *mongoRepository) UpdateParameters(ctx context.Context, serial string, params map[string]string) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	setFields := bson.M{"updated_at": time.Now().UTC()}
-	for k, v := range params {
-		setFields["parameters."+k] = v
-	}
-
 	_, err := r.col.UpdateOne(
 		ctx,
 		bson.M{"serial": serial},
-		bson.M{"$set": setFields},
+		bson.M{"$set": bson.M{
+			"parameters": params,
+			"updated_at": time.Now().UTC(),
+		}},
 	)
 	return err
 }

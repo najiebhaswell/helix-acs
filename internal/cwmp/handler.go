@@ -32,7 +32,7 @@ func (s *Server) Router() http.Handler {
 
 	// Wrap the core handler: enforce Digest auth then delegate.
 	cwmpHandler := s.digestAuth.Middleware(http.HandlerFunc(s.handler.ServeHTTP))
-	cwmpHandler = limitBody(cwmpHandler, 1<<20) // 1 MB
+	cwmpHandler = limitBody(cwmpHandler, 16<<20) // 16 MB
 
 	mux.Handle("/acs", cwmpHandler)
 	mux.Handle("/acs/", cwmpHandler)

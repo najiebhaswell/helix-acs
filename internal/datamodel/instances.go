@@ -18,6 +18,8 @@ type InstanceMap struct {
 	LANIPIfaceIdx int
 	// TR-181: Device.PPP.Interface.{PPPIfaceIdx}
 	PPPIfaceIdx int
+	// TR-181: First unused (disabled) Device.X_TP_GPON.Link.{i} slot.
+	FreeGPONLinkIdx int
 
 	// TR-181 WiFi instances indexed by band (0=2.4GHz, 1=5GHz, 2=6GHz).
 	// A zero entry means the band was not discovered for that slot.
@@ -68,21 +70,47 @@ func isTR181Params(params map[string]string) bool {
 // ---- TR-181 discovery -------------------------------------------------------
 
 var (
-	reIPIfaceAddr   = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.IPv4Address\.\d+\.IPAddress$`)
-	rePPPIface      = regexp.MustCompile(`^Device\.PPP\.Interface\.(\d+)\.`)
-	reRadioFreq     = regexp.MustCompile(`^Device\.WiFi\.Radio\.(\d+)\.OperatingFrequencyBand$`)
-	reSSIDLower     = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.LowerLayers$`)
-	reAPRef         = regexp.MustCompile(`^Device\.WiFi\.AccessPoint\.(\d+)\.SSIDReference$`)
-	reSSIDAnything  = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.`)
+	reIPIfaceAddr     = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.IPv4Address\.\d+\.IPAddress$`)
+	reIPIfaceAddrType = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.IPv4Address\.\d+\.AddressingType$`)
+	reIPIfaceLower    = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.LowerLayers$`)
+	rePPPIface        = regexp.MustCompile(`^Device\.PPP\.Interface\.(\d+)\.`)
+	rePPPIfaceRef     = regexp.MustCompile(`Device\.PPP\.Interface\.(\d+)\.`)
+	reRadioFreq       = regexp.MustCompile(`^Device\.WiFi\.Radio\.(\d+)\.OperatingFrequencyBand$`)
+	reSSIDLower       = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.LowerLayers$`)
+	reAPRef           = regexp.MustCompile(`^Device\.WiFi\.AccessPoint\.(\d+)\.SSIDReference$`)
+	reSSIDAnything    = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.`)
 )
 
 func discoverTR181(params map[string]string, im *InstanceMap) {
 	discoverTR181WAN(params, im)
 	discoverTR181PPP(params, im)
 	discoverTR181WiFi(params, im)
+	discoverTR181FreeGPON(params, im)
+}
+
+var reGPONLinkEnable = regexp.MustCompile(`^Device\.X_TP_GPON\.Link\.(\d+)\.Enable$`)
+
+// discoverTR181FreeGPON finds the first disabled (Enable=0 or empty) GPON Link slot.
+func discoverTR181FreeGPON(params map[string]string, im *InstanceMap) {
+	var candidates []int
+	for name, val := range params {
+		m := reGPONLinkEnable.FindStringSubmatch(name)
+		if m == nil {
+			continue
+		}
+		if val == "0" || val == "" {
+			idx, _ := strconv.Atoi(m[1])
+			candidates = append(candidates, idx)
+		}
+	}
+	sort.Ints(candidates)
+	if len(candidates) > 0 {
+		im.FreeGPONLinkIdx = candidates[0]
+	}
 }
 
 func discoverTR181WAN(params map[string]string, im *InstanceMap) {
+	// First pass: find public-IP interface (best case) and private LAN interface.
 	for name, val := range params {
 		if val == "" {
 			continue
@@ -98,17 +126,65 @@ func discoverTR181WAN(params map[string]string, im *InstanceMap) {
 			im.LANIPIfaceIdx = idx
 		}
 	}
+
+	// Second pass: if no routable-public WAN interface was found (e.g. device is
+	// behind CGNAT and gets a 100.64.0.0/10 address via IPCP), fall back to
+	// detecting the interface by AddressingType=IPCP. This is the PPPoE WAN
+	// interface on devices like TP-Link ONTs.
+	if im.WANIPIfaceIdx == 0 {
+		for name, val := range params {
+			if val != "IPCP" {
+				continue
+			}
+			m := reIPIfaceAddrType.FindStringSubmatch(name)
+			if m == nil {
+				continue
+			}
+			idx, _ := strconv.Atoi(m[1])
+			if im.WANIPIfaceIdx == 0 || idx < im.WANIPIfaceIdx {
+				im.WANIPIfaceIdx = idx
+			}
+		}
+	}
 }
 
 func discoverTR181PPP(params map[string]string, im *InstanceMap) {
+	// Collect all existing PPP interface indices first.
+	allPPP := map[int]bool{}
 	for name := range params {
 		m := rePPPIface.FindStringSubmatch(name)
 		if m == nil {
 			continue
 		}
 		idx, _ := strconv.Atoi(m[1])
+		allPPP[idx] = true
 		if im.PPPIfaceIdx == 0 || idx < im.PPPIfaceIdx {
 			im.PPPIfaceIdx = idx
+		}
+	}
+
+	// Prefer the PPP interface referenced by the discovered WAN IP interface
+	// LowerLayers (typical TR-181 PPPoE topology on TP-Link).
+	if im.WANIPIfaceIdx == 0 {
+		return
+	}
+	for name, val := range params {
+		m := reIPIfaceLower.FindStringSubmatch(name)
+		if m == nil {
+			continue
+		}
+		ipIdx, _ := strconv.Atoi(m[1])
+		if ipIdx != im.WANIPIfaceIdx {
+			continue
+		}
+		pm := rePPPIfaceRef.FindStringSubmatch(val)
+		if pm == nil {
+			continue
+		}
+		pppIdx, _ := strconv.Atoi(pm[1])
+		if allPPP[pppIdx] {
+			im.PPPIfaceIdx = pppIdx
+			return
 		}
 	}
 }

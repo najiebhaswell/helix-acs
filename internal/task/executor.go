@@ -72,9 +72,9 @@ func (e *Executor) BuildSetParams(ctx context.Context, t *Task, mapper datamodel
 		if p.IPAddress != "" {
 			params[mapper.WANIPAddressPath()] = p.IPAddress
 		}
-		if p.MTU > 0 {
-			params[mapper.WANMTUPath()] = strconv.Itoa(p.MTU)
-		}
+		// MTU is skipped intentionally: MaxMTUSize causes type-fault on some
+		// TP-Link devices; MTU is better managed via IP interface provisioning.
+		_ = p.MTU
 		if len(params) == 0 {
 			return nil, fmt.Errorf("wan payload has no settable fields")
 		}

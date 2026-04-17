@@ -173,6 +173,115 @@ func parseCPEStats(params map[string]string, mapper datamodel.Mapper) (*task.CPE
 	return res, wan
 }
 
+// extractWANInfo reads WAN detail fields from the full summon parameter map.
+// It is called from finishSummon to populate the Network tab automatically
+// without requiring a separate CPE Stats task for the static fields.
+func extractWANInfo(params map[string]string, mapper datamodel.Mapper) device.WANInfo {
+	parseInt := func(key string) int64 {
+		if key == "" {
+			return 0
+		}
+		v, _ := strconv.ParseInt(params[key], 10, 64)
+		return v
+	}
+	mtu, _ := strconv.Atoi(params[mapper.WANMTUPath()])
+
+	// Derive WAN interface base path from the WAN IP address path.
+	// e.g. "Device.IP.Interface.5.IPv4Address.1.IPAddress" → "Device.IP.Interface.5."
+	wanIface := ""
+	ipAddrPath := mapper.WANIPAddressPath()
+	if idx := strings.Index(ipAddrPath, ".IPv4Address."); idx > 0 {
+		wanIface = ipAddrPath[:idx] + "."
+	}
+
+	// Derive subnet mask from the same IPv4Address entry as the IP address.
+	subnetMask := ""
+	if ipAddrPath != "" {
+		smPath := strings.Replace(ipAddrPath, ".IPAddress", ".SubnetMask", 1)
+		subnetMask = params[smPath]
+	}
+
+	// Find gateway dynamically: scan IPv4Forwarding entries for one pointing
+	// to the WAN interface with a non-zero GatewayIPAddress.
+	gateway := ""
+	if wanIface != "" {
+		for k, v := range params {
+			if strings.HasSuffix(k, ".Interface") && v == wanIface && strings.Contains(k, "IPv4Forwarding") {
+				base := strings.TrimSuffix(k, ".Interface")
+				enabled := params[base+".Enable"]
+				if enabled == "1" || enabled == "true" || enabled == "" {
+					if gw := params[base+".GatewayIPAddress"]; gw != "" && gw != "0.0.0.0" {
+						gateway = gw
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// Fallback: if no routing entry matched via Interface field, scan all
+	// forwarding entries for a non-zero, non-LAN-subnet gateway.
+	if gateway == "" {
+		wanIP := params[ipAddrPath]
+		for k, v := range params {
+			if !strings.HasSuffix(k, ".GatewayIPAddress") || !strings.Contains(k, "IPv4Forwarding") {
+				continue
+			}
+			if v == "" || v == "0.0.0.0" {
+				continue
+			}
+			// Prefer a gateway in the same address range as the WAN IP.
+			if wanIP != "" && samePrefix(wanIP, v) {
+				gateway = v
+				break
+			}
+			// Otherwise keep the first non-zero candidate.
+			if gateway == "" {
+				gateway = v
+			}
+		}
+	}
+
+	// Parse DNS servers from PPP.IPCP.DNSServers (comma-separated)
+	dnsStr := params[mapper.WANDNS1Path()]
+	dns1, dns2 := "", ""
+	if dnsStr != "" {
+		parts := strings.Split(dnsStr, ",")
+		if len(parts) > 0 {
+			dns1 = strings.TrimSpace(parts[0])
+		}
+		if len(parts) > 1 {
+			dns2 = strings.TrimSpace(parts[1])
+		}
+	}
+
+	return device.WANInfo{
+		ConnectionType: params[mapper.WANConnectionTypePath()],
+		IPAddress:      params[mapper.WANIPAddressPath()],
+		SubnetMask:     subnetMask,
+		Gateway:        gateway,
+		DNS1:           dns1,
+		DNS2:           dns2,
+		MACAddress:     params[mapper.WANMACPath()],
+		PPPoEUsername:  params[mapper.WANPPPoEUserPath()],
+		MTU:            mtu,
+		LinkStatus:     params[mapper.WANStatusPath()],
+		UptimeSeconds:  parseInt(mapper.WANUptimePath()),
+	}
+}
+
+// samePrefix returns true when the first two octets of a and b match.
+// This is a rough heuristic used to associate a gateway with a WAN IP that
+// may be in an ISP CGNAT range (100.64.0.0/10) or similar non-standard block.
+func samePrefix(a, b string) bool {
+	aParts := strings.SplitN(a, ".", 3)
+	bParts := strings.SplitN(b, ".", 3)
+	if len(aParts) < 2 || len(bParts) < 2 {
+		return false
+	}
+	return aParts[0] == bParts[0] && aParts[1] == bParts[1]
+}
+
 // parseConnectedHosts parses a Hosts.Host.{i}.* GetParameterValues response
 // into a slice of ConnectedHost structs.
 func parseConnectedHosts(params map[string]string, mapper datamodel.Mapper) []device.ConnectedHost {

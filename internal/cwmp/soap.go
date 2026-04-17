@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"strings"
 )
 
 // XML namespace constants used across all CWMP envelopes.
 const (
 	soapEnvNS = "http://schemas.xmlsoap.org/soap/envelope/"
-	cwmpNS    = "urn:dslforum-org:cwmp-1-2"
+	cwmpNS    = "urn:dslforum-org:cwmp-1-0"
 	xsdNS     = "http://www.w3.org/2001/XMLSchema"
 	xsiNS     = "http://www.w3.org/2001/XMLSchema-instance"
 )
@@ -107,6 +108,7 @@ type EventStruct struct {
 // ParameterValueList wraps a slice of ParameterValueStruct items. It is reused
 // in Inform, GetParameterValuesResponse, and SetParameterValues.
 type ParameterValueList struct {
+	ArrayType             string                 `xml:"soap-enc:arrayType,attr,omitempty"`
 	ParameterValueStructs []ParameterValueStruct `xml:"ParameterValueStruct"`
 }
 
@@ -325,14 +327,22 @@ func BuildEnvelope(id string, body Body) ([]byte, error) {
 	_, _ = buf.WriteString(xml.Header)
 
 	enc := xml.NewEncoder(&buf)
-	enc.Indent("", "  ")
 	if err := enc.Encode(env); err != nil {
 		return nil, fmt.Errorf("cwmp: failed to encode SOAP envelope: %w", err)
 	}
 	if err := enc.Flush(); err != nil {
 		return nil, fmt.Errorf("cwmp: failed to flush SOAP encoder: %w", err)
 	}
-	return buf.Bytes(), nil
+
+	// Post-process: rename 'soap:' prefix to 'soap-env:' and add soap-enc
+	// namespace. Many CPEs (especially TP-Link) use hard-coded string matching
+	// for namespace prefixes instead of proper XML namespace resolution.
+	out := buf.String()
+	out = strings.ReplaceAll(out, "xmlns:soap=", "xmlns:soap-enc=\"http://schemas.xmlsoap.org/soap/encoding/\" xmlns:soap-env=")
+	out = strings.ReplaceAll(out, "soap:", "soap-env:")
+	// Fix Value type attribute: type="xsd:..." → xsi:type="xsd:..."
+	out = strings.ReplaceAll(out, " type=\"xsd:", " xsi:type=\"xsd:")
+	return []byte(out), nil
 }
 
 // BuildInformResponse constructs a SOAP envelope containing an InformResponse
@@ -370,7 +380,7 @@ func BuildSetParameterValues(id string, params map[string]string) ([]byte, error
 		pvs = append(pvs, ParameterValueStruct{
 			Name: name,
 			Value: Value{
-				Type: "xsd:string",
+				Type: inferXSDType(name, val),
 				Data: val,
 			},
 		})
@@ -378,12 +388,43 @@ func BuildSetParameterValues(id string, params map[string]string) ([]byte, error
 	body := Body{
 		SetParameterValues: &SetParameterValues{
 			ParameterList: ParameterValueList{
+				ArrayType:             fmt.Sprintf("cwmp:ParameterValueStruct[%d]", len(pvs)),
 				ParameterValueStructs: pvs,
 			},
-			ParameterKey: id,
+			ParameterKey: "",
 		},
 	}
 	return BuildEnvelope(id, body)
+}
+
+// inferXSDType returns the appropriate XSD type for a CWMP parameter based on
+// the parameter name and value. TP-Link devices reject SetParameterValues when
+// the xsi:type does not match their internal schema.
+func inferXSDType(paramName, value string) string {
+	// Last segment of the dotted path (e.g. "Enable", "VLANID").
+	parts := strings.Split(paramName, ".")
+	leaf := parts[len(parts)-1]
+
+	// Boolean-typed parameters: anything containing "Enable" or "Mcast"
+	if strings.Contains(leaf, "Enable") || leaf == "RequestAddresses" ||
+		leaf == "RequestPrefixes" || strings.HasSuffix(leaf, "Mcast") {
+		return "xsd:boolean"
+	}
+
+	// Known unsigned integer fields
+	switch leaf {
+	case "VLANID", "MaxMTUSize", "NumberOfRepetitions", "PeriodicInformInterval",
+		"MaxMTU", "Status", "X_TP_VLANMode", "Port":
+		return "xsd:unsignedInt"
+	}
+
+	// Known signed integer fields (default value can be negative, e.g. -1)
+	switch leaf {
+	case "X_TP_MulticastStatus":
+		return "xsd:int"
+	}
+
+	return "xsd:string"
 }
 
 // BuildReboot constructs a Reboot request envelope.
@@ -422,7 +463,7 @@ func BuildAddObject(id, objectName string) ([]byte, error) {
 	body := Body{
 		AddObject: &AddObject{
 			ObjectName:   objectName,
-			ParameterKey: id,
+			ParameterKey: "", // TP-Link devices expect empty ParameterKey
 		},
 	}
 	return BuildEnvelope(id, body)
@@ -435,6 +476,18 @@ func BuildDeleteObject(id, objectName string) ([]byte, error) {
 		DeleteObject: &DeleteObject{
 			ObjectName:   objectName,
 			ParameterKey: id,
+		},
+	}
+	return BuildEnvelope(id, body)
+}
+
+// BuildGetParameterNames constructs a GetParameterNames request envelope.
+// Set nextLevel=false to request the full recursive parameter tree under path.
+func BuildGetParameterNames(id, path string, nextLevel bool) ([]byte, error) {
+	body := Body{
+		GetParameterNames: &GetParameterNames{
+			ParameterPath: path,
+			NextLevel:     nextLevel,
 		},
 	}
 	return BuildEnvelope(id, body)
