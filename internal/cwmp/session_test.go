@@ -342,7 +342,7 @@ func TestExecuteTask_WANCredentialUpdate_NoCredentials(t *testing.T) {
 
 	// Verify error
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no credentials provided")
+	assert.Contains(t, err.Error(), "no credentials or VLAN change provided")
 }
 
 // Test executeTask for non-PPPoE WAN task with DHCP

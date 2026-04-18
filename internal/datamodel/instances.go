@@ -20,6 +20,12 @@ type InstanceMap struct {
 	LANIPIfaceIdx int
 	// TR-181: Device.PPP.Interface.{PPPIfaceIdx}
 	PPPIfaceIdx int
+	// TR-181: Device.Ethernet.VLANTermination.{WANVLANTermIdx} linked to WAN/PPPoE
+	WANVLANTermIdx int
+	// TR-181: Device.Ethernet.Link.{WANEthLinkIdx} linked to WAN/PPPoE (for delete+add provisioning)
+	WANEthLinkIdx int
+	// TR-181: Current VLAN ID value on WANVLANTermination (for change detection)
+	WANCurrentVLAN int
 	// TR-181: First unused (disabled) Device.X_TP_GPON.Link.{i} slot.
 	FreeGPONLinkIdx int
 
@@ -72,23 +78,28 @@ func isTR181Params(params map[string]string) bool {
 // ---- TR-181 discovery -------------------------------------------------------
 
 var (
-	reIPIfaceAddr     = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.IPv4Address\.\d+\.IPAddress$`)
-	reIPIfaceAddrType = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.IPv4Address\.\d+\.AddressingType$`)
-	reIPIfaceConnType = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.X_TP_ConnType$`)
-	reIPIfaceLower    = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.LowerLayers$`)
-	rePPPIface        = regexp.MustCompile(`^Device\.PPP\.Interface\.(\d+)\.`)
-	rePPPIfaceRef     = regexp.MustCompile(`Device\.PPP\.Interface\.(\d+)\.`)
-	reRadioFreq       = regexp.MustCompile(`^Device\.WiFi\.Radio\.(\d+)\.OperatingFrequencyBand$`)
-	reRadioStd        = regexp.MustCompile(`^Device\.WiFi\.Radio\.(\d+)\.OperatingStandards$`)
-	reSSIDLower       = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.LowerLayers$`)
-	reAPRef           = regexp.MustCompile(`^Device\.WiFi\.AccessPoint\.(\d+)\.SSIDReference$`)
-	reAPAnything      = regexp.MustCompile(`^Device\.WiFi\.AccessPoint\.(\d+)\.`)
-	reSSIDAnything    = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.`)
+	reIPIfaceAddr      = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.IPv4Address\.\d+\.IPAddress$`)
+	reIPIfaceAddrType  = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.IPv4Address\.\d+\.AddressingType$`)
+	reIPIfaceConnType  = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.X_TP_ConnType$`)
+	reIPIfaceLower     = regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.LowerLayers$`)
+	rePPPIface         = regexp.MustCompile(`^Device\.PPP\.Interface\.(\d+)\.`)
+	rePPPIfaceRef      = regexp.MustCompile(`Device\.PPP\.Interface\.(\d+)\.`)
+	rePPPIfaceLower    = regexp.MustCompile(`^Device\.PPP\.Interface\.(\d+)\.LowerLayers$`)
+	reVLANTermVLANID   = regexp.MustCompile(`^Device\.Ethernet\.VLANTermination\.(\d+)\.VLANID$`)
+	reVLANTermAnything = regexp.MustCompile(`^Device\.Ethernet\.VLANTermination\.(\d+)\.`)
+	reVLANTermRef      = regexp.MustCompile(`Device\.Ethernet\.VLANTermination\.(\d+)\.`)
+	reRadioFreq        = regexp.MustCompile(`^Device\.WiFi\.Radio\.(\d+)\.OperatingFrequencyBand$`)
+	reRadioStd         = regexp.MustCompile(`^Device\.WiFi\.Radio\.(\d+)\.OperatingStandards$`)
+	reSSIDLower        = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.LowerLayers$`)
+	reAPRef            = regexp.MustCompile(`^Device\.WiFi\.AccessPoint\.(\d+)\.SSIDReference$`)
+	reAPAnything       = regexp.MustCompile(`^Device\.WiFi\.AccessPoint\.(\d+)\.`)
+	reSSIDAnything     = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.`)
 )
 
 func discoverTR181(params map[string]string, im *InstanceMap) {
 	discoverTR181WAN(params, im)
 	discoverTR181PPP(params, im)
+	discoverTR181VLAN(params, im)
 	discoverTR181WiFi(params, im)
 	discoverTR181FreeGPON(params, im)
 }
@@ -206,6 +217,70 @@ func discoverTR181PPP(params map[string]string, im *InstanceMap) {
 		if allPPP[pppIdx] {
 			im.PPPIfaceIdx = pppIdx
 			return
+		}
+	}
+}
+
+// discoverTR181VLAN finds the VLAN Termination linked to PPPoE and extracts current VLAN ID.
+// Also traces back to find the Ethernet Link and GPON Link for delete+add provisioning.
+// Traces: Device.PPP.Interface.{pppIdx}.LowerLayers → Device.Ethernet.VLANTermination.{vlanIdx}
+// Traces: Device.Ethernet.VLANTermination.{vlanIdx}.LowerLayers → Device.Ethernet.Link.{ethIdx}
+// Traces: Device.Ethernet.Link.{ethIdx}.LowerLayers → Device.X_TP_GPON.Link.{gponIdx}
+func discoverTR181VLAN(params map[string]string, im *InstanceMap) {
+	if im.PPPIfaceIdx == 0 {
+		// No PPP interface discovered, cannot find linked VLAN
+		return
+	}
+
+	// Find PPP LowerLayers to discover VLAN Termination index
+	pppLowerKey := fmt.Sprintf("Device.PPP.Interface.%d.LowerLayers", im.PPPIfaceIdx)
+	pppLowerVal, exists := params[pppLowerKey]
+	if !exists || pppLowerVal == "" {
+		// No LowerLayers found - cannot trace to VLAN
+		return
+	}
+
+	// Extract VLAN Termination index from reference (e.g., "Device.Ethernet.VLANTermination.1.")
+	m := reVLANTermRef.FindStringSubmatch(pppLowerVal)
+	if m == nil {
+		// Could not parse VLAN Termination reference
+		return
+	}
+	vlanIdx, _ := strconv.Atoi(m[1])
+	im.WANVLANTermIdx = vlanIdx
+
+	// Extract current VLAN ID from Device.Ethernet.VLANTermination.{vlanIdx}.VLANID
+	vlanIDKey := fmt.Sprintf("Device.Ethernet.VLANTermination.%d.VLANID", vlanIdx)
+	if vlanIDVal, ok := params[vlanIDKey]; ok && vlanIDVal != "" {
+		vlanID, err := strconv.Atoi(vlanIDVal)
+		if err == nil {
+			im.WANCurrentVLAN = vlanID
+		}
+	}
+
+	// Find Ethernet Link by tracing VLAN Termination LowerLayers
+	vlanLowerKey := fmt.Sprintf("Device.Ethernet.VLANTermination.%d.LowerLayers", vlanIdx)
+	vlanLowerVal, exists := params[vlanLowerKey]
+	if exists && vlanLowerVal != "" {
+		// Extract Ethernet Link index from reference (e.g., "Device.Ethernet.Link.2.")
+		reEthLinkRef := regexp.MustCompile(`Device\.Ethernet\.Link\.(\d+)\.`)
+		m := reEthLinkRef.FindStringSubmatch(vlanLowerVal)
+		if m != nil {
+			ethIdx, _ := strconv.Atoi(m[1])
+			im.WANEthLinkIdx = ethIdx
+
+			// Find GPON Link by tracing Ethernet Link LowerLayers
+			ethLowerKey := fmt.Sprintf("Device.Ethernet.Link.%d.LowerLayers", ethIdx)
+			if ethLowerVal, ok := params[ethLowerKey]; ok && ethLowerVal != "" {
+				// Extract GPON index from reference (e.g., "Device.X_TP_GPON.Link.3.")
+				reGPONRef := regexp.MustCompile(`Device\.X_TP_GPON\.Link\.(\d+)\.`)
+				if m := reGPONRef.FindStringSubmatch(ethLowerVal); m != nil {
+					gponIdx, _ := strconv.Atoi(m[1])
+					if gponIdx > 0 {
+						im.FreeGPONLinkIdx = gponIdx // reuse this GPON Link
+					}
+				}
+			}
 		}
 	}
 }

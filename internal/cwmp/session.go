@@ -1015,18 +1015,102 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 		}
 
 		if isPPPoE && im.PPPIfaceIdx > 0 {
-			// PPPoE already provisioned: update credentials only.
+			// PPPoE already provisioned: update credentials and/or VLAN
+
+			// Determine update mode based on whether VLAN is changing
+			vlanChanging := p.VLAN > 0 && p.VLAN != im.WANCurrentVLAN
+			credentialsChanging := p.Username != "" || p.Password != ""
+
+			if vlanChanging {
+				// VLAN change detected: disable → modify VLAN → update credentials → enable
+				h.log.WithField("task_id", t.ID).
+					WithField("ppp_idx", im.PPPIfaceIdx).
+					WithField("vlan_term_idx", im.WANVLANTermIdx).
+					WithField("req_vlan", p.VLAN).
+					WithField("current_vlan", im.WANCurrentVLAN).
+					WithField("req_user", "[REDACTED]").
+					Info("CWMP: WAN PPPoE VLAN change - using disable-modify-enable approach")
+
+				if p.Username == "" {
+					return nil, fmt.Errorf("WAN PPPoE VLAN change requires PPPoE username")
+				}
+
+				// Build parameters for disable→modify→enable sequence
+				params := make(map[string]string)
+
+				// Phase 1: Disable IP Interface (this disables PPPoE without deleting)
+				ipDisablePath := fmt.Sprintf("Device.IP.Interface.%d.Enable", im.WANIPIfaceIdx)
+				params[ipDisablePath] = "0"
+
+				// Phase 2: Update VLAN on VLANTermination
+				vlanIDPath := fmt.Sprintf("Device.Ethernet.VLANTermination.%d.VLANID", im.WANVLANTermIdx)
+				params[vlanIDPath] = strconv.Itoa(p.VLAN)
+
+				// Ensure VLAN is enabled
+				vlanEnablePath := fmt.Sprintf("Device.Ethernet.VLANTermination.%d.Enable", im.WANVLANTermIdx)
+				params[vlanEnablePath] = "1"
+
+				// Phase 3: Update PPPoE credentials
+				params[mapper.WANPPPoEUserPath()] = p.Username
+				params[mapper.WANPPPoEPassPath()] = p.Password
+
+				// Ensure PPP Interface settings
+				pppAuthPath := fmt.Sprintf("Device.PPP.Interface.%d.AuthenticationProtocol", im.PPPIfaceIdx)
+				params[pppAuthPath] = "AUTO_AUTH"
+
+				// Phase 4: Re-enable IP Interface (triggers PPPoE reconnect with new VLAN/credentials)
+				params[ipDisablePath] = "1"
+
+				h.log.WithField("task_id", t.ID).
+					WithField("old_vlan", im.WANCurrentVLAN).
+					WithField("new_vlan", p.VLAN).
+					WithField("param_count", len(params)).
+					Info("CWMP: Building WAN SetParameterValues for disable-modify-enable")
+
+				return BuildSetParameterValues(t.ID, params)
+			}
+
+			if !credentialsChanging {
+				return nil, fmt.Errorf("WAN update: no credentials or VLAN change provided")
+			}
+
+			// Credentials-only update (no VLAN change): use simple SetParameterValues
 			// Do NOT set X_TP_ConnType — it is read-only on an active connection.
 			params := make(map[string]string)
+
+			h.log.WithField("task_id", t.ID).
+				WithField("req_user", "[REDACTED]").
+				WithField("req_pass", "[REDACTED]").
+				Info("CWMP: WAN credentials-only update request")
+
+			// Update credentials if provided
 			if p.Username != "" {
 				params[mapper.WANPPPoEUserPath()] = p.Username
 			}
 			if p.Password != "" {
 				params[mapper.WANPPPoEPassPath()] = p.Password
 			}
-			if len(params) == 0 {
-				return nil, fmt.Errorf("WAN update: no credentials provided")
+
+			// Always ensure PPPoE configuration is complete
+			if im.PPPIfaceIdx > 0 {
+				pppAuthPath := fmt.Sprintf("Device.PPP.Interface.%d.AuthenticationProtocol", im.PPPIfaceIdx)
+				params[pppAuthPath] = "AUTO_AUTH"
+
+				// Ensure PPP Interface is enabled
+				pppEnablePath := fmt.Sprintf("Device.PPP.Interface.%d.Enable", im.PPPIfaceIdx)
+				params[pppEnablePath] = "1"
+
+				// Ensure IP Interface is enabled
+				if im.WANIPIfaceIdx > 0 {
+					ipEnablePath := fmt.Sprintf("Device.IP.Interface.%d.Enable", im.WANIPIfaceIdx)
+					params[ipEnablePath] = "1"
+				}
 			}
+
+			h.log.WithField("task_id", t.ID).
+				WithField("param_count", len(params)).
+				Info("CWMP: Building WAN SetParameterValues for credentials update")
+
 			return BuildSetParameterValues(t.ID, params)
 		}
 

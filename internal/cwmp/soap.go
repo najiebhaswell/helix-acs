@@ -382,11 +382,13 @@ func BuildSetParameterValues(id string, params map[string]string) ([]byte, error
 		sortedNames = append(sortedNames, name)
 	}
 
-	// Custom sort: KeyPassphrase and PreSharedKey parameters come first,
-	// then other parameters, then ModeEnabled last (so security mode changes after password is set)
+	// Custom sort: disable first → VLAN/credentials → enable last
+	// This supports the disable-modify-enable pattern for VLAN/credential updates
 	sort.Slice(sortedNames, func(i, j int) bool {
 		iName := sortedNames[i]
 		jName := sortedNames[j]
+		iVal := params[iName]
+		jVal := params[jName]
 
 		// Extract leaf parameter name
 		iParts := strings.Split(iName, ".")
@@ -394,14 +396,35 @@ func BuildSetParameterValues(id string, params map[string]string) ([]byte, error
 		jParts := strings.Split(jName, ".")
 		jLeaf := jParts[len(jParts)-1]
 
-		// Priority 1: KeyPassphrase/PreSharedKey (must be set first)
-		iIsPassword := iLeaf == "KeyPassphrase" || iLeaf == "PreSharedKey"
-		jIsPassword := jLeaf == "KeyPassphrase" || jLeaf == "PreSharedKey"
-		if iIsPassword != jIsPassword {
-			return iIsPassword // passwords come first
+		// Priority 0: Enable=0 (disable must come first)
+		iIsDisable := iLeaf == "Enable" && iVal == "0"
+		jIsDisable := jLeaf == "Enable" && jVal == "0"
+		if iIsDisable != jIsDisable {
+			return iIsDisable // disable comes first
 		}
 
-		// Priority 2: ModeEnabled/EncryptionMode (must be set last)
+		// Priority 1: VLAN changes (must be set BEFORE credentials that trigger reconnect)
+		iIsVLAN := strings.Contains(iName, "VLANTermination") && iLeaf == "VLANID"
+		jIsVLAN := strings.Contains(jName, "VLANTermination") && jLeaf == "VLANID"
+		if iIsVLAN != jIsVLAN {
+			return iIsVLAN // VLAN comes next
+		}
+
+		// Priority 2: Security parameters (Username, Password, KeyPassphrase, PreSharedKey)
+		iIsSecure := iLeaf == "Username" || iLeaf == "Password" || iLeaf == "KeyPassphrase" || iLeaf == "PreSharedKey"
+		jIsSecure := jLeaf == "Username" || jLeaf == "Password" || jLeaf == "KeyPassphrase" || jLeaf == "PreSharedKey"
+		if iIsSecure != jIsSecure {
+			return iIsSecure // security params come next
+		}
+
+		// Priority 3: Other Enable parameters that are 1 (re-enable must come last)
+		iIsEnable := iLeaf == "Enable" && iVal == "1"
+		jIsEnable := jLeaf == "Enable" && jVal == "1"
+		if iIsEnable != jIsEnable {
+			return !iIsEnable // enable=1 comes last (invert to put false first)
+		}
+
+		// Priority 4: ModeEnabled/EncryptionMode (must be set last, after re-enable)
 		iIsMode := iLeaf == "ModeEnabled" || iLeaf == "EncryptionMode"
 		jIsMode := jLeaf == "ModeEnabled" || jLeaf == "EncryptionMode"
 		if iIsMode != jIsMode {

@@ -25,13 +25,151 @@ type wanStepKind int
 const (
 	wanStepAdd wanStepKind = iota
 	wanStepSet
+	wanStepDelete
 )
 
 type wanStep struct {
 	kind    wanStepKind
-	obj     string            // AddObject: object name (trailing dot required)
+	obj     string            // AddObject: object name (trailing dot required); DeleteObject: full path with trailing dot
 	fillVar string            // AddObject: var name to store new InstanceNumber
 	params  map[string]string // SetParams: keys/values may contain {varName}
+}
+
+// newWANProvisionDeleteAndAdd builds the complete step sequence to delete an
+// existing PPPoE configuration and add a fresh one.
+// This is used when updating an existing PPPoE with different VLAN or credentials.
+//
+// Parameters:
+// - ipIfaceIdx: Device.IP.Interface.{idx} to delete
+// - pppIfaceIdx: Device.PPP.Interface.{idx} to delete
+// - vlanTermIdx: Device.Ethernet.VLANTermination.{idx} to delete
+// - ethLinkIdx: Device.Ethernet.Link.{idx} to delete
+// - gponIdx: Device.X_TP_GPON.Link.{idx} (reused, not deleted)
+// - vlanID, username, password: New configuration values
+//
+// Flow:
+// 1. Delete dependent objects (bottom-up): IP, PPP, VLAN, Ethernet
+// 2. Create fresh provisioning chain with new VLAN/credentials
+// 3. Reuse existing GPON Link
+func newWANProvisionDeleteAndAdd(
+	t *task.Task,
+	ipIfaceIdx, pppIfaceIdx, vlanTermIdx, ethLinkIdx, gponIdx,
+	vlanID int,
+	username, password string,
+) *WANProvision {
+	v := strconv.Itoa(vlanID)
+	gi := strconv.Itoa(gponIdx)
+
+	// Phase 1: Delete existing objects (bottom-up)
+	deleteSteps := []wanStep{
+		// Delete IP Interface (which may have NAT and DHCPv6 children that auto-delete)
+		{kind: wanStepDelete, obj: fmt.Sprintf("Device.IP.Interface.%d.", ipIfaceIdx)},
+		// Delete PPP Interface
+		{kind: wanStepDelete, obj: fmt.Sprintf("Device.PPP.Interface.%d.", pppIfaceIdx)},
+		// Delete VLAN Termination
+		{kind: wanStepDelete, obj: fmt.Sprintf("Device.Ethernet.VLANTermination.%d.", vlanTermIdx)},
+		// Delete Ethernet Link
+		{kind: wanStepDelete, obj: fmt.Sprintf("Device.Ethernet.Link.%d.", ethLinkIdx)},
+	}
+
+	// Phase 2: Add new provisioning (same as newWANProvision but starts from Ethernet Link)
+	addSteps := []wanStep{
+		// Reset GPON Link (reuse existing)
+		{kind: wanStepSet, params: map[string]string{
+			"Device.X_TP_GPON.Link." + gi + ".Alias":       "TpLink_" + v,
+			"Device.X_TP_GPON.Link." + gi + ".LowerLayers": "Device.Optical.Interface.1.",
+		}},
+		// ---- Layer 2: Ethernet Link ----
+		{kind: wanStepAdd, obj: "Device.Ethernet.Link.", fillVar: "eth"},
+		{kind: wanStepSet, params: map[string]string{
+			"Device.Ethernet.Link.{eth}.Alias":       "ethlink_" + v,
+			"Device.Ethernet.Link.{eth}.Enable":      "1",
+			"Device.Ethernet.Link.{eth}.LowerLayers": "Device.X_TP_GPON.Link." + gi + ".",
+		}},
+		// ---- Layer 3: VLAN Termination ----
+		{kind: wanStepAdd, obj: "Device.Ethernet.VLANTermination.", fillVar: "vterm"},
+		{kind: wanStepSet, params: map[string]string{
+			"Device.Ethernet.VLANTermination.{vterm}.Alias":       "VLAN_" + v,
+			"Device.Ethernet.VLANTermination.{vterm}.Enable":      "1",
+			"Device.Ethernet.VLANTermination.{vterm}.LowerLayers": "Device.Ethernet.Link.{eth}.",
+			"Device.Ethernet.VLANTermination.{vterm}.VLANID":      v,
+		}},
+		{kind: wanStepSet, params: map[string]string{
+			"Device.Ethernet.VLANTermination.{vterm}.X_TP_MulticastStatus": "1",
+			"Device.Ethernet.VLANTermination.{vterm}.X_TP_VLANEnable":      "1",
+			"Device.Ethernet.VLANTermination.{vterm}.X_TP_VLANMode":        "2",
+		}},
+		// ---- Layer 4: PPP Interface ----
+		{kind: wanStepAdd, obj: "Device.PPP.Interface.", fillVar: "ppp"},
+		// ---- Layer 5: IP Interface ----
+		{kind: wanStepAdd, obj: "Device.IP.Interface.", fillVar: "ip"},
+		// Set IP LowerLayers before configuring PPP
+		{kind: wanStepSet, params: map[string]string{
+			"Device.IP.Interface.{ip}.LowerLayers": "Device.PPP.Interface.{ppp}.",
+		}},
+		// Configure PPP Interface
+		{kind: wanStepSet, params: map[string]string{
+			"Device.PPP.Interface.{ppp}.Alias":                     "Internet_PPPoE",
+			"Device.PPP.Interface.{ppp}.AuthenticationProtocol":    "AUTO_AUTH",
+			"Device.PPP.Interface.{ppp}.LowerLayers":               "Device.Ethernet.VLANTermination.{vterm}.",
+			"Device.PPP.Interface.{ppp}.Password":                  password,
+			"Device.PPP.Interface.{ppp}.Username":                  username,
+			"Device.PPP.Interface.{ppp}.X_TP_UsernameDomainEnable": "1",
+		}},
+		// Configure IP Interface
+		{kind: wanStepSet, params: map[string]string{
+			"Device.IP.Interface.{ip}.Alias":             "Internet_PPPoE",
+			"Device.IP.Interface.{ip}.IPv4Enable":        "1",
+			"Device.IP.Interface.{ip}.MaxMTUSize":        "1492",
+			"Device.IP.Interface.{ip}.X_TP_ConnName":     "Internet_PPPoE",
+			"Device.IP.Interface.{ip}.X_TP_ConnType":     "PPPoE",
+			"Device.IP.Interface.{ip}.X_TP_IPv6AddrType": "SLAAC",
+			"Device.IP.Interface.{ip}.X_TP_ServiceType":  "Internet",
+		}},
+		// ---- Layer 6: NAT ----
+		{kind: wanStepAdd, obj: "Device.NAT.InterfaceSetting.", fillVar: "nat"},
+		{kind: wanStepSet, params: map[string]string{
+			"Device.NAT.InterfaceSetting.{nat}.Interface": "Device.IP.Interface.{ip}.",
+		}},
+		// ---- IPv6 ----
+		{kind: wanStepSet, params: map[string]string{
+			"Device.IP.Interface.{ip}.IPv6Enable": "1",
+		}},
+		// ---- Layer 7: DHCPv6 Client ----
+		{kind: wanStepAdd, obj: "Device.DHCPv6.Client.", fillVar: "dhcpv6"},
+		{kind: wanStepSet, params: map[string]string{
+			"Device.DHCPv6.Client.{dhcpv6}.Interface": "Device.IP.Interface.{ip}.",
+		}},
+		{kind: wanStepSet, params: map[string]string{
+			"Device.DHCPv6.Client.{dhcpv6}.RequestAddresses":    "0",
+			"Device.DHCPv6.Client.{dhcpv6}.RequestPrefixes":     "1",
+			"Device.DHCPv6.Client.{dhcpv6}.RequestedOptions":    "23",
+			"Device.DHCPv6.Client.{dhcpv6}.X_TP_EnableRaRouter": "1",
+			"Device.DHCPv6.Client.{dhcpv6}.X_TP_EnableSLAAC":    "1",
+		}},
+		// ---- Default Gateway (TP-Link proprietary) ----
+		{kind: wanStepSet, params: map[string]string{
+			"Device.X_TP_DefaultGateway.IPv4DefaultGatewayType":   "Manual",
+			"Device.X_TP_DefaultGateway.CustomIPv4DefaultGateway": "Internet_PPPoE",
+			"Device.X_TP_DefaultGateway.IPv6DefaultGatewayType":   "Manual",
+			"Device.X_TP_DefaultGateway.CustomIPv6DefaultGateway": "Internet_PPPoE",
+		}},
+		// ---- Enable everything ----
+		{kind: wanStepSet, params: map[string]string{
+			"Device.DHCPv6.Client.{dhcpv6}.Enable":           "1",
+			"Device.Ethernet.Link.{eth}.Enable":              "1",
+			"Device.Ethernet.VLANTermination.{vterm}.Enable": "1",
+			"Device.IP.Interface.{ip}.Enable":                "1",
+			"Device.NAT.InterfaceSetting.{nat}.Enable":       "1",
+			"Device.PPP.Interface.{ppp}.Enable":              "1",
+			"Device.X_TP_GPON.Link." + gi + ".Enable":        "1",
+			"Device.DeviceInfo.ProvisioningCode":             "helix.rPPP",
+		}},
+	}
+
+	steps := append(deleteSteps, addSteps...)
+	initVars := map[string]string{"gpon": gi}
+	return &WANProvision{t: t, steps: steps, cur: 0, vars: initVars}
 }
 
 // newWANProvision builds the complete step sequence for a fresh TP-Link
@@ -176,6 +314,8 @@ func (p *WANProvision) buildCurrentXML() ([]byte, error) {
 		return BuildAddObject(id, s.obj)
 	case wanStepSet:
 		return BuildSetParameterValues(id, p.resolveParams(s.params))
+	case wanStepDelete:
+		return BuildDeleteObject(id, s.obj)
 	}
 	return nil, fmt.Errorf("unknown step kind %d", s.kind)
 }
