@@ -684,14 +684,26 @@ func extractWiFiInfo(bandIdx int, params map[string]string, mapper datamodel.Map
 		band = "5GHz"
 	}
 
+	channel := parseInt(mapper.WiFiChannelPath(bandIdx))
+	standard := params[mapper.WiFiStandardPath(bandIdx)]
+	// Infer standard from channel when the device doesn't report it (e.g. CDATA 2.4GHz).
+	// Channel 1-13 → 802.11b/g/n; Channel 36+ → 802.11a/n/ac.
+	if standard == "" && channel > 0 {
+		if channel <= 13 {
+			standard = "b/g/n"
+		} else {
+			standard = "a/n/ac"
+		}
+	}
+
 	return device.WiFiInfo{
 		Band:             band,
 		SSID:             params[mapper.WiFiSSIDPath(bandIdx)],
 		Enabled:          parseBool(mapper.WiFiEnabledPath(bandIdx)),
 		BSSID:            params[mapper.WiFiBSSIDPath(bandIdx)],
-		Channel:          parseInt(mapper.WiFiChannelPath(bandIdx)),
+		Channel:          channel,
 		ChannelWidth:     params[mapper.WiFiChannelWidthPath(bandIdx)],
-		Standard:         params[mapper.WiFiStandardPath(bandIdx)],
+		Standard:         standard,
 		SecurityMode:     params[mapper.WiFiSecurityModePath(bandIdx)],
 		TXPower:          parseInt(mapper.WiFiTXPowerPath(bandIdx)),
 		ConnectedClients: parseInt(mapper.WiFiClientCountPath(bandIdx)),

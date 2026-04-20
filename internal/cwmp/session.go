@@ -773,9 +773,11 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 	h.log.WithField("serial", serial).
 		WithField("wifi_24_ssid", wifi24.SSID).
 		WithField("wifi_24_channel", wifi24.Channel).
+		WithField("wifi_24_standard", wifi24.Standard).
 		WithField("wifi_24_band_steering", bandSteeringStatus).
 		WithField("wifi_5_ssid", wifi5.SSID).
 		WithField("wifi_5_channel", wifi5.Channel).
+		WithField("wifi_5_standard", wifi5.Standard).
 		Info("CWMP: extractWiFiInfo from summon")
 
 	// Extract LAN info
