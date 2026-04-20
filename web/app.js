@@ -200,7 +200,8 @@ function extractOpticalInfo(params) {
     'OMCIPacketsSent': 'Device.Optical.Interface.1.X_TP_OMCIStats.PacketsSent',
   };
 
-  // TR-098 CDATA/ZTE paths — values are pre-formatted strings (e.g. "-21.36 dBm")
+  // TR-098 CDATA/ZTE paths — values are already in real units (°C, V, mA, dBm)
+  // Temperature priority: XponInterface → X_ALU_OntOpticalParam → TemperatureSensor.1.Value
   const cdataMappings = {
     'PonMode': 'InternetGatewayDevice.DeviceInfo.XponInterface.X_CMS_PonMode',
     'Status': 'InternetGatewayDevice.DeviceInfo.XponInterface.Status',
@@ -210,6 +211,11 @@ function extractOpticalInfo(params) {
     'TXPower': 'InternetGatewayDevice.DeviceInfo.XponInterface.TXPower',
     'RXPower': 'InternetGatewayDevice.DeviceInfo.XponInterface.RXPower',
   };
+  // Fallback temperature paths for CDATA (tried in order if primary is missing)
+  const cdataTempFallbacks = [
+    'InternetGatewayDevice.X_ALU_OntOpticalParam.TransceiverTemperature',
+    'InternetGatewayDevice.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Value',
+  ];
 
   for (const [key, path] of Object.entries(tplinkMappings)) {
     if (params[path] !== undefined && params[path] !== null && params[path] !== '') {
@@ -219,6 +225,13 @@ function extractOpticalInfo(params) {
   for (const [key, path] of Object.entries(cdataMappings)) {
     if (params[path] !== undefined && params[path] !== null && params[path] !== '') {
       optical[key] = params[path];
+    }
+  }
+  // Apply temperature fallbacks if primary path was empty
+  if (!optical['Temperature']) {
+    for (const path of cdataTempFallbacks) {
+      const v = params[path];
+      if (v !== undefined && v !== null && v !== '') { optical['Temperature'] = v; break; }
     }
   }
 
@@ -859,7 +872,12 @@ function renderInfoTab(dev) {
       const formatTemp = (val) => {
         if (!val) return '-';
         if (isPreFormatted(val)) return String(val).trim() + ' °C';
-        return (parseInt(val) / 256).toFixed(2) + ' °C';
+        const str = String(val).trim();
+        // Float value (contains '.') = already in °C (CDATA/ZTE gives actual temperature)
+        // Large integer (>= 1000) = raw ADC register, divide by 256 (TP-Link format)
+        if (str.includes('.')) return parseFloat(str).toFixed(2) + ' °C';
+        const n = parseInt(str);
+        return (n >= 1000 ? n / 256 : n).toFixed(2) + ' °C';
       };
       const formatVoltage = (val) => {
         if (!val) return '-';
