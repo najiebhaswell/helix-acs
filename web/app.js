@@ -715,8 +715,16 @@ function renderDeviceHeader(dev) {
           <div class="dev-header-meta">
             ${field('Serial', dev.serial)}
             ${field('Firmware', dev.sw_version)}
-            ${field('WAN IP', dev.wan_ip)}
-            ${field('WAN TR069', dev.wans && dev.wans.length > 0 ? dev.wans.find(w => w.connection_type === 'DHCP')?.ip_address || dev.ip_address : dev.ip_address)}
+            ${(function(){
+              const isTR069 = w => (w.service_type||'').toUpperCase().split(',').some(s=>s.trim()==='TR069'||s.trim()==='MANAGEMENT');
+              const internetWAN = dev.wans && dev.wans.find(w => w.ip_address && !isTR069(w));
+              return field('WAN IP', internetWAN ? internetWAN.ip_address : '');
+            })()}
+            ${(function(){
+              const isTR069 = w => (w.service_type||'').toUpperCase().split(',').some(s=>s.trim()==='TR069'||s.trim()==='MANAGEMENT');
+              const tr069WAN = dev.wans && dev.wans.find(isTR069);
+              return field('WAN TR069', tr069WAN ? tr069WAN.ip_address : dev.wan_ip || '');
+            })()}
             ${field('Uptime', uptimeStr)}
             ${field('CPU', cpuStr)}
             ${field('RAM', ramStr)}
@@ -773,12 +781,24 @@ function renderInfoTab(dev) {
               ${row('CPU Usage', dev.cpu_usage != null ? dev.cpu_usage + '%' : null)}
               ${row('RAM (Used/Total)', dev.ram_total ? fmtRam(dev.ram_total, dev.ram_free) : null)}
               ${row('URL ACS', escHtml(dev.acs_url))}
-              ${row('WAN TR069 IP', dev.wans && dev.wans.length > 0 ? escHtml(dev.wans.find(w => w.connection_type === 'DHCP')?.ip_address || dev.ip_address || '') : escHtml(dev.ip_address))}
+              ${(function() {
+                // WAN TR069 IP: WAN whose service_type contains 'TR069' or 'Management'
+                const isTR069 = w => (w.service_type || '').toUpperCase().split(',').some(s => s.trim() === 'TR069' || s.trim() === 'MANAGEMENT');
+                const tr069WAN = dev.wans && dev.wans.find(isTR069);
+                const tr069IP = tr069WAN ? tr069WAN.ip_address : dev.wan_ip || '';
+                return row('WAN TR069 IP', tr069IP || null);
+              })()}
               <tr>
                 <td class="text-muted small fw-semibold" style="width:180px">WAN IP</td>
-                <td>${dev.wans && dev.wans.length > 0 
-                      ? dev.wans.map(w => w.ip_address ? `${escHtml(w.ip_address)} <span class="text-muted">(${escHtml(w.connection_type || 'Unknown')})</span>` : '').filter(Boolean).join('<br>')
-                      : escHtml(dev.wan_ip || '')}
+                <td>${(function() {
+                  // WAN IP: only WANs with Internet service (PPPoE/DHCP, not TR069 management)
+                  const isTR069 = w => (w.service_type || '').toUpperCase().split(',').some(s => s.trim() === 'TR069' || s.trim() === 'MANAGEMENT');
+                  const internetWANs = dev.wans ? dev.wans.filter(w => w.ip_address && !isTR069(w)) : [];
+                  if (internetWANs.length > 0) {
+                    return internetWANs.map(w => `${escHtml(w.ip_address)} <span class="text-muted">(${escHtml(w.connection_type || 'Unknown')})</span>`).join('<br>');
+                  }
+                  return escHtml(dev.wan_ip && !dev.wans?.some(w => w.ip_address === dev.wan_ip && isTR069(w)) ? dev.wan_ip : '');
+                })()}
                 </td>
               </tr>
               ${row('Last Inform', fmtDate(dev.last_inform))}
