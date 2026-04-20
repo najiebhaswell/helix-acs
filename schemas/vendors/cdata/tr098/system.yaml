@@ -1,0 +1,41 @@
+id: system
+model: tr098
+vendor: cdata
+description: >
+  System information parameters for C-DATA TR-098 GPON ONUs.
+  Includes device info, uptime, and memory usage.
+
+parameters:
+  # Device information (read-only during Inform)
+  - name: system.manufacturer
+    path: "InternetGatewayDevice.DeviceInfo.Manufacturer"
+    type: string
+  - name: system.model_name
+    path: "InternetGatewayDevice.DeviceInfo.ModelName"
+    type: string
+  - name: system.serial
+    path: "InternetGatewayDevice.DeviceInfo.SerialNumber"
+    type: string
+  - name: system.oui
+    path: "InternetGatewayDevice.DeviceInfo.ManufacturerOUI"
+    type: string
+  - name: system.product_class
+    path: "InternetGatewayDevice.DeviceInfo.ProductClass"
+    type: string
+  - name: system.hw_version
+    path: "InternetGatewayDevice.DeviceInfo.HardwareVersion"
+    type: string
+  - name: system.sw_version
+    path: "InternetGatewayDevice.DeviceInfo.SoftwareVersion"
+    type: string
+
+  # System metrics
+  - name: system.uptime
+    path: "InternetGatewayDevice.DeviceInfo.UpTime"
+    type: unsignedInt
+  - name: system.ram_total
+    path: "InternetGatewayDevice.DeviceInfo.MemoryStatus.Total"
+    type: unsignedInt
+  - name: system.ram_free
+    path: "InternetGatewayDevice.DeviceInfo.MemoryStatus.Free"
+    type: unsignedInt

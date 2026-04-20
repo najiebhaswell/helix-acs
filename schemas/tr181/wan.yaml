@@ -3,6 +3,12 @@ model: tr181
 description: WAN interface configuration parameters for TR-181 devices
 
 parameters:
+  - name: wan.service_type
+    path: ""
+    type: string
+  - name: wan.provisioning_type
+    path: "set_params"
+    type: string
   - name: wan.connection_type
     path: "Device.IP.Interface.{wan}.ConnectionType"
     type: string

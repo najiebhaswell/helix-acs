@@ -109,6 +109,11 @@ parameters:
   # Band Steering (TP-Link specific)
   # Band Steering allows both 2.4GHz and 5GHz bands to use the same SSID
   # When enabled, clients are automatically steered between bands
+  - name: wifi.band_steering
+    path: "Device.WiFi.X_TP_BandSteering.Enable"
+    type: boolean
+    writable: true
+    description: "Enable/disable Band Steering (used by BandSteeringPath mapper method)"
   - name: wifi.band_steering.enabled
     path: "Device.WiFi.X_TP_BandSteering.Enable"
     type: boolean

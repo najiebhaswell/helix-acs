@@ -13,6 +13,7 @@ import (
 	"github.com/raykavin/helix-acs/internal/auth"
 	"github.com/raykavin/helix-acs/internal/device"
 	"github.com/raykavin/helix-acs/internal/logger"
+	"github.com/raykavin/helix-acs/internal/parameter"
 	"github.com/raykavin/helix-acs/internal/task"
 	webUI "github.com/raykavin/helix-acs/web"
 )
@@ -59,15 +60,17 @@ func NewRouter(
 	jwtSvc *auth.JWTService,
 	mongoClient *mongo.Client,
 	redisClient *redis.Client,
+	paramRepo parameter.Repository,
 	log logger.Logger,
 	cfg Config,
 ) http.Handler {
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(jwtSvc, cfg.ACSUsername, cfg.ACSPassword)
-	deviceHandler := handler.NewDeviceHandler(deviceSvc)
+	deviceHandler := handler.NewDeviceHandler(deviceSvc, paramRepo)
 	taskHandler := handler.NewTaskHandler(taskQueue, deviceSvc, cfg.MaxAttempts)
 	healthHandler := handler.NewHealthHandler(mongoClient, redisClient)
+	snapshotHandler := handler.NewSnapshotHandler(deviceSvc, paramRepo)
 
 	// Root router global middleware applied to every route.
 	r := mux.NewRouter()
@@ -94,6 +97,10 @@ func NewRouter(
 	api.HandleFunc("/devices/{serial}", deviceHandler.Update).Methods(http.MethodPut)
 	api.HandleFunc("/devices/{serial}", deviceHandler.Delete).Methods(http.MethodDelete)
 	api.HandleFunc("/devices/{serial}/parameters", deviceHandler.GetParameters).Methods(http.MethodGet)
+	api.HandleFunc("/devices/{serial}/provision", deviceHandler.GetProvisionInfo).Methods(http.MethodGet)
+
+	// Snapshot routes
+	api.HandleFunc("/devices/{serial}/snapshots/last-known-good", snapshotHandler.SaveLastKnownGood).Methods(http.MethodPost)
 
 	// Task creation routes
 	api.HandleFunc("/devices/{serial}/tasks/wifi", taskHandler.CreateWifi).Methods(http.MethodPost)

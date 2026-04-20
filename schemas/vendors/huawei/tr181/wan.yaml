@@ -1,0 +1,28 @@
+id: wan
+model: tr181
+vendor: huawei
+description: >
+  WAN interface parameters for Huawei TR-181 devices.
+  Huawei ONTs (e.g. HG8245, MA5671) use standard TR-181 paths for WAN
+  with pre-existing WAN objects — no AddObject flow is required.
+
+parameters:
+  # Huawei uses standard TR-181 ConnectionType (no X_HW_ extension for this field)
+  - name: wan.connection_type
+    path: "Device.IP.Interface.{wan}.Type"
+    type: string
+
+  # Huawei does not expose a standard service-type label; leave empty.
+  - name: wan.service_type
+    path: ""
+    type: string
+
+  # Huawei devices have pre-existing WAN objects; use set_params provisioning.
+  - name: wan.provisioning_type
+    path: "set_params"
+    type: string
+
+  # Uptime: Huawei uses standard LastChange
+  - name: wan.uptime
+    path: "Device.IP.Interface.{wan}.LastChange"
+    type: unsignedInt

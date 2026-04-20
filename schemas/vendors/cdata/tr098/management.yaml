@@ -1,0 +1,24 @@
+id: management
+model: tr098
+vendor: cdata
+description: >
+  Management server parameters for C-DATA TR-098 GPON ONUs.
+  Configures ACS (TR-069) connection parameters including URL, credentials,
+  and periodic inform interval.
+
+parameters:
+  - name: mgmt.url
+    path: "InternetGatewayDevice.ManagementServer.URL"
+    type: string
+  - name: mgmt.user
+    path: "InternetGatewayDevice.ManagementServer.Username"
+    type: string
+  - name: mgmt.pass
+    path: "InternetGatewayDevice.ManagementServer.Password"
+    type: string
+  - name: mgmt.interval
+    path: "InternetGatewayDevice.ManagementServer.PeriodicInformInterval"
+    type: unsignedInt
+  - name: mgmt.inform_enable
+    path: "InternetGatewayDevice.ManagementServer.PeriodicInformEnable"
+    type: boolean

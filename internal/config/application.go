@@ -13,6 +13,8 @@ type applicationConfig struct {
 	ACS         acsConfig              `mapstructure:"acs"`
 	API         apiConfig              `mapstructure:"web"`
 	Tasks       map[string]*taskConfig `mapstructure:"tasks"`
+	PostgreSQL  PostgreSQL             `mapstructure:"postgresql"`
+	Parameters  Parameters             `mapstructure:"parameters"`
 }
 
 var _ ApplicationConfigProvider = (applicationConfig)(applicationConfig{})
@@ -24,6 +26,8 @@ func (a applicationConfig) GetLogLevel() string       { return a.LogLevel }
 func (a applicationConfig) GetJWT() JWTConfigProvider { return a.JWT }
 func (a applicationConfig) GetAPI() APIConfigProvider { return a.API }
 func (a applicationConfig) GetACS() ACSConfigProvider { return a.ACS }
+func (a applicationConfig) GetPostgreSQL() PostgreSQL { return a.PostgreSQL }
+func (a applicationConfig) GetParameters() Parameters { return a.Parameters }
 
 func (a applicationConfig) GetTask(taskName string) (TaskConfigProvider, error) {
 	if t, ok := a.Tasks[taskName]; ok {

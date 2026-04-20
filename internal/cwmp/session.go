@@ -19,6 +19,7 @@ import (
 	"github.com/raykavin/helix-acs/internal/datamodel"
 	"github.com/raykavin/helix-acs/internal/device"
 	"github.com/raykavin/helix-acs/internal/logger"
+	"github.com/raykavin/helix-acs/internal/parameter"
 	"github.com/raykavin/helix-acs/internal/schema"
 	"github.com/raykavin/helix-acs/internal/task"
 )
@@ -60,6 +61,18 @@ type Session struct {
 	summonAllNames   []string          // all leaf names discovered by GetParameterNames
 	summonBatchIdx   int               // index of current batch being fetched
 	summonAllParams  map[string]string // accumulated params from all completed batches
+
+	// lastSetParams holds the parameters sent in the most recent SetParameterValues
+	// dispatch so that handleSetParamValuesResponse can sync them to PostgreSQL.
+	lastSetParams map[string]string
+
+	// pendingWANCredentials holds PPPoE credentials from a WAN task to be
+	// persisted to PostgreSQL once the task completes successfully.
+	// Keys: "_helix.provision.pppoe_username", "_helix.provision.pppoe_password",
+	//       "_helix.provision.vlan_id", "_helix.provision.connection_type".
+	// This is needed because TP-Link ONTs never return the PPPoE password
+	// in GetParameterValues responses.
+	pendingWANCredentials map[string]string
 }
 
 func (s *Session) setState(st SessionState) {
@@ -107,6 +120,7 @@ func (sm *SessionManager) Cleanup() {
 type Handler struct {
 	deviceSvc      device.Service
 	taskQueue      task.Queue
+	parameterRepo  parameter.Repository
 	sessionMgr     *SessionManager
 	log            logger.Logger
 	acsUsername    string
@@ -121,6 +135,7 @@ type Handler struct {
 func NewHandler(
 	deviceSvc device.Service,
 	taskQueue task.Queue,
+	parameterRepo parameter.Repository,
 	log logger.Logger,
 	username, password, acsURL string,
 	informInterval time.Duration,
@@ -129,6 +144,7 @@ func NewHandler(
 	return &Handler{
 		deviceSvc:      deviceSvc,
 		taskQueue:      taskQueue,
+		parameterRepo:  parameterRepo,
 		sessionMgr:     NewSessionManager(),
 		log:            log,
 		acsUsername:    username,
@@ -302,6 +318,17 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	h.log.WithField("serial", dev.Serial).
 		WithField("id", dev.ID.Hex()).Debug("CWMP: Device upserted")
 
+	// Record device parameters in PostgreSQL repository (non-blocking)
+	if len(upsertReq.Parameters) > 0 {
+		go func() {
+			recordCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := h.parameterRepo.UpdateParameters(recordCtx, upsertReq.Serial, upsertReq.Parameters); err != nil {
+				h.log.WithError(err).WithField("serial", upsertReq.Serial).Warn("CWMP: Failed to record parameters")
+			}
+		}()
+	}
+
 	modelType := datamodel.DetectFromRootObject(firstRootObject(upsertReq.Parameters))
 	instanceMap := datamodel.DiscoverInstances(upsertReq.Parameters)
 
@@ -323,16 +350,24 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 		mapper = datamodel.ApplyInstanceMap(datamodel.NewMapper(modelType), instanceMap)
 	}
 
-	// Trigger full parameter summon when device has minimal Inform parameters.
-	// This fetches the complete parameter tree (typically thousands of entries)
-	// and stores it in MongoDB, enabling accurate instance discovery and
-	// vendor-specific task mapping.
-	if len(dev.Parameters) < 50 {
+	// Detect factory reset synchronously BEFORE DequeuePending so the restore task
+	// is included in the current session's pending queue.
+	h.detectAndHandleReset(ctx, upsertReq.Serial, env.Body.Inform, mapper)
+
+	// Trigger full parameter summon when PostgreSQL has fewer than 100 parameters
+	// for this device. Using the PostgreSQL count (not MongoDB's Inform-only 24)
+	// prevents re-triggering the summon on every Inform for devices that re-inform
+	// rapidly (e.g. CDATA/ZTE ONTs with very short periodic intervals), which
+	// would continuously interrupt the multi-batch GetParameterValues exchange.
+	pgCount, _ := h.parameterRepo.CountParameters(ctx, upsertReq.Serial)
+	if pgCount < 100 {
 		session.mu.Lock()
 		session.summonPhase = 1
 		session.summonSchemaName = schemaName
 		session.mu.Unlock()
-		h.log.WithField("serial", upsertReq.Serial).Info("CWMP: scheduling full parameter summon")
+		h.log.WithField("serial", upsertReq.Serial).
+			WithField("pg_param_count", pgCount).
+			Info("CWMP: scheduling full parameter summon")
 	}
 
 	// Fetch real pending tasks.
@@ -460,8 +495,15 @@ func (h *Handler) handleSetParamValuesResponse(ctx context.Context, w http.Respo
 		// All steps done — clear provision state and mark task complete.
 		session.mu.Lock()
 		session.wanProvision = nil
+		creds := session.pendingWANCredentials
+		session.pendingWANCredentials = nil
+		serial := session.DeviceSerial
 		session.mu.Unlock()
 		h.log.WithField("task_id", wp.t.ID).Info("CWMP: WAN PPPoE provisioning complete")
+		// Persist PPPoE credentials to PostgreSQL now that provisioning succeeded.
+		if len(creds) > 0 {
+			h.persistWANCredentials(ctx, serial, creds)
+		}
 		h.handleTaskResponse(ctx, w, session, nil, "")
 		return
 	}
@@ -487,7 +529,41 @@ func (h *Handler) handleSetParamValuesResponse(ctx context.Context, w http.Respo
 		return
 	}
 
+	// On success, sync the parameters that were sent to PostgreSQL so that
+	// SaveSnapshot captures the latest device state (including recent task changes).
+	session.mu.Lock()
+	setParams := session.lastSetParams
+	serial := session.DeviceSerial
+	session.lastSetParams = nil
+	wanCreds := session.pendingWANCredentials
+	session.pendingWANCredentials = nil
+	session.mu.Unlock()
+
+	if len(setParams) > 0 {
+		// Sync synchronously so the task is only marked done AFTER PostgreSQL is updated.
+		// This prevents a race where the user saves a snapshot before params are persisted.
+		pgCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		if err := h.parameterRepo.UpdateParameters(pgCtx, serial, setParams); err != nil {
+			h.log.WithError(err).WithField("serial", serial).Warn("CWMP: failed to sync task params to PostgreSQL")
+		}
+	}
+
+	// Persist PPPoE credentials if this was a WAN task (set_params flow).
+	if len(wanCreds) > 0 {
+		h.persistWANCredentials(ctx, serial, wanCreds)
+	}
+
 	h.handleTaskResponse(ctx, w, session, nil, "")
+}
+
+// buildSetParamsXML stores params in session.lastSetParams (for PostgreSQL sync
+// on success) then delegates to BuildSetParameterValues.
+func (h *Handler) buildSetParamsXML(session *Session, id string, params map[string]string) ([]byte, error) {
+	session.mu.Lock()
+	session.lastSetParams = params
+	session.mu.Unlock()
+	return BuildSetParameterValues(id, params)
 }
 
 // sendGetParameterNamesSummon sends a GetParameterNames RPC to the CPE to
@@ -496,10 +572,39 @@ func (h *Handler) sendGetParameterNamesSummon(w http.ResponseWriter, session *Se
 	session.mu.Lock()
 	session.summonPhase = 1
 	serial := session.DeviceSerial
+	mapper := session.mapper
+	schemaName := session.summonSchemaName
 	session.mu.Unlock()
 
+	// Determine root path based on schema name or mapper type.
+	// TR-098 devices use "InternetGatewayDevice."; TR-181 devices use "Device."
+	// Priority: schema name → mapper type → default to Device
 	rootPath := "Device."
-	h.log.WithField("serial", serial).WithField("path", rootPath).Info("CWMP: sending GetParameterNames for summon")
+
+	// Check schema name first (most reliable)
+	if schemaName != "" {
+		lowerSchema := strings.ToLower(schemaName)
+		// C-DATA, TP-Link, ZTE, and other TR-098 vendors
+		if strings.Contains(lowerSchema, "tr098") ||
+			strings.Contains(lowerSchema, "cdata") ||
+			strings.Contains(lowerSchema, "tplink") ||
+			strings.Contains(lowerSchema, "zte") {
+			rootPath = "InternetGatewayDevice."
+		}
+	}
+
+	// Fall back to mapper type check if schema didn't determine path
+	if rootPath == "Device." && mapper != nil {
+		switch mapper.(type) {
+		case *datamodel.TR098Mapper:
+			rootPath = "InternetGatewayDevice."
+		}
+	}
+
+	h.log.WithField("serial", serial).
+		WithField("schema", schemaName).
+		WithField("path", rootPath).
+		Info("CWMP: sending GetParameterNames for summon")
 
 	id := uuid.NewString()
 	env, err := BuildGetParameterNames(id, rootPath, false)
@@ -514,10 +619,12 @@ func (h *Handler) sendGetParameterNamesSummon(w http.ResponseWriter, session *Se
 	writeXML(w, env)
 }
 
-// summonBatchSize is the number of parameter names fetched per GetParameterValues
-// RPC during a parameter summon. Keeping this small prevents CPE memory exhaustion
-// on devices with thousands of parameters.
-const summonBatchSize = 100
+// summonBatchSize is the number of parameter names sent per GetParameterValues RPC
+// during a parameter summon. A large value reduces round-trips, which is critical
+// for devices (e.g. CDATA/ZTE ONTs) that re-inform every few seconds and would
+// otherwise interrupt a multi-batch summon. Most ONTs can handle a single request
+// with several thousand parameter names.
+const summonBatchSize = 10000
 
 // handleGetParameterNamesResponse collects all leaf parameter names from the
 // CPE's response and starts the first batched GetParameterValues fetch.
@@ -539,9 +646,11 @@ func (h *Handler) handleGetParameterNamesResponse(
 		}
 	}
 
+	nBatches := (len(names) + summonBatchSize - 1) / summonBatchSize
 	h.log.WithField("serial", serial).
 		WithField("total", len(names)).
 		WithField("batch_size", summonBatchSize).
+		WithField("batches", nBatches).
 		Info("CWMP: GetParameterNames received, starting batched fetch")
 
 	if len(names) == 0 {
@@ -618,6 +727,18 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 		h.log.WithField("serial", serial).WithField("count", len(params)).Info("CWMP: full parameter summon complete")
 	}
 
+	// Persist full parameter set to PostgreSQL synchronously so that:
+	// 1. GetAllParameters (used by SaveSnapshot) returns the complete dataset.
+	// 2. The write completes BEFORE tasks are dispatched, preventing an async
+	//    goroutine from overwriting param values that subsequent task syncs set.
+	{
+		pgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := h.parameterRepo.UpdateParameters(pgCtx, serial, params); err != nil {
+			h.log.WithError(err).WithField("serial", serial).Warn("CWMP: failed to persist summon params to PostgreSQL")
+		}
+	}
+
 	// Rebuild mapper with newly discovered instance indices from full param set.
 	instanceMap := datamodel.DiscoverInstances(params)
 	h.log.WithField("serial", serial).
@@ -644,8 +765,8 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 	wifi24 := extractWiFiInfo(0, params, newMapper)
 	wifi5 := extractWiFiInfo(1, params, newMapper)
 
-	// Extract Band Steering status (device-level TP-Link feature)
-	bandSteeringStatus := extractBandSteeringStatus(params)
+	// Extract Band Steering status (uses mapper.BandSteeringPath — returns nil for non-TP-Link)
+	bandSteeringStatus := extractBandSteeringStatus(params, newMapper)
 	wifi24.BandSteeringEnabled = bandSteeringStatus
 	wifi5.BandSteeringEnabled = bandSteeringStatus
 
@@ -690,10 +811,21 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 	}
 
 	acsUrl := params["Device.ManagementServer.URL"]
+	if acsUrl == "" {
+		acsUrl = params["InternetGatewayDevice.ManagementServer.URL"]
+	}
 	var cpuUsage *int64
-	if cpuStr := params["Device.DeviceInfo.ProcessStatus.CPUUsage"]; cpuStr != "" {
-		if c, err := strconv.ParseInt(cpuStr, 10, 64); err == nil {
-			cpuUsage = &c
+	// TR-181: Device.DeviceInfo.ProcessStatus.CPUUsage
+	// TR-098 CDATA/ZTE: InternetGatewayDevice.DeviceInfo.X_CMS_CPUUsage
+	for _, cpuPath := range []string{
+		"Device.DeviceInfo.ProcessStatus.CPUUsage",
+		"InternetGatewayDevice.DeviceInfo.X_CMS_CPUUsage",
+	} {
+		if cpuStr := params[cpuPath]; cpuStr != "" {
+			if c, err := strconv.ParseInt(cpuStr, 10, 64); err == nil {
+				cpuUsage = &c
+				break
+			}
 		}
 	}
 
@@ -988,30 +1120,51 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 		}
 
 		if isPPPoE && im.WANIPIfaceIdx == 0 {
-			// No working WAN IP interface: device needs full layer-by-layer provisioning.
+			// No working WAN IP interface: device needs full provisioning.
 			if p.VLAN == 0 {
 				return nil, fmt.Errorf("WAN full provisioning requires VLAN ID")
 			}
 			if p.Username == "" {
 				return nil, fmt.Errorf("WAN full provisioning requires PPPoE username")
 			}
-			wp := newWANProvision(t, im.FreeGPONLinkIdx, p.VLAN, p.Username, p.Password)
-			session.mu.Lock()
-			session.wanProvision = wp
-			session.currentTask = t
-			session.mu.Unlock()
-			h.log.WithField("task_id", t.ID).
-				WithField("gpon_idx", im.FreeGPONLinkIdx).
-				WithField("vlan", p.VLAN).
-				WithField("user", "[REDACTED]").
-				Info("CWMP: starting full TP-Link PPPoE provisioning")
-			xmlBytes, err := wp.buildCurrentXML()
+
+			if mapper.WANProvisioningType() == "add_object" {
+				// TP-Link (and similar GPON ONTs): multi-step AddObject provisioning.
+				wp := newWANProvision(t, im.FreeGPONLinkIdx, p.VLAN, p.Username, p.Password)
+				session.mu.Lock()
+				session.wanProvision = wp
+				session.currentTask = t
+				// Store credentials for persistence after provisioning succeeds.
+				session.pendingWANCredentials = buildWANCredentialMap(p)
+				session.mu.Unlock()
+				h.log.WithField("task_id", t.ID).
+					WithField("gpon_idx", im.FreeGPONLinkIdx).
+					WithField("vlan", p.VLAN).
+					WithField("user", "[REDACTED]").
+					Info("CWMP: starting full TP-Link PPPoE provisioning (add_object)")
+				xmlBytes, err := wp.buildCurrentXML()
+				if err != nil {
+					return nil, err
+				}
+				h.log.WithField("xml_out", string(xmlBytes)).Info("CWMP: WAN provision step 0 XML")
+				writeXML(w, xmlBytes)
+				return nil, nil // response already written
+			}
+
+			// Generic devices (set_params): single SetParameterValues.
+			genParams, err := buildGenericWANParams(p, im, mapper)
 			if err != nil {
 				return nil, err
 			}
-			h.log.WithField("xml_out", string(xmlBytes)).Info("CWMP: WAN provision step 0 XML")
-			writeXML(w, xmlBytes)
-			return nil, nil // response already written
+			h.log.WithField("task_id", t.ID).
+				WithField("provisioning_type", mapper.WANProvisioningType()).
+				WithField("user", "[REDACTED]").
+				Info("CWMP: starting generic PPPoE provisioning (set_params)")
+			// Store credentials for persistence after task succeeds.
+			session.mu.Lock()
+			session.pendingWANCredentials = buildWANCredentialMap(p)
+			session.mu.Unlock()
+			return h.buildSetParamsXML(session, t.ID, genParams)
 		}
 
 		if isPPPoE && im.PPPIfaceIdx > 0 {
@@ -1067,7 +1220,11 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 					WithField("param_count", len(params)).
 					Info("CWMP: Building WAN SetParameterValues for disable-modify-enable")
 
-				return BuildSetParameterValues(t.ID, params)
+				// Store credentials for persistence after task succeeds.
+				session.mu.Lock()
+				session.pendingWANCredentials = buildWANCredentialMap(p)
+				session.mu.Unlock()
+				return h.buildSetParamsXML(session, t.ID, params)
 			}
 
 			if !credentialsChanging {
@@ -1111,7 +1268,11 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 				WithField("param_count", len(params)).
 				Info("CWMP: Building WAN SetParameterValues for credentials update")
 
-			return BuildSetParameterValues(t.ID, params)
+			// Store credentials for persistence after task succeeds.
+			session.mu.Lock()
+			session.pendingWANCredentials = buildWANCredentialMap(p)
+			session.mu.Unlock()
+			return h.buildSetParamsXML(session, t.ID, params)
 		}
 
 		// Non-PPPoE WAN task: use the generic executor.
@@ -1122,7 +1283,7 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 		if len(params) == 0 {
 			return nil, fmt.Errorf("task %s produced no parameters", t.ID)
 		}
-		return BuildSetParameterValues(t.ID, params)
+		return h.buildSetParamsXML(session, t.ID, params)
 
 	// WiFi task with Band Steering support
 	case task.TypeWifi:
@@ -1242,7 +1403,7 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 			}
 		}
 
-		return BuildSetParameterValues(t.ID, params)
+		return h.buildSetParamsXML(session, t.ID, params)
 
 	// SetParameterValues-based tasks
 	case task.TypeLAN, task.TypeSetParams,
@@ -1254,7 +1415,7 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 		if len(params) == 0 {
 			return nil, fmt.Errorf("task %s produced no parameters", t.ID)
 		}
-		return BuildSetParameterValues(t.ID, params)
+		return h.buildSetParamsXML(session, t.ID, params)
 
 	// Legacy diagnostic
 	case task.TypeDiagnostic:
@@ -1336,6 +1497,31 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 
 	// Simple one-shot tasks
 	case task.TypeReboot:
+		// Save current parameters snapshot before reboot (async, non-blocking)
+		go func() {
+			snapCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			deviceSerial := session.DeviceSerial
+			if deviceSerial == "" {
+				return // No device serial available yet
+			}
+
+			// Get current parameters
+			params, err := h.parameterRepo.GetAllParameters(snapCtx, deviceSerial)
+			if err != nil {
+				h.log.WithError(err).WithField("serial", deviceSerial).Warn("CWMP: Failed to get parameters for pre-reset snapshot")
+				return
+			}
+
+			// Save as pre_reset_params snapshot
+			if err := h.parameterRepo.SaveSnapshot(snapCtx, deviceSerial, "pre_reset_params", params); err != nil {
+				h.log.WithError(err).WithField("serial", deviceSerial).Warn("CWMP: Failed to save pre-reset snapshot")
+			} else {
+				h.log.WithField("serial", deviceSerial).WithField("param_count", len(params)).Debug("CWMP: Pre-reset snapshot saved")
+			}
+		}()
+
 		return BuildReboot(t.ID, t.ID)
 
 	case task.TypeFactoryReset:
@@ -1483,19 +1669,26 @@ func (h *Handler) extractInformParams(env *Envelope) *device.UpsertRequest {
 			if v, err := parseInt64(val); err == nil {
 				req.RAMFree = v
 			}
-		case strings.HasSuffix(lower, "managementserver.url"):
+		case strings.HasSuffix(lower, "managementserver.url") && req.ACSURL == "":
 			req.ACSURL = val
 		}
 	}
 
+	// Detect data model by scanning all Inform parameters in one pass.
+	// InternetGatewayDevice.* (TR-098) takes priority over Device.* (TR-181)
+	// because some CDATA/ZTE ONTs send both prefixes in a single Inform.
+	hasIGD, hasDev := false, false
 	for name := range req.Parameters {
-		if strings.HasPrefix(name, "Device.") {
-			req.DataModel = "tr181"
-			break
-		} else if strings.HasPrefix(name, "InternetGatewayDevice.") {
-			req.DataModel = "tr098"
-			break
+		if strings.HasPrefix(name, "InternetGatewayDevice.") {
+			hasIGD = true
+		} else if strings.HasPrefix(name, "Device.") {
+			hasDev = true
 		}
+	}
+	if hasIGD {
+		req.DataModel = "tr098"
+	} else if hasDev {
+		req.DataModel = "tr181"
 	}
 
 	return req
@@ -1566,14 +1759,23 @@ func headerID(env *Envelope) string {
 	return uuid.NewString()
 }
 
+// firstRootObject returns the dominant root object namespace present in params.
+// InternetGatewayDevice. (TR-098) takes priority when both prefixes coexist,
+// because some CDATA/ZTE ONTs report both namespaces in a single session.
 func firstRootObject(params map[string]string) string {
+	hasIGD, hasDev := false, false
 	for k := range params {
-		if strings.HasPrefix(k, "Device.") {
-			return "Device."
-		}
 		if strings.HasPrefix(k, "InternetGatewayDevice.") {
-			return "InternetGatewayDevice."
+			hasIGD = true
+		} else if strings.HasPrefix(k, "Device.") {
+			hasDev = true
 		}
+	}
+	if hasIGD {
+		return "InternetGatewayDevice."
+	}
+	if hasDev {
+		return "Device."
 	}
 	return ""
 }
@@ -1607,4 +1809,318 @@ func parseInt64(s string) (int64, error) {
 	var v int64
 	_, err := fmt.Sscanf(s, "%d", &v)
 	return v, err
+}
+
+// detectAndHandleReset checks for factory reset via TR-069 "0 BOOTSTRAP" event
+// or ProvisioningCode reset, and queues a parameter restore task synchronously
+// so it is picked up by DequeuePending in the same CWMP session.
+func (h *Handler) detectAndHandleReset(ctx context.Context, serial string, inf *InformRequest, mapper datamodel.Mapper) {
+	isBootstrap := hasBootstrapEvent(inf)
+	informProvCode := informParamValue(inf, "Device.DeviceInfo.ProvisioningCode")
+
+	// Log every Inform's reset-relevant signals for diagnostics.
+	h.log.WithField("serial", serial).
+		WithField("bootstrap_event", isBootstrap).
+		WithField("provisioning_code", informProvCode).
+		Debug("CWMP: reset detection signals")
+
+	// Case 1: ACS-triggered reboot had a pre_reset_params snapshot saved.
+	preResetParams, err := h.parameterRepo.GetSnapshot(ctx, serial, "pre_reset_params")
+	if err == nil && preResetParams != nil {
+		// Always delete the snapshot so it is only used once.
+		_ = h.parameterRepo.DeleteSnapshot(ctx, serial, "pre_reset_params")
+
+		if !isBootstrap {
+			// Regular reboot (not factory reset) — parameters unchanged, no restore needed.
+			h.log.WithField("serial", serial).Debug("CWMP: Regular ACS reboot, no parameter restore needed")
+			return
+		}
+
+		// Factory reset triggered after ACS reboot: restore from pre_reset_params.
+		h.log.WithField("serial", serial).
+			WithField("param_count", len(preResetParams)).
+			Info("CWMP: ACS-triggered factory reset detected, queuing parameter restore")
+		h.restoreParameters(ctx, serial, preResetParams, "pre_reset_params")
+		return
+	}
+
+	// Case 2: Detect physical/manual factory reset.
+	// Primary: TR-069 "0 BOOTSTRAP" event (§3.7.1.4).
+	// Fallback: ProvisioningCode in Inform is empty but snapshot has non-empty value —
+	//           TP-Link always includes ProvisioningCode in Inform; factory reset clears it.
+	lastKnownGood, err := h.parameterRepo.GetSnapshot(ctx, serial, "last_known_good")
+	if err != nil || lastKnownGood == nil {
+		if isBootstrap {
+			h.log.WithField("serial", serial).
+				Warn("CWMP: Bootstrap event detected but no last_known_good snapshot — save a snapshot first")
+		}
+		return
+	}
+
+	snapshotProvCode := lastKnownGood["Device.DeviceInfo.ProvisioningCode"]
+	isProvCodeReset := informProvCode == "" && snapshotProvCode != ""
+
+	if !isBootstrap && !isProvCodeReset {
+		return
+	}
+
+	reason := "Bootstrap event"
+	if !isBootstrap {
+		reason = "ProvisioningCode cleared"
+	}
+
+	h.log.WithField("serial", serial).
+		WithField("reason", reason).
+		WithField("snapshot_params", len(lastKnownGood)).
+		Info("CWMP: Factory reset detected, queuing WiFi restore from last_known_good")
+	// Clear stored parameters so the next Inform triggers a fresh summon.
+	_ = h.parameterRepo.DeleteDeviceParameters(ctx, serial)
+	h.restoreWiFiConfig(ctx, serial, lastKnownGood, mapper)
+}
+
+// informParamValue returns the value of a named parameter from the Inform
+// ParameterList, or empty string if not present.
+func informParamValue(inf *InformRequest, name string) string {
+	if inf == nil {
+		return ""
+	}
+	for _, pv := range inf.ParameterList.ParameterValueStructs {
+		if pv.Name == name {
+			return pv.Value.Data
+		}
+	}
+	return ""
+}
+
+// restoreParameters enqueues a SetParams task to restore critical device parameters
+// into Redis so DequeuePending (called immediately after) picks it up in the same session.
+func (h *Handler) restoreParameters(ctx context.Context, serial string, params map[string]string, snapshotType string) {
+	if len(params) == 0 {
+		return
+	}
+
+	// Filter to critical parameters only (SSID, WiFi password, PPPoE, etc.)
+	criticalParams := filterCriticalParameters(params)
+	if len(criticalParams) == 0 {
+		h.log.WithField("serial", serial).Warn("CWMP: No critical parameters to restore after reset")
+		return
+	}
+
+	// Build SetParameterValues task
+	payload, err := json.Marshal(task.SetParamsPayload{
+		Parameters: criticalParams,
+	})
+	if err != nil {
+		h.log.WithError(err).WithField("serial", serial).Error("CWMP: Failed to marshal restore payload")
+		return
+	}
+
+	restoreTask := &task.Task{
+		ID:      fmt.Sprintf("restore_%s_%d", snapshotType, time.Now().Unix()),
+		Serial:  serial,
+		Type:    task.TypeSetParams,
+		Status:  task.StatusPending,
+		Payload: payload,
+	}
+
+	// Queue the restore task
+	if err := h.taskQueue.Enqueue(ctx, restoreTask); err != nil {
+		h.log.WithError(err).WithField("serial", serial).Error("CWMP: Failed to queue restore task")
+		return
+	}
+
+	h.log.WithField("serial", serial).
+		WithField("task_id", restoreTask.ID).
+		WithField("param_count", len(criticalParams)).
+		Info("CWMP: Parameter restoration task queued")
+}
+
+// hasBootstrapEvent returns true when the Inform carries the "0 BOOTSTRAP" event.
+// Per TR-069 §3.7.1.4 CPEs MUST send this event after factory reset or first boot.
+func hasBootstrapEvent(inf *InformRequest) bool {
+	if inf == nil {
+		return false
+	}
+	for _, ev := range inf.Event.Events {
+		if ev.EventCode == "0 BOOTSTRAP" {
+			return true
+		}
+	}
+	return false
+}
+
+// restoreWiFiConfig creates TypeWifi tasks from the snapshot to restore SSID/password
+// after a factory reset, using the exact same mechanism as manual WiFi configuration.
+// It rebuilds the mapper from the full snapshot params (not Bootstrap Inform params)
+// so the correct device-specific TR-181 instance numbers (e.g. SSID.3 for 5GHz) are used.
+func (h *Handler) restoreWiFiConfig(ctx context.Context, serial string, snapshot map[string]string, mapper datamodel.Mapper) {
+	// Rebuild mapper from snapshot (full param set) so instance discovery is accurate.
+	// Bootstrap Inform carries only a few params and defaults to SSID.1/SSID.2,
+	// but the device may use SSID.3 (or higher) for 5GHz.
+	snapshotInstanceMap := datamodel.DiscoverInstances(snapshot)
+	modelType := datamodel.DetectFromRootObject(firstRootObject(snapshot))
+	snapshotMapper := datamodel.ApplyInstanceMap(datamodel.NewMapper(modelType), snapshotInstanceMap)
+
+	h.log.WithField("serial", serial).
+		WithField("ssid_idx_24", snapshotInstanceMap.WiFiSSIDIndices).
+		Debug("CWMP: restore WiFi mapper rebuilt from snapshot")
+
+	type bandCfg struct {
+		band     string
+		ssidPath string
+		passPath string
+		secPath  string
+	}
+	bands := []bandCfg{
+		{"2.4", snapshotMapper.WiFiSSIDPath(0), snapshotMapper.WiFiPasswordPath(0), snapshotMapper.WiFiSecurityModePath(0)},
+		{"5", snapshotMapper.WiFiSSIDPath(1), snapshotMapper.WiFiPasswordPath(1), snapshotMapper.WiFiSecurityModePath(1)},
+	}
+
+	// Read band steering state from snapshot. Include it in the first (2.4GHz) task
+	// so it is restored before individual SSID tasks run. This prevents the device
+	// from syncing SSIDs across bands when band steering is enabled by default after reset.
+	bandSteering := extractBandSteeringStatus(snapshot, snapshotMapper)
+
+	queued := 0
+	for i, b := range bands {
+		ssid := snapshot[b.ssidPath]
+		if ssid == "" {
+			h.log.WithField("serial", serial).
+				WithField("band", b.band).
+				WithField("path", b.ssidPath).
+				Warn("CWMP: SSID not found in snapshot for band, skipping")
+			continue
+		}
+		password := snapshot[b.passPath]
+		security := deviceSecToPayloadSec(snapshot[b.secPath])
+
+		wifiPayload := task.WiFiPayload{
+			Band:     b.band,
+			SSID:     ssid,
+			Password: password,
+			Security: security,
+		}
+		// Attach band steering to the first task only so it is set once.
+		if i == 0 {
+			wifiPayload.BandSteeringEnabled = bandSteering
+		}
+		payload, err := json.Marshal(wifiPayload)
+		if err != nil {
+			h.log.WithError(err).WithField("serial", serial).Error("CWMP: Failed to marshal WiFi restore payload")
+			continue
+		}
+		t := &task.Task{
+			ID:      fmt.Sprintf("restore_wifi_%s_%d", strings.ReplaceAll(b.band, ".", "_"), time.Now().UnixNano()),
+			Serial:  serial,
+			Type:    task.TypeWifi,
+			Status:  task.StatusPending,
+			Payload: payload,
+		}
+		if err := h.taskQueue.Enqueue(ctx, t); err != nil {
+			h.log.WithError(err).WithField("serial", serial).Error("CWMP: Failed to queue WiFi restore task")
+			continue
+		}
+		h.log.WithField("serial", serial).
+			WithField("band", b.band).
+			WithField("ssid", ssid).
+			WithField("task_id", t.ID).
+			Info("CWMP: WiFi restore task queued")
+		queued++
+	}
+
+	// Also restore ProvisioningCode as a single-param task to stop re-detection loop.
+	if provCode := snapshot["Device.DeviceInfo.ProvisioningCode"]; provCode != "" {
+		payload, err := json.Marshal(task.SetParamsPayload{
+			Parameters: map[string]string{"Device.DeviceInfo.ProvisioningCode": provCode},
+		})
+		if err == nil {
+			provTask := &task.Task{
+				ID:      fmt.Sprintf("restore_provcode_%d", time.Now().UnixNano()),
+				Serial:  serial,
+				Type:    task.TypeSetParams,
+				Status:  task.StatusPending,
+				Payload: payload,
+			}
+			if err := h.taskQueue.Enqueue(ctx, provTask); err == nil {
+				queued++
+			}
+		}
+	}
+
+	h.log.WithField("serial", serial).
+		WithField("tasks_queued", queued).
+		Info("CWMP: WiFi restore tasks queued after factory reset")
+}
+
+// deviceSecToPayloadSec converts a device-native TR-181 security mode string
+// (e.g. "WPA2-Personal") to the WiFiPayload security format (e.g. "WPA2-PSK").
+func deviceSecToPayloadSec(deviceSec string) string {
+	switch deviceSec {
+	case "WPA2-Personal":
+		return "WPA2-PSK"
+	case "WPA-WPA2-Personal":
+		return "WPA-WPA2-PSK"
+	case "WPA-Personal":
+		return "WPA-PSK"
+	default:
+		return deviceSec
+	}
+}
+
+// filterCriticalParameters extracts user-configured parameters that must be
+// restored after a factory reset: PPPoE credentials, WiFi SSID/password/security.
+// Patterns are intentionally narrow to avoid pushing read-only or volatile params.
+func filterCriticalParameters(params map[string]string) map[string]string {
+	critical := make(map[string]string)
+
+	criticalPatterns := []string{
+		".SSID",        // Device.WiFi.SSID.X.SSID
+		"PreSharedKey", // WiFi WPA pre-shared key
+		"ModeEnabled",  // WiFi security mode (e.g. WPA2-Personal)
+		"WPAAuthenticationMode",
+		"WPAEncryptionModes",
+		"BeaconType",
+		".Username",        // Device.PPP.Interface.X.Username
+		".Password",        // Device.PPP.Interface.X.Password
+		"VLANID",           // Ethernet.VLANTermination.X.VLANID
+		"ProvisioningCode", // Device.DeviceInfo.ProvisioningCode — restored to stop re-detection loop
+	}
+
+	for key, value := range params {
+		for _, pattern := range criticalPatterns {
+			if strings.Contains(key, pattern) {
+				// Exclude read-only, volatile, and system-managed parameters.
+				// NOTE: TR-069 SetParameterValues is atomic — one non-writable param
+				// rejects the entire request (9003/9008), so exclusions must be tight.
+				if !strings.Contains(key, ".Stats.") &&
+					!strings.Contains(key, ".Status") &&
+					!strings.Contains(key, ".AutoDetect") &&
+					!strings.Contains(key, ".ConfigFile") &&
+					!strings.Contains(key, "ManagementServer") &&
+					!strings.HasSuffix(key, ".BSSID") &&
+					!strings.HasSuffix(key, ".Name") &&
+					!strings.HasSuffix(key, ".LastChange") &&
+					!strings.HasSuffix(key, "NumberOfEntries") &&
+					!strings.HasSuffix(key, "PasswordReset") &&
+					!strings.Contains(key, ".MultiAP.") &&
+					!strings.Contains(key, ".DataElements.") &&
+					!strings.Contains(key, "Users.User.") {
+					// For WiFi paths, only restore primary instances (1 and 2).
+					// Pushing all 16 SSID/AccessPoint instances at once can hang devices.
+					if strings.Contains(key, "WiFi.") {
+						if !strings.Contains(key, "WiFi.SSID.1.") &&
+							!strings.Contains(key, "WiFi.SSID.2.") &&
+							!strings.Contains(key, "WiFi.AccessPoint.1.") &&
+							!strings.Contains(key, "WiFi.AccessPoint.2.") {
+							break
+						}
+					}
+					critical[key] = value
+					break
+				}
+			}
+		}
+	}
+
+	return critical
 }

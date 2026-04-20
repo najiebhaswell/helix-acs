@@ -105,6 +105,44 @@ application:
       Access-Control-Max-Age: "86400"
       Vary: "Origin"
 
+  # PostgreSQL configuration for parameter storage
+  postgresql:
+    # PostgreSQL server host and port
+    host: "localhost"
+    port: 5432
+
+    # Database credentials
+    user: "helix"
+    password: "helix_password"
+    database: "helix_parameters"
+
+    # Connection pool settings
+    max_connections: 50
+    connection_max_lifetime: "5m"  # Connection reuse timeout
+
+  # Parameter storage configuration
+  parameters:
+    # Backend: postgresql (for parameter storage)
+    backend: "postgresql"
+
+    # Redis cache settings
+    cache_enabled: true
+    cache_ttl_minutes: 60
+
+    # Daily snapshot configuration (for detecting unexpected reset)
+    daily_snapshot:
+      enabled: true
+      time: "03:00"  # UTC time format HH:MM
+
+    # Parameter history configuration
+    history:
+      enabled: true
+      retention_days: 30  # Delete history older than 30 days
+      batch_cleanup_size: 1000
+
+    # Batch operation settings
+    batch_size: 1000
+
 # Databases
 databases:
 

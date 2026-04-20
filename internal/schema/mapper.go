@@ -294,3 +294,13 @@ func (m *SchemaMapper) WebAdminPasswordPath() string { return m.resolvePath("adm
 func (m *SchemaMapper) SupportsWiFiAccessPoint() bool {
 	return m.modelType == datamodel.TR181
 }
+
+func (m *SchemaMapper) WANServiceTypePath() string { return m.resolvePath("wan.service_type") }
+func (m *SchemaMapper) BandSteeringPath() string   { return m.resolvePath("wifi.band_steering") }
+func (m *SchemaMapper) WANProvisioningType() string {
+	v := m.params["wan.provisioning_type"]
+	if v == "" {
+		return "set_params"
+	}
+	return v
+}

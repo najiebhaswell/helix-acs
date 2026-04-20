@@ -3,6 +3,7 @@ package device
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/raykavin/helix-acs/internal/logger"
 )
@@ -148,6 +149,19 @@ func (s *service) UpdateParameters(ctx context.Context, serial string, params ma
 		return fmt.Errorf("update parameters for device %s: %w", serial, err)
 	}
 	return nil
+}
+
+// MarkStaleOffline sets online=false for all devices that have not sent an
+// Inform since olderThan. Returns the count of affected devices.
+func (s *service) MarkStaleOffline(ctx context.Context, olderThan time.Time) (int64, error) {
+	count, err := s.repo.MarkStaleOffline(ctx, olderThan)
+	if err != nil {
+		return 0, fmt.Errorf("mark stale offline: %w", err)
+	}
+	if count > 0 {
+		s.logger.WithField("count", count).Info("Devices marked offline (no Inform received)")
+	}
+	return count, nil
 }
 
 // SetOnline updates the online presence flag for a device.

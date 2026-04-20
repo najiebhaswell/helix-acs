@@ -17,6 +17,8 @@ type ApplicationConfigProvider interface {
 	GetAPI() APIConfigProvider                           // Returns the api web server configuration
 	GetACS() ACSConfigProvider                           // Returns the acs server configuration
 	GetJWT() JWTConfigProvider                           // Returns the jwt configuration
+	GetPostgreSQL() PostgreSQL                           // Returns the PostgreSQL configuration
+	GetParameters() Parameters                           // Returns the parameter storage configuration
 	GetTask(taskName string) (TaskConfigProvider, error) // Returns a task configuration by name or error if not found
 }
 

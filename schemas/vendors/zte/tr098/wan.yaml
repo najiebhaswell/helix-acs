@@ -1,0 +1,37 @@
+id: wan
+model: tr098
+vendor: zte
+description: >
+  WAN interface parameters for ZTE TR-098 devices.
+  ZTE ONTs (e.g. F660, F600W, F680) follow the standard TR-098 hierarchy
+  with pre-existing WAN connection objects — no AddObject flow is needed.
+  ZTE uses WANPPPConnection for PPPoE (same as base TR-098).
+
+parameters:
+  # ZTE does not expose a standard service-type label.
+  - name: wan.service_type
+    path: ""
+    type: string
+
+  # ZTE devices have pre-existing WAN objects; use set_params provisioning.
+  - name: wan.provisioning_type
+    path: "set_params"
+    type: string
+
+  # ZTE PPPoE credentials (same TR-098 hierarchy as base, but PPPConnection used for PPPoE)
+  - name: wan.pppoe_user
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Username"
+    type: string
+  - name: wan.pppoe_pass
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Password"
+    type: string
+
+  # ZTE connection status path (same as TR-098 base)
+  - name: wan.status
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.ConnectionStatus"
+    type: string
+
+  # ZTE WAN IP (from PPPConnection when PPPoE)
+  - name: wan.ip_address
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.ExternalIPAddress"
+    type: string

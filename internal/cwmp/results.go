@@ -174,6 +174,21 @@ func parseCPEStats(params map[string]string, mapper datamodel.Mapper) (*task.CPE
 	return res, wan
 }
 
+// reExternalIPAddress matches any TR-098 WANIPConnection or WANPPPConnection
+// ExternalIPAddress parameter, used as fallback when the mapper path is empty.
+var reExternalIPAddress = regexp.MustCompile(`^InternetGatewayDevice\.WANDevice\.\d+\.WANConnectionDevice\.\d+\.WAN(?:IP|PPP)Connection\.\d+\.ExternalIPAddress$`)
+
+// fallbackExternalIP scans params for the first non-empty ExternalIPAddress
+// from a TR-098 WAN connection (WANIPConnection or WANPPPConnection).
+func fallbackExternalIP(params map[string]string) string {
+	for k, v := range params {
+		if v != "" && v != "0.0.0.0" && reExternalIPAddress.MatchString(k) {
+			return v
+		}
+	}
+	return ""
+}
+
 // extractWANInfo reads WAN detail fields from the full summon parameter map.
 // It is called from finishSummon to populate the Network tab automatically
 // without requiring a separate CPE Stats task for the static fields.
@@ -217,9 +232,29 @@ func extractWANInfo(params map[string]string, mapper datamodel.Mapper) device.WA
 		}
 	}
 
+	// Read service type via mapper (e.g. X_TP_ServiceType for TP-Link, "" for generic).
+	serviceType := ""
+	if stPath := mapper.WANServiceTypePath(); stPath != "" {
+		serviceType = params[stPath]
+	} else if wanIface != "" {
+		// Fallback: derive suffix from WANServiceTypePath if mapper returns empty
+		// but wanIface is known (supports legacy TR181Mapper without schema).
+		// For generic devices this will also be empty, which is correct.
+		serviceType = ""
+	}
+
+	// For TR-098 devices that use DHCP (WANIPConnection), the mapper's
+	// WANIPAddressPath may point to the PPPoE path (WANPPPConnection) which
+	// will be empty. Fall back to scanning params for any ExternalIPAddress.
+	wanIP := params[ipAddrPath]
+	if wanIP == "" || wanIP == "0.0.0.0" {
+		wanIP = fallbackExternalIP(params)
+	}
+
 	return device.WANInfo{
 		ConnectionType: params[mapper.WANConnectionTypePath()],
-		IPAddress:      params[mapper.WANIPAddressPath()],
+		ServiceType:    serviceType,
+		IPAddress:      wanIP,
 		SubnetMask:     subnetMask,
 		Gateway:        gateway,
 		DNS1:           dns1,
@@ -282,47 +317,83 @@ func extractWANInfos(params map[string]string, mapper datamodel.Mapper) []device
 		seen[mainWan.IPAddress] = true
 	}
 
-	// Additional WANs for TP-Link (using X_TP_ConnType)
+	// Additional WAN interfaces: scan for connection-type parameters that match
+	// the vendor-specific path pattern derived from the mapper.
+	//
+	// For TP-Link: "Device.IP.Interface.{n}.X_TP_ConnType"
+	// For generic TR-181: "Device.IP.Interface.{n}.ConnectionType"
+	//
+	// The pattern is extracted by replacing the instance placeholder in the
+	// resolved WANConnectionTypePath with a regex wildcard.
+	connTypePat := buildConnTypePattern(mapper)
+	serviceTypeSuffix := serviceTypeSuffixFromMapper(mapper)
+
 	for k, v := range params {
-		m := regexp.MustCompile(`^Device\.IP\.Interface\.(\d+)\.X_TP_ConnType$`).FindStringSubmatch(k)
-		if m != nil && v != "LAN" && v != "Bridge" {
-			idx := m[1]
-			ipAddr := params[fmt.Sprintf("Device.IP.Interface.%s.IPv4Address.1.IPAddress", idx)]
-			
-			if ipAddr == "" || ipAddr == "0.0.0.0" || seen[ipAddr] {
-				continue
-			}
+		m := connTypePat.FindStringSubmatch(k)
+		if m == nil {
+			continue
+		}
+		if v == "LAN" || v == "Bridge" || v == "" {
+			continue
+		}
+		idx := m[1]
+		ipAddr := params[fmt.Sprintf("Device.IP.Interface.%s.IPv4Address.1.IPAddress", idx)]
 
-			mtu, _ := strconv.Atoi(params[fmt.Sprintf("Device.IP.Interface.%s.MaxMTUSize", idx)])
+		if ipAddr == "" || ipAddr == "0.0.0.0" || seen[ipAddr] {
+			continue
+		}
 
-			wan := device.WANInfo{
-				ConnectionType: v,
-				ServiceType:    params[fmt.Sprintf("Device.IP.Interface.%s.X_TP_ServiceType", idx)],
-				IPAddress:      ipAddr,
-				SubnetMask:     params[fmt.Sprintf("Device.IP.Interface.%s.IPv4Address.1.SubnetMask", idx)],
-				LinkStatus:     params[fmt.Sprintf("Device.IP.Interface.%s.Status", idx)],
-				Gateway:        findGateway(fmt.Sprintf("Device.IP.Interface.%s.", idx), ipAddr, params),
-				MACAddress:     macAddress,
-				MTU:            mtu,
-			}
+		mtu, _ := strconv.Atoi(params[fmt.Sprintf("Device.IP.Interface.%s.MaxMTUSize", idx)])
 
-			uptimeStr := params[fmt.Sprintf("Device.IP.Interface.%s.X_TP_Uptime", idx)]
-			if uptimeStr == "" {
-				uptimeStr = params[fmt.Sprintf("Device.IP.Interface.%s.LastChange", idx)]
+		serviceType := ""
+		if serviceTypeSuffix != "" {
+			serviceType = params[fmt.Sprintf("Device.IP.Interface.%s.", idx)+serviceTypeSuffix]
+		}
+
+		wan := device.WANInfo{
+			ConnectionType: v,
+			ServiceType:    serviceType,
+			IPAddress:      ipAddr,
+			SubnetMask:     params[fmt.Sprintf("Device.IP.Interface.%s.IPv4Address.1.SubnetMask", idx)],
+			LinkStatus:     params[fmt.Sprintf("Device.IP.Interface.%s.Status", idx)],
+			Gateway:        findGateway(fmt.Sprintf("Device.IP.Interface.%s.", idx), ipAddr, params),
+			MACAddress:     macAddress,
+			MTU:            mtu,
+		}
+
+		uptimeStr := params[fmt.Sprintf("Device.IP.Interface.%s.X_TP_Uptime", idx)]
+		if uptimeStr == "" {
+			uptimeStr = params[fmt.Sprintf("Device.IP.Interface.%s.LastChange", idx)]
+		}
+		if uptimeStr != "" {
+			if u, err := strconv.ParseInt(uptimeStr, 10, 64); err == nil {
+				wan.UptimeSeconds = u
 			}
-			if uptimeStr != "" {
-				if u, err := strconv.ParseInt(uptimeStr, 10, 64); err == nil {
-					wan.UptimeSeconds = u
+		}
+
+		if v == "PPPoE" {
+			lower := params[fmt.Sprintf("Device.IP.Interface.%s.LowerLayers", idx)]
+			if pppMatch := regexp.MustCompile(`Device\.PPP\.Interface\.(\d+)`).FindStringSubmatch(lower); pppMatch != nil {
+				pppIdx := pppMatch[1]
+				wan.PPPoEUsername = params[fmt.Sprintf("Device.PPP.Interface.%s.Username", pppIdx)]
+
+				dnsStr := params[fmt.Sprintf("Device.PPP.Interface.%s.IPCP.DNSServers", pppIdx)]
+				if dnsStr != "" {
+					parts := strings.Split(dnsStr, ",")
+					if len(parts) > 0 {
+						wan.DNS1 = strings.TrimSpace(parts[0])
+					}
+					if len(parts) > 1 {
+						wan.DNS2 = strings.TrimSpace(parts[1])
+					}
 				}
 			}
-
-			if v == "PPPoE" {
-				lower := params[fmt.Sprintf("Device.IP.Interface.%s.LowerLayers", idx)]
-				if pppMatch := regexp.MustCompile(`Device\.PPP\.Interface\.(\d+)`).FindStringSubmatch(lower); pppMatch != nil {
-					pppIdx := pppMatch[1]
-					wan.PPPoEUsername = params[fmt.Sprintf("Device.PPP.Interface.%s.Username", pppIdx)]
-					
-					dnsStr := params[fmt.Sprintf("Device.PPP.Interface.%s.IPCP.DNSServers", pppIdx)]
+		} else if v == "DHCP" {
+			wanIfacePath := fmt.Sprintf("Device.IP.Interface.%s.", idx)
+			for pk, pval := range params {
+				if strings.HasSuffix(pk, ".Interface") && strings.HasPrefix(pk, "Device.DHCPv4.Client.") && pval == wanIfacePath {
+					base := strings.TrimSuffix(pk, ".Interface")
+					dnsStr := params[base+".DNSServers"]
 					if dnsStr != "" {
 						parts := strings.Split(dnsStr, ",")
 						if len(parts) > 0 {
@@ -332,33 +403,53 @@ func extractWANInfos(params map[string]string, mapper datamodel.Mapper) []device
 							wan.DNS2 = strings.TrimSpace(parts[1])
 						}
 					}
-				}
-			} else if v == "DHCP" {
-				wanIfacePath := fmt.Sprintf("Device.IP.Interface.%s.", idx)
-				for pk, pval := range params {
-					if strings.HasSuffix(pk, ".Interface") && strings.HasPrefix(pk, "Device.DHCPv4.Client.") && pval == wanIfacePath {
-						base := strings.TrimSuffix(pk, ".Interface")
-						dnsStr := params[base+".DNSServers"]
-						if dnsStr != "" {
-							parts := strings.Split(dnsStr, ",")
-							if len(parts) > 0 {
-								wan.DNS1 = strings.TrimSpace(parts[0])
-							}
-							if len(parts) > 1 {
-								wan.DNS2 = strings.TrimSpace(parts[1])
-							}
-						}
-						break
-					}
+					break
 				}
 			}
-
-			wans = append(wans, wan)
-			seen[ipAddr] = true
 		}
+
+		wans = append(wans, wan)
+		seen[ipAddr] = true
 	}
 
 	return wans
+}
+
+// buildConnTypePattern derives a per-interface connection-type regex from the
+// mapper's WANConnectionTypePath. It replaces the numeric instance segment with
+// a capture group so all interfaces can be scanned in a single pass.
+//
+// Example: "Device.IP.Interface.5.X_TP_ConnType" → ^Device\.IP\.Interface\.(\d+)\.X_TP_ConnType$
+// Falls back to the standard TR-181 path when the mapper returns "".
+func buildConnTypePattern(mapper datamodel.Mapper) *regexp.Regexp {
+	path := mapper.WANConnectionTypePath()
+	if path == "" {
+		path = "Device.IP.Interface.1.ConnectionType"
+	}
+	escaped := regexp.QuoteMeta(path)
+	// Replace the quoted instance number with a capture group.
+	pat := regexp.MustCompile(`\\\.\d+\\\.`).ReplaceAllLiteralString(escaped, `\.(\d+)\.`)
+	return regexp.MustCompile("^" + pat + "$")
+}
+
+// serviceTypeSuffixFromMapper extracts the field suffix (the part after
+// "Device.IP.Interface.{n}.") from the mapper's WANServiceTypePath.
+// Returns "" when the path is empty or does not follow the expected structure.
+func serviceTypeSuffixFromMapper(mapper datamodel.Mapper) string {
+	path := mapper.WANServiceTypePath()
+	if path == "" {
+		return ""
+	}
+	const prefix = "Device.IP.Interface."
+	if !strings.HasPrefix(path, prefix) {
+		return ""
+	}
+	rest := path[len(prefix):]
+	dotIdx := strings.Index(rest, ".")
+	if dotIdx < 0 {
+		return ""
+	}
+	return rest[dotIdx+1:]
 }
 
 // samePrefix returns true when the first two octets of a and b match.
@@ -426,7 +517,7 @@ func parseConnectedHosts(params map[string]string, mapper datamodel.Mapper) []de
 				} else {
 					h.Interface = "Wi-Fi"
 				}
-				
+
 				// Try to get RSSI if the tree was fetched
 				if rssiStr := params[v+"SignalStrength"]; rssiStr != "" {
 					if r, err := strconv.Atoi(rssiStr); err == nil {
@@ -585,13 +676,14 @@ func extractWiFiInfo(bandIdx int, params map[string]string, mapper datamodel.Map
 }
 
 // extractBandSteeringStatus reads Band Steering status from the parameter map.
-// Band Steering is a device-level vendor-specific feature (TP-Link).
+// The path is looked up from the mapper so it works for any vendor.
 // Returns a pointer to bool if found, nil otherwise.
-func extractBandSteeringStatus(params map[string]string) *bool {
-	// TP-Link Band Steering path
-	const bandSteeringPath = "Device.WiFi.X_TP_BandSteering.Enable"
-	
-	if val, exists := params[bandSteeringPath]; exists && val != "" {
+func extractBandSteeringStatus(params map[string]string, mapper datamodel.Mapper) *bool {
+	path := mapper.BandSteeringPath()
+	if path == "" {
+		return nil
+	}
+	if val, exists := params[path]; exists && val != "" {
 		enabled := strings.EqualFold(val, "true") || val == "1"
 		return &enabled
 	}

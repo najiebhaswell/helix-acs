@@ -253,6 +253,26 @@ func (r *mongoRepository) Delete(ctx context.Context, serial string) error {
 	return err
 }
 
+// MarkStaleOffline sets online=false for all devices whose last_inform is
+// older than olderThan. Returns the number of documents updated.
+func (r *mongoRepository) MarkStaleOffline(ctx context.Context, olderThan time.Time) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	res, err := r.col.UpdateMany(
+		ctx,
+		bson.M{
+			"online":      true,
+			"last_inform": bson.M{"$lt": olderThan},
+		},
+		bson.M{"$set": bson.M{"online": false, "updated_at": time.Now().UTC()}},
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.ModifiedCount, nil
+}
+
 // SetOnline updates the online status of a device.
 func (r *mongoRepository) SetOnline(ctx context.Context, serial string, online bool) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)

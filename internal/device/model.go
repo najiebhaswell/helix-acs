@@ -53,17 +53,17 @@ type LANInfo struct {
 
 // WiFiInfo holds the current state of a single wireless radio / SSID.
 type WiFiInfo struct {
-	Band                 string `bson:"band"                  json:"band"` // "2.4GHz" or "5GHz"
-	SSID                 string `bson:"ssid"                  json:"ssid"`
-	Enabled              bool   `bson:"enabled"               json:"enabled"`
-	BSSID                string `bson:"bssid"                 json:"bssid"`
-	Channel              int    `bson:"channel"               json:"channel"`
-	ChannelWidth         string `bson:"channel_width"         json:"channel_width"`
-	Standard             string `bson:"standard"              json:"standard"`
-	SecurityMode         string `bson:"security_mode"         json:"security_mode"`
-	TXPower              int    `bson:"tx_power"              json:"tx_power"`
-	ConnectedClients     int    `bson:"connected_clients"     json:"connected_clients"`
-	BandSteeringEnabled  *bool  `bson:"band_steering_enabled" json:"band_steering_enabled,omitempty"` // TP-Link specific
+	Band                string `bson:"band"                  json:"band"` // "2.4GHz" or "5GHz"
+	SSID                string `bson:"ssid"                  json:"ssid"`
+	Enabled             bool   `bson:"enabled"               json:"enabled"`
+	BSSID               string `bson:"bssid"                 json:"bssid"`
+	Channel             int    `bson:"channel"               json:"channel"`
+	ChannelWidth        string `bson:"channel_width"         json:"channel_width"`
+	Standard            string `bson:"standard"              json:"standard"`
+	SecurityMode        string `bson:"security_mode"         json:"security_mode"`
+	TXPower             int    `bson:"tx_power"              json:"tx_power"`
+	ConnectedClients    int    `bson:"connected_clients"     json:"connected_clients"`
+	BandSteeringEnabled *bool  `bson:"band_steering_enabled" json:"band_steering_enabled,omitempty"` // TP-Link specific
 
 	// Traffic counters
 	BytesSent       int64 `bson:"bytes_sent"        json:"bytes_sent"`
@@ -95,7 +95,7 @@ type Device struct {
 	ModelName    string             `bson:"model_name"    json:"model_name"`
 	ProductClass string             `bson:"product_class" json:"product_class"`
 	DataModel    string             `bson:"data_model"    json:"data_model"` // "tr181" or "tr098"
-	Schema       string             `bson:"schema"        json:"schema"`      // resolved schema name, e.g. "tr181" or "vendor/huawei/tr181"
+	Schema       string             `bson:"schema"        json:"schema"`     // resolved schema name, e.g. "tr181" or "vendor/huawei/tr181"
 	Online       bool               `bson:"online"        json:"online"`
 	LastInform   time.Time          `bson:"last_inform"   json:"last_inform"`
 	IPAddress    string             `bson:"ip_address"    json:"ip_address"`
@@ -187,6 +187,7 @@ type Repository interface {
 	UpdateTags(ctx context.Context, serial string, tags []string) error
 	Delete(ctx context.Context, serial string) error
 	SetOnline(ctx context.Context, serial string, online bool) error
+	MarkStaleOffline(ctx context.Context, olderThan time.Time) (int64, error)
 	UpdateParameters(ctx context.Context, serial string, params map[string]string) error
 	UpdateInfo(ctx context.Context, serial string, upd InfoUpdate) error
 }
@@ -198,6 +199,7 @@ type Service interface {
 	UpdateTags(ctx context.Context, serial string, tags []string) (*Device, error)
 	Delete(ctx context.Context, serial string) error
 	SetOnline(ctx context.Context, serial string, online bool) error
+	MarkStaleOffline(ctx context.Context, olderThan time.Time) (int64, error)
 	UpdateInfo(ctx context.Context, serial string, upd InfoUpdate) error
 	UpdateParameters(ctx context.Context, serial string, params map[string]string) error
 }

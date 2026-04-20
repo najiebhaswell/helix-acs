@@ -557,10 +557,12 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 // ---- TR-098 discovery -------------------------------------------------------
 
 var (
-	reWANIPConn  = regexp.MustCompile(`^InternetGatewayDevice\.WANDevice\.(\d+)\.WANConnectionDevice\.(\d+)\.WANIPConnection\.(\d+)\.`)
-	reWANPPPConn = regexp.MustCompile(`^InternetGatewayDevice\.WANDevice\.(\d+)\.WANConnectionDevice\.(\d+)\.WANPPPConnection\.(\d+)\.`)
-	reLANDevice  = regexp.MustCompile(`^InternetGatewayDevice\.LANDevice\.(\d+)\.`)
-	reWLANCfg    = regexp.MustCompile(`^InternetGatewayDevice\.LANDevice\.\d+\.WLANConfiguration\.(\d+)\.`)
+	reWANIPConn   = regexp.MustCompile(`^InternetGatewayDevice\.WANDevice\.(\d+)\.WANConnectionDevice\.(\d+)\.WANIPConnection\.(\d+)\.`)
+	reWANPPPConn  = regexp.MustCompile(`^InternetGatewayDevice\.WANDevice\.(\d+)\.WANConnectionDevice\.(\d+)\.WANPPPConnection\.(\d+)\.`)
+	reLANDevice   = regexp.MustCompile(`^InternetGatewayDevice\.LANDevice\.(\d+)\.`)
+	reWLANCfg     = regexp.MustCompile(`^InternetGatewayDevice\.LANDevice\.\d+\.WLANConfiguration\.(\d+)\.`)
+	reWLANChannel = regexp.MustCompile(`^InternetGatewayDevice\.LANDevice\.\d+\.WLANConfiguration\.(\d+)\.Channel$`)
+	reWLANStd     = regexp.MustCompile(`^InternetGatewayDevice\.LANDevice\.\d+\.WLANConfiguration\.(\d+)\.Standard$`)
 )
 
 func discoverTR098(params map[string]string, im *InstanceMap) {
@@ -610,6 +612,7 @@ func discoverTR098LAN(params map[string]string, im *InstanceMap) {
 }
 
 func discoverTR098WLAN(params map[string]string, im *InstanceMap) {
+	// Step 1: collect all discovered WLAN indices.
 	seen := map[int]bool{}
 	for name := range params {
 		m := reWLANCfg.FindStringSubmatch(name)
@@ -622,11 +625,123 @@ func discoverTR098WLAN(params map[string]string, im *InstanceMap) {
 	if len(seen) == 0 {
 		return
 	}
+
+	// Step 2: detect band per index using Channel value (most reliable).
+	// Channel 1-13 → 2.4 GHz (band 0); Channel 36+ → 5 GHz (band 1).
+	bandForIdx := map[int]int{}
+	for name, val := range params {
+		if val == "" {
+			continue
+		}
+		if m := reWLANChannel.FindStringSubmatch(name); m != nil {
+			ch, err := strconv.Atoi(val)
+			if err != nil {
+				continue
+			}
+			idx, _ := strconv.Atoi(m[1])
+			if ch >= 1 && ch <= 13 {
+				bandForIdx[idx] = 0
+			} else if ch >= 36 {
+				bandForIdx[idx] = 1
+			}
+		}
+	}
+
+	// Step 3: fallback — use Standard parameter for indices still unresolved.
+	for name, val := range params {
+		if val == "" {
+			continue
+		}
+		if m := reWLANStd.FindStringSubmatch(name); m != nil {
+			idx, _ := strconv.Atoi(m[1])
+			if _, already := bandForIdx[idx]; already {
+				continue
+			}
+			v := strings.ToLower(val)
+			if strings.Contains(v, "ac") || (strings.Contains(v, "a") && !strings.Contains(v, "n")) {
+				bandForIdx[idx] = 1
+			} else if strings.ContainsAny(v, "bgn") {
+				bandForIdx[idx] = 0
+			}
+		}
+	}
+
+	// Step 4: if band info was detected, build WLANIndices ordered by band
+	// (smallest/primary index per band). This handles both the common CDATA/ZTE
+	// layout (2.4 GHz on indices 1-4, 5 GHz on 5-8) and the FD514GD-R460 variant
+	// (5 GHz on indices 1-5, 2.4 GHz on 6-10) automatically from real channel data.
+	if len(bandForIdx) > 0 {
+		primary := map[int]int{} // band → smallest WLAN index
+		for idx := range seen {
+			band, ok := bandForIdx[idx]
+			if !ok {
+				continue
+			}
+			if cur, exists := primary[band]; !exists || idx < cur {
+				primary[band] = idx
+			}
+		}
+		if len(primary) > 0 {
+			maxBand := 0
+			for band := range primary {
+				if band > maxBand {
+					maxBand = band
+				}
+			}
+			im.WLANIndices = make([]int, maxBand+1)
+			for band, idx := range primary {
+				im.WLANIndices[band] = idx
+			}
+			return
+		}
+	}
+
+	// Step 5: no channel/standard info available — apply CDATA/ZTE index heuristic:
+	// indices 1-4 → 2.4 GHz (band 0), indices 5-8 → 5 GHz (band 1).
+	// Falls back to sorted order for devices not matching this pattern.
 	indices := make([]int, 0, len(seen))
 	for idx := range seen {
 		indices = append(indices, idx)
 	}
 	sort.Ints(indices)
+
+	have2G, have5G := false, false
+	for _, idx := range indices {
+		if idx >= 1 && idx <= 4 {
+			have2G = true
+		} else if idx >= 5 && idx <= 8 {
+			have5G = true
+		}
+	}
+	if have2G && have5G {
+		primary := map[int]int{}
+		for _, idx := range indices {
+			if idx >= 1 && idx <= 4 {
+				if _, exists := primary[0]; !exists {
+					primary[0] = idx
+				}
+			} else if idx >= 5 && idx <= 8 {
+				if _, exists := primary[1]; !exists {
+					primary[1] = idx
+				}
+			}
+		}
+		if len(primary) > 0 {
+			maxBand := 0
+			for band := range primary {
+				if band > maxBand {
+					maxBand = band
+				}
+			}
+			im.WLANIndices = make([]int, maxBand+1)
+			for band, idx := range primary {
+				im.WLANIndices[band] = idx
+			}
+			return
+		}
+	}
+
+	// Final fallback: sorted order (original behaviour for unknown devices).
 	im.WLANIndices = indices
 }
 

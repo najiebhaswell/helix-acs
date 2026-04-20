@@ -1,0 +1,21 @@
+id: diagnostics
+model: tr098
+vendor: cdata
+description: >
+  Diagnostic tool base paths for C-DATA TR-098 GPON ONUs.
+  Provides paths for ping, traceroute, and speed test diagnostics.
+  These are typically used by ACS to trigger network diagnostics remotely.
+
+parameters:
+  - name: diag.ping.base
+    path: "InternetGatewayDevice.IPPingDiagnostics."
+    type: string
+  - name: diag.traceroute.base
+    path: "InternetGatewayDevice.TraceRouteDiagnostics."
+    type: string
+  - name: diag.download.base
+    path: "InternetGatewayDevice.DownloadDiagnostics."
+    type: string
+  - name: diag.upload.base
+    path: "InternetGatewayDevice.UploadDiagnostics."
+    type: string

@@ -1,0 +1,241 @@
+# Helix ACS Configuration Example
+# With PostgreSQL for Parameter Storage
+
+app:
+  name: "Helix ACS"
+  version: "1.0.0"
+  port: 8080
+  debug: false
+
+# ============================================================
+# Database Configuration
+# ============================================================
+
+# MongoDB - untuk device metadata, tasks, users
+mongodb:
+  uri: "mongodb://helix:helix_password@localhost:27017/helix_acs"
+  username: "helix"
+  password: "helix_password"
+  database: "helix_acs"
+
+# PostgreSQL - untuk parameter storage (BARU)
+postgresql:
+  host: "localhost"
+  port: 5432
+  user: "helix"
+  password: "helix_password"
+  database: "helix_parameters"
+  
+  # Connection pool settings
+  max_connections: 50
+  connection_timeout_ms: 5000
+  connection_max_lifetime_seconds: 300
+  
+  # Cache backend
+  cache_host: "localhost"
+  cache_port: 6379
+
+# Redis - untuk task queue dan parameter cache
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+
+# ============================================================
+# CWMP Server Configuration
+# ============================================================
+
+cwmp:
+  # Server configuration
+  host: "0.0.0.0"
+  port: 7547
+  
+  # TR-069 settings
+  max_inform_interval: 3600  # seconds
+  default_periodic_interval: 3600
+  
+  # Session timeout
+  session_timeout: 600  # seconds (10 minutes)
+  
+  # Digest authentication
+  realm: "Helix ACS"
+
+# ============================================================
+# Parameter Management
+# ============================================================
+
+parameters:
+  # Storage backend: "postgresql" atau "mongodb"
+  backend: "postgresql"
+  
+  # Redis cache settings
+  cache_enabled: true
+  cache_ttl_minutes: 60
+  
+  # Daily snapshot untuk detect unexpected reset
+  daily_snapshot:
+    enabled: true
+    time: "03:00"  # UTC
+  
+  # Parameter history retention
+  history:
+    enabled: true
+    retention_days: 30  # Hapus history lebih lama dari 30 hari
+    
+  # Batch settings
+  batch_size: 1000  # Max parameters per batch insert
+
+# ============================================================
+# Device Management
+# ============================================================
+
+devices:
+  # Auto-discovery
+  auto_discovery_enabled: true
+  
+  # Device timeout
+  offline_timeout_minutes: 30
+  
+  # Reset handling
+  reset:
+    enable_auto_restore: true
+    reconnect_timeout_minutes: 30
+    # Parameters untuk exclude dari restoration
+    exclude_patterns:
+      - "^Device.DeviceInfo.*"
+      - "^Device.ManagementServer.Username"
+      - "^Device.ManagementServer.Password"
+
+# ============================================================
+# Task Management
+# ============================================================
+
+tasks:
+  # Task queue
+  queue_backend: "redis"
+  max_attempts: 3
+  retry_delay_seconds: 60
+  
+  # Task timeout
+  execution_timeout_seconds: 300
+  
+  # Task cleanup (hapus completed tasks)
+  cleanup_enabled: true
+  cleanup_older_than_days: 7
+
+# ============================================================
+# API Configuration
+# ============================================================
+
+api:
+  # CORS
+  cors:
+    allowed_origins:
+      - "http://localhost:8080"
+      - "http://localhost:3000"
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+  
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 100
+  
+  # Pagination
+  default_page_size: 20
+  max_page_size: 100
+
+# ============================================================
+# Authentication
+# ============================================================
+
+auth:
+  # JWT
+  jwt:
+    secret_key: "your-secret-key-change-this-in-production"
+    expiration_hours: 24
+    refresh_expiration_hours: 168  # 7 days
+  
+  # Default admin user
+  default_admin:
+    username: "admin"
+    password: "admin_password"  # CHANGE IN PRODUCTION!
+
+# ============================================================
+# Logging
+# ============================================================
+
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json atau text
+  output: "stdout"  # stdout atau file path
+  
+  # File logging
+  file:
+    enabled: false
+    path: "logs/helix-acs.log"
+    max_size_mb: 100
+    max_backups: 5
+    max_age_days: 30
+
+# ============================================================
+# Monitoring & Metrics
+# ============================================================
+
+monitoring:
+  # Health check endpoint
+  health_check_enabled: true
+  
+  # Prometheus metrics
+  prometheus:
+    enabled: false
+    port: 9090
+    
+  # Database stats
+  db_stats_interval_seconds: 60
+
+# ============================================================
+# Notification & Webhook
+# ============================================================
+
+notification:
+  # Email notifications
+  email:
+    enabled: false
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    from: "helix-acs@example.com"
+    subject_prefix: "[Helix ACS]"
+  
+  # Webhooks
+  webhook:
+    enabled: false
+    retry_attempts: 3
+    timeout_seconds: 10
+    events:
+      - "device.registered"
+      - "device.reset"
+      - "task.completed"
+      - "task.failed"
+
+# ============================================================
+# Data Model Configuration
+# ============================================================
+
+datamodel:
+  # Supported models
+  tr098_enabled: true
+  tr181_enabled: true
+  
+  # Vendor-specific schemas
+  vendor_schemas:
+    - name: "tp-link"
+      data_models: ["tr181"]
+    - name: "huawei"
+      data_models: ["tr181"]
+    - name: "zte"
+      data_models: ["tr098"]

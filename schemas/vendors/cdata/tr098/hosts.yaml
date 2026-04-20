@@ -1,0 +1,14 @@
+id: hosts
+model: tr098
+vendor: cdata
+description: >
+  Connected hosts parameters for C-DATA TR-098 GPON ONUs.
+  Provides paths to query DHCP clients and connected devices on the LAN.
+
+parameters:
+  - name: hosts.base
+    path: "InternetGatewayDevice.LANDevice.{lan_dev}.Hosts.Host."
+    type: string
+  - name: hosts.count
+    path: "InternetGatewayDevice.LANDevice.{lan_dev}.Hosts.HostNumberOfEntries"
+    type: unsignedInt

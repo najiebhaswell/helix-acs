@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # MongoDB - untuk device metadata dan tasks (tetap)
+  mongodb:
+    image: mongo:7.0
+    container_name: helix-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: helix
+      MONGO_INITDB_ROOT_PASSWORD: helix_password
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/init-mongodb.js:/docker-entrypoint-initdb.d/init-mongodb.js
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - helix-network
+
+  # PostgreSQL - untuk parameter storage (BARU)
+  postgresql:
+    image: postgres:16-alpine
+    container_name: helix-postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: helix
+      POSTGRES_PASSWORD: helix_password
+      POSTGRES_DB: helix_parameters
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./scripts/init-postgresql.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./scripts/schema-postgresql.sql:/docker-entrypoint-initdb.d/02-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helix -d helix_parameters"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - helix-network
+
+  # Redis - untuk task queue dan parameter cache (tetap)
+  redis:
+    image: redis:7-alpine
+    container_name: helix-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - helix-network
+
+  # pgAdmin - untuk manage PostgreSQL (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: helix-pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - helix-network
+    depends_on:
+      - postgresql
+
+volumes:
+  mongodb_data:
+  postgresql_data:
+  redis_data:
+  pgadmin_data:
+
+networks:
+  helix-network:
+    driver: bridge

@@ -15,6 +15,11 @@ coverage.*
 dist/
 bin/
 out/
+build/
+api
+
+# Device parameter dumps
+*.csv
 
 # Go workspace
 go.work

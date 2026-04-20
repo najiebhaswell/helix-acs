@@ -83,6 +83,20 @@ type Mapper interface {
 	WANErrorsSentPath() string
 	WANErrorsReceivedPath() string
 
+	// WANServiceTypePath returns the path for the service label (e.g. "Internet").
+	// Returns "" if the device does not expose this field.
+	WANServiceTypePath() string
+
+	// BandSteeringPath returns the device-level path to enable/disable WiFi
+	// band steering. Returns "" for devices that do not support this feature.
+	BandSteeringPath() string
+
+	// WANProvisioningType describes the mechanism required to provision a new
+	// WAN connection from scratch:
+	//   "add_object"  – multi-step AddObject flow (TP-Link GPON ONTs)
+	//   "set_params"  – single SetParameterValues on pre-existing WAN paths
+	WANProvisioningType() string
+
 	// LAN / DHCP
 
 	LANIPAddressPath() string

@@ -300,3 +300,13 @@ func (m *TR181Mapper) WebAdminPasswordPath() string {
 func (m *TR181Mapper) SupportsWiFiAccessPoint() bool {
 	return true
 }
+
+// WANServiceTypePath returns "" for generic TR-181; vendor schemas override this.
+func (m *TR181Mapper) WANServiceTypePath() string { return "" }
+
+// BandSteeringPath returns "" for generic TR-181; vendor schemas override this.
+func (m *TR181Mapper) BandSteeringPath() string { return "" }
+
+// WANProvisioningType returns "set_params" for generic TR-181 devices that
+// have pre-existing WAN objects and only need credential/VLAN updates.
+func (m *TR181Mapper) WANProvisioningType() string { return "set_params" }

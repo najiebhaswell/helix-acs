@@ -175,78 +175,54 @@ function tagBadges(tags) {
 
 function extractOpticalInfo(params) {
   if (!params) return null;
-  
   const optical = {};
-  
-  // TP-Link XPON parameter mappings from Device.Optical.Interface.1.X_TP_GPON_Config
-  const mappings = {
-    'PonType': [
-      'Device.Optical.Interface.1.X_TP_GPON_Config.PonType',
-    ],
-    'XPONStatus': [
-      'Device.Optical.Interface.1.X_TP_GPON_Config.XponStatus',
-    ],
-    'Status': [
-      'Device.Optical.Interface.1.X_TP_GPON_Config.Status',
-    ],
-    'Temperature': [
-      'Device.Optical.Interface.1.X_TP_GPON_Config.TransceiverTemperature',
-    ],
-    'SupplyVoltage': [
-      'Device.Optical.Interface.1.X_TP_GPON_Config.SupplyVottage',
-      'Device.Optical.Interface.1.X_TP_GPON_Config.SupplyVoltage',
-    ],
-    'BiasCurrent': [
-      'Device.Optical.Interface.1.X_TP_GPON_Config.BiasCurrent',
-    ],
-    'TXPower': [
-      'Device.Optical.Interface.1.X_TP_GPON_Config.TXPower',
-    ],
-    'RXPower': [
-      'Device.Optical.Interface.1.X_TP_GPON_Config.RXPower',
-    ],
-    'FecDownstreamEnabled': [
-      'Device.Optical.Interface.1.X_TP_GPON_Config.FecDsEn',
-    ],
-    'FecUpstreamEnabled': [
-      'Device.Optical.Interface.1.X_TP_GPON_Config.FecUsEn',
-    ],
-    'OMCIPacketsReceived': [
-      'Device.Optical.Interface.1.X_TP_OMCIStats.PacketsReceived',
-    ],
-    'OMCIPacketsSent': [
-      'Device.Optical.Interface.1.X_TP_OMCIStats.PacketsSent',
-    ],
-    'OpticalSignalLevel': [
-      'Device.Optical.Interface.1.OpticalSignalLevel',
-    ],
-    'TransmitOpticalLevel': [
-      'Device.Optical.Interface.1.TransmitOpticalLevel',
-    ],
-    'BytesReceived': [
-      'Device.Optical.Interface.1.Stats.BytesReceived',
-    ],
-    'BytesSent': [
-      'Device.Optical.Interface.1.Stats.BytesSent',
-    ],
-    'PacketsReceived': [
-      'Device.Optical.Interface.1.Stats.PacketsReceived',
-    ],
-    'PacketsSent': [
-      'Device.Optical.Interface.1.Stats.PacketsSent',
-    ],
+
+  // TR-181 TP-Link paths
+  const tplinkMappings = {
+    'PonType': 'Device.Optical.Interface.1.X_TP_GPON_Config.PonType',
+    'PonMode': 'Device.Optical.Interface.1.X_TP_GPON_Config.PonMode',
+    'XPONStatus': 'Device.Optical.Interface.1.X_TP_GPON_Config.XponStatus',
+    'Status': 'Device.Optical.Interface.1.X_TP_GPON_Config.Status',
+    'Temperature': 'Device.Optical.Interface.1.X_TP_GPON_Config.TransceiverTemperature',
+    'SupplyVoltage': 'Device.Optical.Interface.1.X_TP_GPON_Config.SupplyVottage',
+    'BiasCurrent': 'Device.Optical.Interface.1.X_TP_GPON_Config.BiasCurrent',
+    'TXPower': 'Device.Optical.Interface.1.X_TP_GPON_Config.TXPower',
+    'RXPower': 'Device.Optical.Interface.1.X_TP_GPON_Config.RXPower',
+    'OpticalSignalLevel': 'Device.Optical.Interface.1.X_TP_GPON_Config.OpticalSignalLevel',
+    'TransmitOpticalLevel': 'Device.Optical.Interface.1.X_TP_GPON_Config.TransmitOpticalLevel',
+    'FecDownstream': 'Device.Optical.Interface.1.X_TP_GPON_Config.FecDsEn',
+    'FecUpstream': 'Device.Optical.Interface.1.X_TP_GPON_Config.FecUsEn',
+    'BytesReceived': 'Device.Optical.Interface.1.Stats.BytesReceived',
+    'BytesSent': 'Device.Optical.Interface.1.Stats.BytesSent',
+    'PacketsReceived': 'Device.Optical.Interface.1.Stats.PacketsReceived',
+    'PacketsSent': 'Device.Optical.Interface.1.Stats.PacketsSent',
+    'OMCIPacketsReceived': 'Device.Optical.Interface.1.X_TP_OMCIStats.PacketsReceived',
+    'OMCIPacketsSent': 'Device.Optical.Interface.1.X_TP_OMCIStats.PacketsSent',
   };
-  
-  for (const [key, paths] of Object.entries(mappings)) {
-    for (const path of paths) {
-      if (params[path]) {
-        optical[key] = params[path];
-        break;
-      }
+
+  // TR-098 CDATA/ZTE paths — values are pre-formatted strings (e.g. "-21.36 dBm")
+  const cdataMappings = {
+    'PonMode': 'InternetGatewayDevice.DeviceInfo.XponInterface.X_CMS_PonMode',
+    'Status': 'InternetGatewayDevice.DeviceInfo.XponInterface.Status',
+    'Temperature': 'InternetGatewayDevice.DeviceInfo.XponInterface.TransceiverTemperature',
+    'SupplyVoltage': 'InternetGatewayDevice.DeviceInfo.XponInterface.SupplyVottage',
+    'BiasCurrent': 'InternetGatewayDevice.DeviceInfo.XponInterface.BiasCurrent',
+    'TXPower': 'InternetGatewayDevice.DeviceInfo.XponInterface.TXPower',
+    'RXPower': 'InternetGatewayDevice.DeviceInfo.XponInterface.RXPower',
+  };
+
+  for (const [key, path] of Object.entries(tplinkMappings)) {
+    if (params[path] !== undefined && params[path] !== null && params[path] !== '') {
+      optical[key] = params[path];
     }
   }
-  
-  return Object.keys(optical).length > 0 ? optical : null;
+  for (const [key, path] of Object.entries(cdataMappings)) {
+    if (params[path] !== undefined && params[path] !== null && params[path] !== '') {
+      optical[key] = params[path];
+    }
+  }
+
+  return optical;
 }
 
 function escHtml(s) {
@@ -616,6 +592,15 @@ async function deleteDevice(serial) {
   });
 }
 
+async function saveSnapshot(serial) {
+  try {
+    const res = await API.post(`/devices/${encodeURIComponent(serial)}/snapshots/last-known-good`, {});
+    toast(`Snapshot saved: ${res.param_count} parameters stored as last_known_good.`, 'success');
+  } catch (e) {
+    toast(e.message || 'Failed to save snapshot', 'danger');
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 //  View: Device detail
 // ─────────────────────────────────────────────────────────────
@@ -698,7 +683,7 @@ async function viewDeviceDetail(serial) {
     }
     renderDeviceHeader(dev);
     renderInfoTab(dev);
-    renderNetworkTab(dev);
+    renderNetworkTab(dev, serial);
   } catch (e) {
     toast('Error while loading device: ' + e.message, 'danger');
   }
@@ -731,7 +716,7 @@ function renderDeviceHeader(dev) {
             ${field('Serial', dev.serial)}
             ${field('Firmware', dev.sw_version)}
             ${field('WAN IP', dev.wan_ip)}
-            ${field('WAN TR069', dev.ip_address)}
+            ${field('WAN TR069', dev.wans && dev.wans.length > 0 ? dev.wans.find(w => w.connection_type === 'DHCP')?.ip_address || dev.ip_address : dev.ip_address)}
             ${field('Uptime', uptimeStr)}
             ${field('CPU', cpuStr)}
             ${field('RAM', ramStr)}
@@ -745,11 +730,12 @@ function renderInfoTab(dev) {
   const row = (label, val) =>
     `<tr><td class="text-muted small fw-semibold" style="width:180px">${label}</td><td>${val||''}</td></tr>`;
 
-  // Build base HTML with reorganized layout: Identification + Versions + Tags + System, then Optical section below
+  // Build base HTML: Identification + Versions on top row, then Tags + System on second row
   let baseHtml = `
     <div class="row g-3">
-      <div class="col-md-6">
-        <div class="card border-0 shadow-sm">
+      <!-- First row: Identification + Versions -->
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
           <div class="card-header bg-white fw-semibold small">Identification</div>
           <div class="card-body p-0">
             <table class="table table-sm mb-0">
@@ -763,8 +749,9 @@ function renderInfoTab(dev) {
           </div>
         </div>
       </div>
-      <div class="col-md-6">
-        <div class="card border-0 shadow-sm">
+      
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
           <div class="card-header bg-white fw-semibold small">Versions</div>
           <div class="card-body p-0">
             <table class="table table-sm mb-0">
@@ -775,21 +762,10 @@ function renderInfoTab(dev) {
           </div>
         </div>
       </div>
-      <div class="col-md-6">
-        <div class="card border-0 shadow-sm">
-          <div class="card-header bg-white fw-semibold small d-flex justify-content-between align-items-center">
-            Tags
-            <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="openTagsModal('${escHtml(dev.serial)}', ${JSON.stringify(dev.tags||[])})">
-              <i class="bi bi-pencil"></i>
-            </button>
-          </div>
-          <div class="card-body" id="dev-tags-area">
-            ${tagBadges(dev.tags)}
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card border-0 shadow-sm">
+      
+      <!-- Second row: System + Optical Information -->
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
           <div class="card-header bg-white fw-semibold small">System</div>
           <div class="card-body p-0">
             <table class="table table-sm mb-0">
@@ -797,7 +773,7 @@ function renderInfoTab(dev) {
               ${row('CPU Usage', dev.cpu_usage != null ? dev.cpu_usage + '%' : null)}
               ${row('RAM (Used/Total)', dev.ram_total ? fmtRam(dev.ram_total, dev.ram_free) : null)}
               ${row('URL ACS', escHtml(dev.acs_url))}
-              ${row('WAN TR069 IP', escHtml(dev.ip_address))}
+              ${row('WAN TR069 IP', dev.wans && dev.wans.length > 0 ? escHtml(dev.wans.find(w => w.connection_type === 'DHCP')?.ip_address || dev.ip_address || '') : escHtml(dev.ip_address))}
               <tr>
                 <td class="text-muted small fw-semibold" style="width:180px">WAN IP</td>
                 <td>${dev.wans && dev.wans.length > 0 
@@ -811,10 +787,41 @@ function renderInfoTab(dev) {
           </div>
         </div>
       </div>
-    </div>
-    
-    <!-- Optical Information Section (loaded separately) -->
-    <div id="optical-section" class="row g-3 mt-2"></div>`;
+      
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white fw-semibold small"><i class="bi bi-lightbulb me-1 text-warning"></i>Optical Information</div>
+          <div class="card-body p-0" id="optical-info-card"></div>
+        </div>
+      </div>
+      
+      <!-- Third row: Tags (at bottom) -->
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold small d-flex justify-content-between align-items-center">
+            Tags
+            <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="openTagsModal('${escHtml(dev.serial)}', ${JSON.stringify(dev.tags||[])})">
+              <i class="bi bi-pencil"></i>
+            </button>
+          </div>
+          <div class="card-body" id="dev-tags-area">
+            ${tagBadges(dev.tags)}
+          </div>
+        </div>
+      </div>
+
+      <!-- Fourth row: Maintenance Actions -->
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold small"><i class="bi bi-tools me-1 text-secondary"></i>Maintenance</div>
+          <div class="card-body d-flex flex-wrap gap-2">
+            <button class="btn btn-sm btn-outline-success" onclick="saveSnapshot('${escHtml(dev.serial)}')" title="Simpan parameter saat ini sebagai last_known_good snapshot. Snapshot ini digunakan untuk restore otomatis setelah factory reset.">
+              <i class="bi bi-floppy me-1"></i>Save Snapshot (last_known_good)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`;
 
   document.getElementById('tab-info').innerHTML = baseHtml;
 
@@ -822,82 +829,58 @@ function renderInfoTab(dev) {
   API.get(`/devices/${encodeURIComponent(dev.serial)}/parameters`)
     .then(params => {
       const opticalInfo = extractOpticalInfo(params);
-      if (opticalInfo) {
-        const opticalRow = (label, val) => 
-          `<tr><td class="text-muted small fw-semibold" style="width:180px">${label}</td><td>${val ? escHtml(String(val)) : '-'}</td></tr>`;
-        
-        const formatTemp = (val) => val ? Math.round(val / 100) + ' °C' : '-';
-        const formatVoltage = (val) => val ? (val / 1000).toFixed(3) + ' mV' : '-';
-        const formatCurrent = (val) => val ? (val / 100).toFixed(2) + ' mA' : '-';
-        const formatTXPower = (val) => val ? (parseInt(val) / 10000).toFixed(2) + ' dBm' : '-';
-        
-        const opticalHtml = `
-          <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white fw-semibold small"><i class="bi bi-lightbulb me-1 text-warning"></i>XPON Status</div>
-              <div class="card-body p-0">
-                <table class="table table-sm mb-0">
-                  ${opticalInfo.PonType ? opticalRow('PON Type', opticalInfo.PonType) : ''}
-                  ${opticalInfo.XPONStatus ? opticalRow('XPON Status', opticalInfo.XPONStatus) : ''}
-                  ${opticalInfo.Status ? opticalRow('Status Code', opticalInfo.Status) : ''}
-                  ${opticalInfo.OpticalSignalLevel ? opticalRow('Signal Level', opticalInfo.OpticalSignalLevel) : ''}
-                </table>
-              </div>
-            </div>
-          </div>`;
-        
-        // Optical metrics card
-        const opticalMetricsHtml = `
-          <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white fw-semibold small">Optical Metrics</div>
-              <div class="card-body p-0">
-                <table class="table table-sm mb-0">
-                  ${opticalInfo.Temperature ? opticalRow('Temperature', formatTemp(opticalInfo.Temperature)) : ''}
-                  ${opticalInfo.SupplyVoltage ? opticalRow('Supply Voltage', formatVoltage(opticalInfo.SupplyVoltage)) : ''}
-                  ${opticalInfo.BiasCurrent ? opticalRow('Bias Current', formatCurrent(opticalInfo.BiasCurrent)) : ''}
-                  ${opticalInfo.TXPower ? opticalRow('TX Power', formatTXPower(opticalInfo.TXPower)) : ''}
-                  ${opticalInfo.RXPower ? opticalRow('RX Power', opticalInfo.RXPower + ' dBm') : ''}
-                  ${opticalInfo.TransmitOpticalLevel ? opticalRow('TX Optical Level', opticalInfo.TransmitOpticalLevel) : ''}
-                  ${opticalInfo.FecDownstreamEnabled ? opticalRow('FEC Downstream', opticalInfo.FecDownstreamEnabled === '1' || opticalInfo.FecDownstreamEnabled === 1 ? 'Enabled' : 'Disabled') : ''}
-                  ${opticalInfo.FecUpstreamEnabled ? opticalRow('FEC Upstream', opticalInfo.FecUpstreamEnabled === '1' || opticalInfo.FecUpstreamEnabled === 1 ? 'Enabled' : 'Disabled') : ''}
-                </table>
-              </div>
-            </div>
-          </div>`;
-        
-        // Traffic stats card
-        const trafficHtml = `
-          <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white fw-semibold small">Optical Traffic</div>
-              <div class="card-body p-0">
-                <table class="table table-sm mb-0">
-                  ${opticalInfo.BytesReceived ? opticalRow('Bytes RX', fmtBytes(opticalInfo.BytesReceived)) : ''}
-                  ${opticalInfo.BytesSent ? opticalRow('Bytes TX', fmtBytes(opticalInfo.BytesSent)) : ''}
-                  ${opticalInfo.PacketsReceived ? opticalRow('Packets RX', opticalInfo.PacketsReceived) : ''}
-                  ${opticalInfo.PacketsSent ? opticalRow('Packets TX', opticalInfo.PacketsSent) : ''}
-                </table>
-              </div>
-            </div>
-          </div>`;
-        
-        // OMCI stats card
-        const omciHtml = opticalInfo.OMCIPacketsReceived || opticalInfo.OMCIPacketsSent ? `
-          <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-              <div class="card-header bg-white fw-semibold small">OMCI Stats</div>
-              <div class="card-body p-0">
-                <table class="table table-sm mb-0">
-                  ${opticalInfo.OMCIPacketsReceived ? opticalRow('OMCI RX', opticalInfo.OMCIPacketsReceived) : ''}
-                  ${opticalInfo.OMCIPacketsSent ? opticalRow('OMCI TX', opticalInfo.OMCIPacketsSent) : ''}
-                </table>
-              </div>
-            </div>
-          </div>` : '';
-        
-        document.getElementById('optical-section').innerHTML = opticalHtml + opticalMetricsHtml + trafficHtml + omciHtml;
+      const opticalRow = (label, val) => 
+        `<tr><td class="text-muted small fw-semibold" style="width:180px">${label}</td><td>${val ? escHtml(String(val)) : '-'}</td></tr>`;
+      
+      // Detect if value is already a formatted string (CDATA/ZTE pre-formats values).
+      // TP-Link values are raw integers; CDATA values contain units like "dBm", "V", "mA".
+      const isPreFormatted = (val) => val && /[a-zA-Z]/.test(String(val));
+
+      const formatTemp = (val) => {
+        if (!val) return '-';
+        if (isPreFormatted(val)) return String(val).trim() + ' °C';
+        return (parseInt(val) / 256).toFixed(2) + ' °C';
+      };
+      const formatVoltage = (val) => {
+        if (!val) return '-';
+        if (isPreFormatted(val)) return String(val).trim();
+        return (val / 1000).toFixed(3) + ' V';
+      };
+      const formatCurrent = (val) => {
+        if (!val) return '-';
+        if (isPreFormatted(val)) return String(val).trim();
+        return (val * 2 / 1000).toFixed(2) + ' mA';
+      };
+      const formatPower = (val) => {
+        if (!val) return '-';
+        if (isPreFormatted(val)) return String(val).trim();
+        const microWatts = parseInt(val) * 0.1;
+        const milliWatts = microWatts / 1000;
+        const dBm = 10 * Math.log10(milliWatts);
+        return isNaN(dBm) ? String(val) : dBm.toFixed(2) + ' dBm';
+      };
+
+      let htmlContent = '';
+
+      if (opticalInfo && Object.keys(opticalInfo).length > 0) {
+        htmlContent = `<table class="table table-sm mb-0" style="margin-top:8px;border-top:1px solid #dee2e6">
+          <tbody>
+            ${opticalInfo.PonMode ? opticalRow('PON Mode', opticalInfo.PonMode) : ''}
+            ${opticalInfo.Status ? opticalRow('Status', opticalInfo.Status) : ''}
+            ${opticalInfo.Temperature ? opticalRow('Temperature', formatTemp(opticalInfo.Temperature)) : ''}
+            ${opticalInfo.SupplyVoltage ? opticalRow('Supply Voltage', formatVoltage(opticalInfo.SupplyVoltage)) : ''}
+            ${opticalInfo.BiasCurrent ? opticalRow('Bias Current', formatCurrent(opticalInfo.BiasCurrent)) : ''}
+            ${opticalInfo.TXPower ? opticalRow('TX Power', formatPower(opticalInfo.TXPower)) : ''}
+            ${opticalInfo.RXPower ? opticalRow('RX Power', formatPower(opticalInfo.RXPower)) : ''}
+            ${opticalInfo.OpticalSignalLevel ? opticalRow('Signal Level', opticalInfo.OpticalSignalLevel) : ''}
+            ${opticalInfo.BytesReceived ? opticalRow('Bytes RX', fmtBytes(opticalInfo.BytesReceived)) : ''}
+            ${opticalInfo.BytesSent ? opticalRow('Bytes TX', fmtBytes(opticalInfo.BytesSent)) : ''}
+          </tbody>
+        </table>`;
       }
+      
+      const opticalCard = document.getElementById('optical-info-card');
+      if (opticalCard) opticalCard.innerHTML = htmlContent;
     })
     .catch(e => {
       // Silently fail if parameters endpoint not available
@@ -905,16 +888,68 @@ function renderInfoTab(dev) {
 }
 
 
-function renderNetworkTab(dev) {
+async function renderNetworkTab(dev, serial) {
   const row = (label, val) =>
     `<tr><td class="text-muted small fw-semibold" style="width:180px">${label}</td><td>${escHtml(String(val||''))}</td></tr>`;
 
+  // Fetch stored PPPoE credentials from PostgreSQL (if any).
+  // TP-Link ONTs never return the password via CWMP, so we store it ourselves.
+  let provisionInfo = {};
+  try {
+    provisionInfo = await API.get(`/devices/${encodeURIComponent(serial || dev.serial)}/provision`);
+  } catch (_) { /* non-blocking: silently ignore if endpoint unavailable */ }
+
+  const pppoeUser = provisionInfo.pppoe_username || '';
+  const pppoePass = provisionInfo.pppoe_password || '';
+  const provVLAN  = provisionInfo.vlan_id || '';
+
+  // Store for task modal pre-fill
+  S.provisionInfo = provisionInfo;
+
+  // passRow: always rendered when WAN is PPPoE.
+  // If password is stored → show masked with eye toggle.
+  // If not yet stored → show a helpful hint so user knows to run a WAN task.
+  const passRow = (isPPPoE, stored) => {
+    if (!isPPPoE) return '';
+    if (stored) {
+      return `<tr>
+        <td class="text-muted small fw-semibold" style="width:180px">PPPoE Password</td>
+        <td>
+          <span id="pppoe-pass-val" style="font-family:monospace;letter-spacing:.1em">••••••••</span>
+          <button class="btn btn-link btn-sm py-0 px-1 text-muted" style="font-size:.75rem"
+                  onclick="togglePPPoEPass('${escHtml(stored)}')" title="Show/Hide password">
+            <i class="bi bi-eye" id="pppoe-pass-eye"></i>
+          </button>
+        </td>
+       </tr>`;
+    }
+    // Password not yet captured — explain why and what to do.
+    return `<tr>
+      <td class="text-muted small fw-semibold" style="width:180px">PPPoE Password</td>
+      <td>
+        <span class="text-muted" style="font-size:.8rem">
+          <i class="bi bi-info-circle me-1"></i>Belum tersimpan — jalankan task <strong>WAN Configuration</strong> untuk menangkap password.
+        </span>
+      </td>
+     </tr>`;
+  };
+
+  const vlanBadge = (v) => v
+    ? `<span class="badge bg-light text-dark border ms-1" style="font-size:.7rem">VLAN ${escHtml(v)}</span>`
+    : '';
+
   let wanCards = '';
   if (dev.wans && dev.wans.length > 0) {
-    wanCards = dev.wans.map(w => `
+    wanCards = dev.wans.map(w => {
+      const isPPPoE = (w.connection_type||'').toLowerCase().includes('pppoe');
+      const displayUser = isPPPoE && pppoeUser ? pppoeUser : w.pppoe_username;
+      const displayPass = isPPPoE ? pppoePass : '';
+      return `
     <div>
       <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white fw-semibold small"><i class="bi bi-globe me-1 text-primary"></i>WAN (${escHtml(w.connection_type || 'Unknown')})</div>
+        <div class="card-header bg-white fw-semibold small">
+          <i class="bi bi-globe me-1 text-primary"></i>WAN (${escHtml(w.connection_type || 'Unknown')})${vlanBadge(isPPPoE ? provVLAN : '')}
+        </div>
         <div class="card-body p-0">
           <table class="table table-sm mb-0">
             ${row('Status', w.link_status)}
@@ -928,7 +963,8 @@ function renderNetworkTab(dev) {
             ${row('MAC', w.mac_address)}
             ${row('MTU', w.mtu || null)}
             ${row('Uptime WAN', w.uptime_seconds ? fmtUptime(w.uptime_seconds) : null)}
-            ${w.pppoe_username ? row('PPPoE Username', w.pppoe_username) : ''}
+            ${displayUser ? row('PPPoE Username', displayUser) : ''}
+            ${passRow(isPPPoE, displayPass)}
           </table>
         </div>
         ${w.bytes_sent || w.bytes_received ? `
@@ -936,13 +972,17 @@ function renderNetworkTab(dev) {
           <small class="text-muted">Traffic  Sent: ${fmtBytes(w.bytes_sent)} · Received: ${fmtBytes(w.bytes_received)}</small>
         </div>` : ''}
       </div>
-    </div>`).join('');
+    </div>`;
+    }).join('');
   } else if (dev.wan) {
     // fallback for older db data
+    const isPPPoE = (dev.wan.connection_type||'').toLowerCase().includes('pppoe');
+    const displayUser = isPPPoE && pppoeUser ? pppoeUser : dev.wan.pppoe_username;
+    const displayPass = isPPPoE ? pppoePass : '';
     wanCards = `
     <div>
       <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white fw-semibold small"><i class="bi bi-globe me-1 text-primary"></i>WAN</div>
+        <div class="card-header bg-white fw-semibold small"><i class="bi bi-globe me-1 text-primary"></i>WAN${vlanBadge(isPPPoE ? provVLAN : '')}</div>
         <div class="card-body p-0">
           <table class="table table-sm mb-0">
             ${row('Status', dev.wan.link_status)}
@@ -955,7 +995,8 @@ function renderNetworkTab(dev) {
             ${row('MAC', dev.wan.mac_address)}
             ${row('MTU', dev.wan.mtu || null)}
             ${row('Uptime WAN', dev.wan.uptime_seconds ? fmtUptime(dev.wan.uptime_seconds) : null)}
-            ${dev.wan.pppoe_username ? row('PPPoE Username', dev.wan.pppoe_username) : ''}
+            ${displayUser ? row('PPPoE Username', displayUser) : ''}
+            ${passRow(isPPPoE, displayPass)}
           </table>
         </div>
       </div>
@@ -1044,6 +1085,22 @@ function renderNetworkTab(dev) {
     </div>`;
 }
 
+// Toggle PPPoE password visibility in WAN card
+function togglePPPoEPass(pass) {
+  const span = document.getElementById('pppoe-pass-val');
+  const eye  = document.getElementById('pppoe-pass-eye');
+  if (!span) return;
+  if (span.dataset.shown === '1') {
+    span.textContent = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+    span.dataset.shown = '0';
+    if (eye) { eye.className = 'bi bi-eye'; }
+  } else {
+    span.textContent = pass;
+    span.dataset.shown = '1';
+    if (eye) { eye.className = 'bi bi-eye-slash'; }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 //  Tab: Connected Hosts
 // ─────────────────────────────────────────────────────────────
@@ -1107,7 +1164,6 @@ async function loadHosts() {
 // ─────────────────────────────────────────────────────────────
 async function loadParams() {
   const el = document.getElementById('tab-params');
-  if (el.dataset.loaded) return;
   try {
     const params = await API.get(`/devices/${encodeURIComponent(S.currentSerial)}/parameters`);
     const entries = Object.entries(params || {});
@@ -1116,8 +1172,13 @@ async function loadParams() {
       <div class="card border-0 shadow-sm">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
           <span class="fw-semibold small">Parameters TR-069 (${entries.length})</span>
-          <input class="form-control form-control-sm w-auto" id="param-search"
-                 placeholder="Filter…" oninput="filterParams()" style="max-width:240px">
+          <div class="d-flex gap-2 align-items-center">
+            <input class="form-control form-control-sm w-auto" id="param-search"
+                   placeholder="Filter…" oninput="filterParams()" style="max-width:240px">
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadParams()" title="Refresh">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+          </div>
         </div>
         <div class="card-body p-0">
           <div style="max-height:520px;overflow-y:auto">
@@ -1137,7 +1198,6 @@ async function loadParams() {
           </div>
         </div>
       </div>`;
-    el.dataset.loaded = '1';
   } catch (e) {
     el.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
   }

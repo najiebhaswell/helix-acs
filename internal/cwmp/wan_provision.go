@@ -346,6 +346,9 @@ func (p *WANProvision) onSetParams() ([]byte, error) {
 		return nil, fmt.Errorf("expected SetParams at step %d", p.cur)
 	}
 	p.cur++
+	if p.done() {
+		return nil, nil // all steps complete — signal success to caller
+	}
 	return p.buildCurrentXML()
 }
 

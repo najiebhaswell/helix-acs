@@ -3,6 +3,14 @@ model: tr098
 description: WAN interface configuration parameters for TR-098 devices
 
 parameters:
+  # TR-098 base model has no standard service-type label; vendor schemas may override.
+  - name: wan.service_type
+    path: ""
+    type: string
+  # TR-098 devices have pre-existing WAN objects; use set_params provisioning.
+  - name: wan.provisioning_type
+    path: "set_params"
+    type: string
   - name: wan.connection_type
     path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.ConnectionType"
     type: string

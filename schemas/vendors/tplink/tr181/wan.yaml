@@ -7,6 +7,12 @@ parameters:
   - name: wan.connection_type
     path: "Device.IP.Interface.{wan}.X_TP_ConnType"
     type: string
+  - name: wan.service_type
+    path: "Device.IP.Interface.{wan}.X_TP_ServiceType"
+    type: string
   - name: wan.uptime
     path: "Device.IP.Interface.{wan}.X_TP_Uptime"
     type: unsignedInt
+  - name: wan.provisioning_type
+    path: "add_object"
+    type: string

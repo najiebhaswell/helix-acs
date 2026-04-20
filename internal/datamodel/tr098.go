@@ -310,3 +310,12 @@ func (m *TR098Mapper) WebAdminPasswordPath() string { return "" }
 
 // SupportsWiFiAccessPoint returns false for TR-098 which uses vendor-specific WiFi paths.
 func (m *TR098Mapper) SupportsWiFiAccessPoint() bool { return false }
+
+// WANServiceTypePath returns "" for TR-098; no standard service-type label exists.
+func (m *TR098Mapper) WANServiceTypePath() string { return "" }
+
+// BandSteeringPath returns "" for TR-098; vendor schemas override this.
+func (m *TR098Mapper) BandSteeringPath() string { return "" }
+
+// WANProvisioningType returns "set_params" for generic TR-098 devices.
+func (m *TR098Mapper) WANProvisioningType() string { return "set_params" }

@@ -280,3 +280,150 @@ func TestValidateTypeUnknown(t *testing.T) {
 	assert.NoError(t, ValidateType("xsd:anyType", "whatever"))
 	assert.NoError(t, ValidateType("vendor:custom", "value"))
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// C-DATA TR-098 Integration Tests
+// ────────────────────────────────────────────────────────────────────────
+
+// TestTR098MapperCDATA verifies that C-DATA GPON ONUs (using TR-098) have
+// correct path mappings for PPPoE provisioning via WANPPPConnection.
+func TestTR098MapperCDATA(t *testing.T) {
+	// C-DATA ONUs: FD514GD-R460 series, uses TR-098 with pre-configured WAN objects
+	m := &TR098Mapper{
+		WANDeviceIdx:  1,
+		WANConnDevIdx: 1,
+		WANPPPConnIdx: 1,
+	}
+
+	// Verify PPPoE credential paths for C-DATA
+	// C-DATA provides standard TR-098 WANPPPConnection paths
+	expectedUserPath := "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username"
+	expectedPassPath := "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password"
+
+	assert.Equal(t, expectedUserPath, m.WANPPPoEUserPath(), "C-DATA PPPoE username path")
+	assert.Equal(t, expectedPassPath, m.WANPPPoEPassPath(), "C-DATA PPPoE password path")
+
+	// Verify WAN status paths
+	expectedStatusPath := "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.ConnectionStatus"
+	assert.Equal(t, expectedStatusPath, m.WANStatusPath(), "C-DATA WAN connection status path")
+
+	// Verify WAN IP address can be read from WANIPConnection (fallback)
+	expectedIPPath := "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress"
+	assert.Equal(t, expectedIPPath, m.WANIPAddressPath(), "C-DATA WAN IP address path")
+
+	// Verify traffic statistics paths (from WANCommonInterfaceConfig)
+	expectedBytesRxPath := "InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesReceived"
+	assert.Equal(t, expectedBytesRxPath, m.WANBytesReceivedPath(), "C-DATA WAN bytes received path")
+
+	expectedBytesTxPath := "InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesSent"
+	assert.Equal(t, expectedBytesTxPath, m.WANBytesSentPath(), "C-DATA WAN bytes sent path")
+}
+
+// TestTR098MapperCDATA_CustomIndices verifies that custom instance indices
+// (discovered at runtime) are properly applied to C-DATA TR-098 paths.
+func TestTR098MapperCDATA_CustomIndices(t *testing.T) {
+	// If instance discovery finds different indices (e.g. WANDevice.2)
+	m := &TR098Mapper{
+		WANDeviceIdx:  2,
+		WANConnDevIdx: 2,
+		WANPPPConnIdx: 1,
+		LANDeviceIdx:  1,
+		WLANIndices:   []int{1, 2},
+	}
+
+	// Paths should use the custom indices
+	expectedUserPath := "InternetGatewayDevice.WANDevice.2.WANConnectionDevice.2.WANPPPConnection.1.Username"
+	assert.Equal(t, expectedUserPath, m.WANPPPoEUserPath())
+
+	// WiFi paths should also respect custom indices
+	expectedWiFi2GPath := "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID"
+	expectedWiFi5GPath := "InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSID"
+
+	assert.Equal(t, expectedWiFi2GPath, m.WiFiSSIDPath(0))
+	assert.Equal(t, expectedWiFi5GPath, m.WiFiSSIDPath(1))
+}
+
+// TestTR098MapperCDATA_DetectModel verifies that parameters with InternetGatewayDevice
+// prefix are correctly detected as TR-098.
+func TestTR098MapperCDATA_DetectModel(t *testing.T) {
+	m := &TR098Mapper{}
+
+	// Simulated C-DATA device parameters (TR-098 hierarchy)
+	params := map[string]string{
+		"InternetGatewayDevice.DeviceInfo.Manufacturer": "ZTEG",
+		"InternetGatewayDevice.DeviceInfo.ModelName":    "FD514GD-R460",
+		"InternetGatewayDevice.DeviceInfo.SerialNumber": "CDTCAF252D7F",
+	}
+
+	// Should always return TR098 for TR098Mapper
+	assert.Equal(t, TR098, m.DetectModel(params))
+}
+
+// TestTR098MapperCDATA_ExtractDeviceInfo verifies device info extraction from
+// C-DATA device parameters.
+func TestTR098MapperCDATA_ExtractDeviceInfo(t *testing.T) {
+	m := &TR098Mapper{}
+
+	params := map[string]string{
+		"InternetGatewayDevice.DeviceInfo.Manufacturer":                                                "ZTEG",
+		"InternetGatewayDevice.DeviceInfo.ModelName":                                                   "FD514GD-R460",
+		"InternetGatewayDevice.DeviceInfo.SerialNumber":                                                "CDTCAF252D7F",
+		"InternetGatewayDevice.DeviceInfo.ManufacturerOUI":                                             "00188F",
+		"InternetGatewayDevice.DeviceInfo.ProductClass":                                                "GPON ONU",
+		"InternetGatewayDevice.DeviceInfo.SoftwareVersion":                                             "1.0.0",
+		"InternetGatewayDevice.DeviceInfo.HardwareVersion":                                             "R460",
+		"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.ExternalIPAddress": "203.0.113.100",
+		"InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.1.IPInterfaceIPAddress": "192.168.100.1",
+	}
+
+	dev := m.ExtractDeviceInfo(params)
+	require.NotNil(t, dev)
+	assert.Equal(t, "ZTEG", dev.Manufacturer)
+	assert.Equal(t, "FD514GD-R460", dev.ModelName)
+	assert.Equal(t, "CDTCAF252D7F", dev.Serial)
+	assert.Equal(t, "00188F", dev.OUI)
+	assert.Equal(t, "GPON ONU", dev.ProductClass)
+	assert.Equal(t, "1.0.0", dev.SWVersion)
+	assert.Equal(t, "R460", dev.HWVersion)
+	// Note: ExtractDeviceInfo uses WANIPConnection path for WANIP, so PPP external IP won't be extracted
+	assert.Equal(t, "192.168.100.1", dev.LANIP)
+}
+
+// TestTR098Mapper_ApplyInstanceMap verifies that discovered instance indices
+// are correctly applied to the mapper.
+func TestTR098Mapper_ApplyInstanceMap(t *testing.T) {
+	original := &TR098Mapper{}
+
+	im := InstanceMap{
+		WANDeviceIdx:  3,
+		WANConnDevIdx: 2,
+		WANIPConnIdx:  1,
+		WANPPPConnIdx: 1,
+		LANDeviceIdx:  1,
+		WLANIndices:   []int{1, 2},
+	}
+
+	result := ApplyInstanceMap(original, im)
+	mapped, ok := result.(*TR098Mapper)
+	require.True(t, ok, "ApplyInstanceMap should return *TR098Mapper")
+
+	assert.Equal(t, 3, mapped.WANDeviceIdx)
+	assert.Equal(t, 2, mapped.WANConnDevIdx)
+	assert.Equal(t, 1, mapped.WANIPConnIdx)
+	assert.Equal(t, 1, mapped.WANPPPConnIdx)
+	assert.Equal(t, 1, mapped.LANDeviceIdx)
+	assert.Equal(t, []int{1, 2}, mapped.WLANIndices)
+
+	// Verify paths now use the new indices
+	assert.Equal(t,
+		"InternetGatewayDevice.WANDevice.3.WANConnectionDevice.2.WANPPPConnection.1.Username",
+		mapped.WANPPPoEUserPath(),
+	)
+}
+
+// TestTR098Mapper_ProvisioningType verifies that TR-098 devices report
+// "set_params" as the provisioning type (pre-existing WAN objects).
+func TestTR098Mapper_ProvisioningType(t *testing.T) {
+	m := &TR098Mapper{}
+	assert.Equal(t, "set_params", m.WANProvisioningType())
+}
