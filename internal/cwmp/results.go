@@ -11,6 +11,7 @@ import (
 
 	"github.com/raykavin/helix-acs/internal/datamodel"
 	"github.com/raykavin/helix-acs/internal/device"
+	"github.com/raykavin/helix-acs/internal/schema"
 	"github.com/raykavin/helix-acs/internal/task"
 )
 
@@ -211,13 +212,27 @@ func extractWANInfo(params map[string]string, mapper datamodel.Mapper) device.WA
 	}
 
 	// Derive subnet mask from the same IPv4Address entry as the IP address.
+	// For TR-181: replace ".IPAddress" → ".SubnetMask" in the IPv4Address path.
+	// For TR-098: SchemaMapper exposes WANSubnetMaskPath() directly.
 	subnetMask := ""
 	if ipAddrPath != "" {
 		smPath := strings.Replace(ipAddrPath, ".IPAddress", ".SubnetMask", 1)
 		subnetMask = params[smPath]
 	}
+	if subnetMask == "" {
+		if sm, ok := mapper.(*schema.SchemaMapper); ok {
+			if smPath := sm.WANSubnetMaskPath(); smPath != "" {
+				subnetMask = params[smPath]
+			}
+		}
+	}
 
-	gateway := findGateway(wanIface, params[ipAddrPath], params)
+	// For TR-098: mapper.WANGatewayPath() resolves to WANIPConnection.DefaultGateway.
+	// For TR-181: fall back to the routing-table scan via findGateway().
+	gateway := params[mapper.WANGatewayPath()]
+	if gateway == "" || gateway == "0.0.0.0" {
+		gateway = findGateway(wanIface, params[ipAddrPath], params)
+	}
 
 	// Parse DNS servers from PPP.IPCP.DNSServers (comma-separated)
 	dnsStr := params[mapper.WANDNS1Path()]
@@ -232,15 +247,29 @@ func extractWANInfo(params map[string]string, mapper datamodel.Mapper) device.WA
 		}
 	}
 
-	// Read service type via mapper (e.g. X_TP_ServiceType for TP-Link, "" for generic).
+	// Read service type via mapper (e.g. X_TP_ServiceType for TP-Link,
+	// X_CT-COM_ServiceList for CDATA/ZTE). If WANIPConnection path is empty,
+	// fall back to the PPPoE path exposed by SchemaMapper.
 	serviceType := ""
 	if stPath := mapper.WANServiceTypePath(); stPath != "" {
 		serviceType = params[stPath]
-	} else if wanIface != "" {
-		// Fallback: derive suffix from WANServiceTypePath if mapper returns empty
-		// but wanIface is known (supports legacy TR181Mapper without schema).
-		// For generic devices this will also be empty, which is correct.
-		serviceType = ""
+	}
+	if serviceType == "" {
+		if sm, ok := mapper.(*schema.SchemaMapper); ok {
+			if pppPath := sm.WANServiceTypePPPPath(); pppPath != "" {
+				serviceType = params[pppPath]
+			}
+		}
+	}
+
+	// WAN link status — try WANIPConnection first, fall back to WANPPPConnection.
+	linkStatus := params[mapper.WANStatusPath()]
+	if linkStatus == "" {
+		if sm, ok := mapper.(*schema.SchemaMapper); ok {
+			if pppStatusPath := sm.WANStatusPPPPath(); pppStatusPath != "" {
+				linkStatus = params[pppStatusPath]
+			}
+		}
 	}
 
 	// For TR-098 devices that use DHCP (WANIPConnection), the mapper's
@@ -262,7 +291,7 @@ func extractWANInfo(params map[string]string, mapper datamodel.Mapper) device.WA
 		MACAddress:     params[mapper.WANMACPath()],
 		PPPoEUsername:  params[mapper.WANPPPoEUserPath()],
 		MTU:            mtu,
-		LinkStatus:     params[mapper.WANStatusPath()],
+		LinkStatus:     linkStatus,
 		UptimeSeconds:  parseInt(mapper.WANUptimePath()),
 	}
 }

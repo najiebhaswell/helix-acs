@@ -295,8 +295,11 @@ func (m *SchemaMapper) SupportsWiFiAccessPoint() bool {
 	return m.modelType == datamodel.TR181
 }
 
-func (m *SchemaMapper) WANServiceTypePath() string { return m.resolvePath("wan.service_type") }
-func (m *SchemaMapper) BandSteeringPath() string   { return m.resolvePath("wifi.band_steering") }
+func (m *SchemaMapper) WANServiceTypePath() string    { return m.resolvePath("wan.service_type") }
+func (m *SchemaMapper) WANServiceTypePPPPath() string { return m.resolvePath("wan.service_type_ppp") }
+func (m *SchemaMapper) WANStatusPPPPath() string      { return m.resolvePath("wan.status_ppp") }
+func (m *SchemaMapper) WANSubnetMaskPath() string     { return m.resolvePath("wan.subnet_mask") }
+func (m *SchemaMapper) BandSteeringPath() string      { return m.resolvePath("wifi.band_steering") }
 func (m *SchemaMapper) WANProvisioningType() string {
 	v := m.params["wan.provisioning_type"]
 	if v == "" {

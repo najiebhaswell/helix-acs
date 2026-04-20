@@ -8,9 +8,15 @@ description: >
   Vendor extensions use X_CT-COM namespace (China Telecom OEM).
 
 parameters:
-  # C-DATA does not expose a standard service-type label on TR-098.
+  # Service list from WANIPConnection (DHCP mode) — China Telecom extension.
+  # Value is typically a comma-separated list, e.g. "INTERNET,TR069".
   - name: wan.service_type
-    path: ""
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.X_CT-COM_ServiceList"
+    type: string
+
+  # Service list from WANPPPConnection (PPPoE mode) — fallback for PPPoE WANs.
+  - name: wan.service_type_ppp
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_CT-COM_ServiceList"
     type: string
 
   # C-DATA devices have pre-existing WAN objects — no AddObject flow needed.
@@ -26,13 +32,23 @@ parameters:
     path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Password"
     type: string
 
-  # Connection type (PPPoE / IP_Routed / etc.)
+  # Connection type via WANIPConnection (IP_Routed for DHCP)
   - name: wan.connection_type
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.ConnectionType"
+    type: string
+
+  # Connection type fallback via WANPPPConnection (PPPoE)
+  - name: wan.connection_type_ppp
     path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.ConnectionType"
     type: string
 
-  # Connection status
+  # Connection status (DHCP/IP_Routed via WANIPConnection)
   - name: wan.status
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.ConnectionStatus"
+    type: string
+
+  # Connection status fallback for PPPoE via WANPPPConnection
+  - name: wan.status_ppp
     path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.ConnectionStatus"
     type: string
 
@@ -46,24 +62,29 @@ parameters:
     path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.ExternalIPAddress"
     type: string
 
-  # Default gateway
+  # Subnet mask via WANIPConnection (DHCP)
+  - name: wan.subnet_mask
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.SubnetMask"
+    type: string
+
+  # Default gateway via WANIPConnection
   - name: wan.gateway
-    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.DefaultGateway"
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.DefaultGateway"
     type: string
 
-  # DNS servers (comma-separated)
+  # DNS servers via WANIPConnection (comma-separated)
   - name: wan.dns1
-    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.DNSServers"
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.DNSServers"
     type: string
 
-  # MTU
+  # MTU via WANIPConnection
   - name: wan.mtu
-    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.MaxMRUSize"
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.MaxMTUSize"
     type: unsignedInt
 
-  # Uptime in seconds
+  # Uptime in seconds via WANIPConnection
   - name: wan.uptime
-    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Uptime"
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.Uptime"
     type: unsignedInt
 
   # MAC address from Ethernet interface
