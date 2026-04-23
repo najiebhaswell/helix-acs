@@ -1,7 +1,6 @@
 package api
 
 import (
-	"io/fs"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -125,13 +124,9 @@ func NewRouter(
 	api.HandleFunc("/tasks/{task_id}", taskHandler.Get).Methods(http.MethodGet)
 	api.HandleFunc("/tasks/{task_id}", taskHandler.Cancel).Methods(http.MethodDelete)
 
-	// Web UI static files served from the embedded web/ directory.
-	// Must be registered last so it does not shadow any API routes.
-	webFS, err := fs.Sub(webUI.FS, ".")
-	if err != nil {
-		log.WithError(err).Fatal("Failed to create web UI sub-filesystem")
-	}
-	r.PathPrefix("/").Handler(http.FileServer(http.FS(webFS)))
+	// Serve embedded Web UI for direct access.
+	webFS := http.FileServer(http.FS(webUI.FS))
+	r.PathPrefix("/").Handler(http.StripPrefix("/", webFS))
 
 	return r
 }

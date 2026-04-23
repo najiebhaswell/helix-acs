@@ -1,0 +1,167 @@
+id: wan_pppoe_delete_add
+vendor: tplink
+model: tr181
+description: >
+  Delete existing PPPoE configuration and create a fresh one for TP-Link GPON ONT.
+  Used when updating VLAN or credentials on an existing PPPoE connection.
+  
+  Phase 1: Delete existing objects (bottom-up: IP → PPP → VLAN → Ethernet)
+  Phase 2: Recreate full stack using existing GPON Link (reuse mode)
+
+  Input variables:
+    ip_iface_idx, ppp_iface_idx, vlan_term_idx, eth_link_idx, gpon_idx,
+    vlan_id, username, password
+  
+  Variables from driver config:
+    gpon_root, optical_interface, ppp_auth_protocol, default_mtu, provisioning_code
+
+steps:
+  # ---- Phase 1: Delete existing objects (bottom-up) ----
+  - kind: delete
+    object: "Device.IP.Interface.{ip_iface_idx}."
+
+  - kind: delete
+    object: "Device.PPP.Interface.{ppp_iface_idx}."
+
+  - kind: delete
+    object: "Device.Ethernet.VLANTermination.{vlan_term_idx}."
+
+  - kind: delete
+    object: "Device.Ethernet.Link.{eth_link_idx}."
+
+  # ---- Phase 2: Reset GPON Link (reuse existing) ----
+  - kind: set
+    params:
+      "{gpon_root}.{gpon_idx}.Alias": "TpLink_{vlan_id}"
+      "{gpon_root}.{gpon_idx}.LowerLayers": "{optical_interface}"
+
+  # ---- Phase 3: Ethernet Link ----
+  - kind: add_object
+    object: "Device.Ethernet.Link."
+    as: eth
+
+  - kind: set
+    params:
+      "Device.Ethernet.Link.{eth}.Alias": "ethlink_{vlan_id}"
+      "Device.Ethernet.Link.{eth}.Enable": "1"
+      "Device.Ethernet.Link.{eth}.LowerLayers": "{gpon_root}.{gpon_idx}."
+
+  # ---- Phase 4: VLAN Termination ----
+  - kind: add_object
+    object: "Device.Ethernet.VLANTermination."
+    as: vterm
+
+  - kind: set
+    params:
+      "Device.Ethernet.VLANTermination.{vterm}.Alias": "VLAN_{vlan_id}"
+      "Device.Ethernet.VLANTermination.{vterm}.Enable": "1"
+      "Device.Ethernet.VLANTermination.{vterm}.LowerLayers": "Device.Ethernet.Link.{eth}."
+      "Device.Ethernet.VLANTermination.{vterm}.VLANID": "{vlan_id}"
+
+  - kind: set
+    params:
+      "Device.Ethernet.VLANTermination.{vterm}.X_TP_MulticastStatus": "1"
+      "Device.Ethernet.VLANTermination.{vterm}.X_TP_VLANEnable": "1"
+      "Device.Ethernet.VLANTermination.{vterm}.X_TP_VLANMode": "2"
+
+  # ---- Phase 5: PPP Interface ----
+  - kind: add_object
+    object: "Device.PPP.Interface."
+    as: ppp
+
+  # ---- Phase 6: IP Interface ----
+  - kind: add_object
+    object: "Device.IP.Interface."
+    as: ip
+
+  - kind: set
+    params:
+      "Device.IP.Interface.{ip}.LowerLayers": "Device.PPP.Interface.{ppp}."
+
+  - kind: set
+    params:
+      "Device.PPP.Interface.{ppp}.Alias": "Internet_PPPoE"
+      "Device.PPP.Interface.{ppp}.AuthenticationProtocol": "{ppp_auth_protocol}"
+      "Device.PPP.Interface.{ppp}.LowerLayers": "Device.Ethernet.VLANTermination.{vterm}."
+      "Device.PPP.Interface.{ppp}.Password": "{password}"
+      "Device.PPP.Interface.{ppp}.Username": "{username}"
+      "Device.PPP.Interface.{ppp}.X_TP_UsernameDomainEnable": "1"
+
+  - kind: set
+    params:
+      "Device.IP.Interface.{ip}.Alias": "Internet_PPPoE"
+      "Device.IP.Interface.{ip}.IPv4Enable": "1"
+      "Device.IP.Interface.{ip}.MaxMTUSize": "{default_mtu}"
+      "Device.IP.Interface.{ip}.X_TP_ConnName": "Internet_PPPoE"
+      "Device.IP.Interface.{ip}.X_TP_ConnType": "PPPoE"
+      "Device.IP.Interface.{ip}.X_TP_IPv6AddrType": "SLAAC"
+      "Device.IP.Interface.{ip}.X_TP_ServiceType": "Internet"
+
+  # ---- Phase 7: NAT ----
+  - kind: add_object
+    when: feature_nat
+    object: "Device.NAT.InterfaceSetting."
+    as: nat
+
+  - kind: set
+    when: feature_nat
+    params:
+      "Device.NAT.InterfaceSetting.{nat}.Interface": "Device.IP.Interface.{ip}."
+
+  # ---- Phase 8: IPv6 ----
+  - kind: set
+    when: feature_ipv6
+    params:
+      "Device.IP.Interface.{ip}.IPv6Enable": "1"
+
+  # ---- Phase 9: DHCPv6 Client ----
+  - kind: add_object
+    when: feature_dhcpv6_client
+    object: "Device.DHCPv6.Client."
+    as: dhcpv6
+
+  - kind: set
+    when: feature_dhcpv6_client
+    params:
+      "Device.DHCPv6.Client.{dhcpv6}.Interface": "Device.IP.Interface.{ip}."
+
+  - kind: set
+    when: feature_dhcpv6_client
+    params:
+      "Device.DHCPv6.Client.{dhcpv6}.RequestAddresses": "0"
+      "Device.DHCPv6.Client.{dhcpv6}.RequestPrefixes": "1"
+      "Device.DHCPv6.Client.{dhcpv6}.RequestedOptions": "23"
+      "Device.DHCPv6.Client.{dhcpv6}.X_TP_EnableRaRouter": "1"
+      "Device.DHCPv6.Client.{dhcpv6}.X_TP_EnableSLAAC": "1"
+
+  # ---- Phase 10: Default Gateway ----
+  - kind: set
+    params:
+      "Device.X_TP_DefaultGateway.IPv4DefaultGatewayType": "Manual"
+      "Device.X_TP_DefaultGateway.CustomIPv4DefaultGateway": "Internet_PPPoE"
+      "Device.X_TP_DefaultGateway.IPv6DefaultGatewayType": "Manual"
+      "Device.X_TP_DefaultGateway.CustomIPv6DefaultGateway": "Internet_PPPoE"
+
+  # ---- Phase 11: Enable everything ----
+  - kind: set
+    params:
+      "Device.IP.Interface.{ip}.Enable": "1"
+      "Device.PPP.Interface.{ppp}.Enable": "1"
+      "Device.Ethernet.VLANTermination.{vterm}.Enable": "1"
+      "Device.Ethernet.Link.{eth}.Enable": "1"
+      "Device.DeviceInfo.ProvisioningCode": "{provisioning_code}"
+
+  - kind: set
+    when: feature_dhcpv6_client
+    params:
+      "Device.DHCPv6.Client.{dhcpv6}.Enable": "1"
+
+  - kind: set
+    when: feature_nat
+    params:
+      "Device.NAT.InterfaceSetting.{nat}.Enable": "1"
+
+  - kind: set
+    when: feature_gpon
+    params:
+      "{gpon_root}.{gpon_idx}.Enable": "1"

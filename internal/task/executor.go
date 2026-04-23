@@ -10,13 +10,33 @@ import (
 	"github.com/raykavin/helix-acs/internal/datamodel"
 )
 
+// DriverHints provides vendor-specific configuration to the executor without
+// creating a direct dependency on the schema package.
+type DriverHints struct {
+	// BandSteeringPath is the vendor-specific TR-069 path for band steering.
+	// Empty means band steering is not supported.
+	BandSteeringPath string
+
+	// SecurityModeMapper maps UI security mode labels to TR-069 values.
+	// If nil, a hardcoded default mapping is used.
+	SecurityModeMapper func(uiMode string) string
+}
+
 // Executor converts Task payloads into the parameter maps / name lists that
 // the CWMP session handler needs to build SetParameterValues and
 // GetParameterValues requests.
-type Executor struct{}
+type Executor struct {
+	Hints *DriverHints
+}
 
-// NewExecutor returns a ready-to-use Executor.
+// NewExecutor returns a ready-to-use Executor with no vendor hints.
 func NewExecutor() *Executor { return &Executor{} }
+
+// NewExecutorWithHints returns an Executor that uses the given driver hints
+// for vendor-specific behaviour.
+func NewExecutorWithHints(hints *DriverHints) *Executor {
+	return &Executor{Hints: hints}
+}
 
 // BuildSetParams converts a task into a map of TR-069 parameter path → value
 // suitable for a SetParameterValues RPC. Returns (nil, nil) for task types
@@ -36,9 +56,14 @@ func (e *Executor) BuildSetParams(ctx context.Context, t *Task, mapper datamodel
 
 		// If Band Steering is being set, apply it first
 		if p.BandSteeringEnabled != nil {
-			// Band Steering is device-wide setting (TP-Link specific)
-			const bandSteeringPath = "Device.WiFi.X_TP_BandSteering.Enable"
-			params[bandSteeringPath] = strconv.FormatBool(*p.BandSteeringEnabled)
+			// Use vendor-specific path from driver, or skip if not supported.
+			bandSteeringPath := ""
+			if e.Hints != nil && e.Hints.BandSteeringPath != "" {
+				bandSteeringPath = e.Hints.BandSteeringPath
+			}
+			if bandSteeringPath != "" {
+				params[bandSteeringPath] = strconv.FormatBool(*p.BandSteeringEnabled)
+			}
 		}
 
 		// Handle SSID/password for specific band
@@ -56,13 +81,8 @@ func (e *Executor) BuildSetParams(ctx context.Context, t *Task, mapper datamodel
 			if p.Security == "None" {
 				params[mapper.WiFiSecurityModePath(bandIdx)] = "None"
 			} else {
-				// Map UI values to TR-181 standard values
-				mode := p.Security
-				if p.Security == "WPA2-PSK" {
-					mode = "WPA2-Personal"
-				} else if p.Security == "WPA-WPA2-PSK" {
-					mode = "WPA-WPA2-Personal"
-				}
+				// Map UI values to TR-069 values using driver hints or fallback.
+				mode := e.mapSecurityMode(p.Security)
 				params[mapper.WiFiSecurityModePath(bandIdx)] = mode
 				if p.Password != "" {
 					params[mapper.WiFiPasswordPath(bandIdx)] = p.Password
@@ -71,7 +91,7 @@ func (e *Executor) BuildSetParams(ctx context.Context, t *Task, mapper datamodel
 		} else if p.Password != "" {
 			// If password is provided but security mode is not explicitly set,
 			// assume WPA2-Personal and set both
-			params[mapper.WiFiSecurityModePath(bandIdx)] = "WPA2-Personal"
+			params[mapper.WiFiSecurityModePath(bandIdx)] = e.mapSecurityMode("WPA2-PSK")
 			params[mapper.WiFiPasswordPath(bandIdx)] = p.Password
 		}
 
@@ -347,4 +367,22 @@ func BuildDiagResultPaths(taskType Type, mapper datamodel.Mapper) []string {
 		}
 	}
 	return nil
+}
+
+// mapSecurityMode maps a UI security mode label to the TR-069 value.
+// Uses DriverHints.SecurityModeMapper if set, otherwise falls back to
+// a default mapping.
+func (e *Executor) mapSecurityMode(uiMode string) string {
+	if e.Hints != nil && e.Hints.SecurityModeMapper != nil {
+		return e.Hints.SecurityModeMapper(uiMode)
+	}
+	// Default fallback mapping.
+	switch uiMode {
+	case "WPA2-PSK":
+		return "WPA2-Personal"
+	case "WPA-WPA2-PSK":
+		return "WPA-WPA2-Personal"
+	default:
+		return uiMode
+	}
 }

@@ -1,0 +1,37 @@
+id: wan_pppoe_update_vlan
+vendor: tplink
+model: tr181
+description: >
+  Non-destructive VLAN change for an existing PPPoE stack on TP-Link TR-181 devices.
+  Uses two SetParameterValues RPCs (disable-then-update, then re-enable).
+
+  Step 1 disables the IP interface and updates VLAN/credentials atomically.
+  Step 2 re-enables the PPP and IP interfaces.
+
+  Empty-value params (e.g. username / password not provided) are automatically
+  omitted by the executor so the device retains its existing credentials.
+
+  Input variables:
+    ip_iface_idx, ppp_iface_idx, vlan_term_idx, vlan_id,
+    username (optional), password (optional)
+
+  Variables from driver config:
+    ppp_auth_protocol
+
+steps:
+  # Step 1: Disable IP interface, apply VLAN and credential changes atomically.
+  # BuildSetParameterValues sorts Enable=0 first, then VLAN, then credentials.
+  - kind: set
+    params:
+      "Device.IP.Interface.{ip_iface_idx}.Enable": "0"
+      "Device.Ethernet.VLANTermination.{vlan_term_idx}.VLANID": "{vlan_id}"
+      "Device.Ethernet.VLANTermination.{vlan_term_idx}.Enable": "1"
+      "Device.PPP.Interface.{ppp_iface_idx}.AuthenticationProtocol": "{ppp_auth_protocol}"
+      "Device.PPP.Interface.{ppp_iface_idx}.Username": "{username}"
+      "Device.PPP.Interface.{ppp_iface_idx}.Password": "{password}"
+
+  # Step 2: Re-enable the stack.
+  - kind: set
+    params:
+      "Device.PPP.Interface.{ppp_iface_idx}.Enable": "1"
+      "Device.IP.Interface.{ip_iface_idx}.Enable": "1"

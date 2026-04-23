@@ -6,6 +6,7 @@ package cwmp
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -333,17 +334,22 @@ func findGateway(wanIface string, wanIP string, params map[string]string) string
 }
 
 // extractWANInfos reads all WAN interfaces (main WAN + TP-Link additional WANs)
-func extractWANInfos(params map[string]string, mapper datamodel.Mapper) []device.WANInfo {
+func extractWANInfos(params map[string]string, mapper datamodel.Mapper, driver *schema.DeviceDriver) []device.WANInfo {
 	var wans []device.WANInfo
 	seen := make(map[string]bool)
 
 	macAddress := params[mapper.WANMACPath()]
+	connTypePath := mapper.WANConnectionTypePath()
+	tr098Mode := strings.HasPrefix(connTypePath, "InternetGatewayDevice.")
 
-	// Main WAN
-	mainWan := extractWANInfo(params, mapper)
-	if mainWan.IPAddress != "" || mainWan.ConnectionType != "" {
-		wans = append(wans, mainWan)
-		seen[mainWan.IPAddress] = true
+	// Main WAN — only add when it has a usable IP (skip 0.0.0.0 which means
+	// the interface exists but is not connected/routed yet).
+	if !tr098Mode {
+		mainWan := extractWANInfo(params, mapper)
+		if mainWan.IPAddress != "" && mainWan.IPAddress != "0.0.0.0" {
+			wans = append(wans, mainWan)
+			seen[mainWan.IPAddress] = true
+		}
 	}
 
 	// Additional WAN interfaces: scan for connection-type parameters that match
@@ -354,15 +360,48 @@ func extractWANInfos(params map[string]string, mapper datamodel.Mapper) []device
 	//
 	// The pattern is extracted by replacing the instance placeholder in the
 	// resolved WANConnectionTypePath with a regex wildcard.
-	connTypePat := buildConnTypePattern(mapper)
-	serviceTypeSuffix := serviceTypeSuffixFromMapper(mapper)
+	serviceTypePath := mapper.WANServiceTypePath()
+	uptimePathTpl := "Device.IP.Interface.{i}.X_TP_Uptime"
+	lanTypeValues := map[string]bool{"LAN": true}
+	bridgeTypeValues := map[string]bool{"Bridge": true}
+	if driver != nil {
+		if driver.Discovery.WANTypePath != "" {
+			connTypePath = driver.Discovery.WANTypePath
+		}
+		if driver.Discovery.WANServiceTypePath != "" {
+			serviceTypePath = driver.Discovery.WANServiceTypePath
+		}
+		if driver.Discovery.WANUptimePath != "" {
+			uptimePathTpl = driver.Discovery.WANUptimePath
+		}
+		if len(driver.Discovery.WANTypeValues.LAN) > 0 {
+			lanTypeValues = make(map[string]bool, len(driver.Discovery.WANTypeValues.LAN))
+			for _, v := range driver.Discovery.WANTypeValues.LAN {
+				lanTypeValues[v] = true
+			}
+		}
+		if len(driver.Discovery.WANTypeValues.Bridge) > 0 {
+			bridgeTypeValues = make(map[string]bool, len(driver.Discovery.WANTypeValues.Bridge))
+			for _, v := range driver.Discovery.WANTypeValues.Bridge {
+				bridgeTypeValues[v] = true
+			}
+		}
+	}
+
+	connTypePat := buildConnTypePatternFromPath(connTypePath)
+	serviceTypeSuffix := serviceTypeSuffixFromPath(serviceTypePath)
+	if tr098Mode {
+		wans = append(wans, extractWANInfosTR098(params, seen, macAddress)...)
+		sortWANInfosByPriority(wans)
+		return wans
+	}
 
 	for k, v := range params {
 		m := connTypePat.FindStringSubmatch(k)
 		if m == nil {
 			continue
 		}
-		if v == "LAN" || v == "Bridge" || v == "" {
+		if v == "" || lanTypeValues[v] || bridgeTypeValues[v] {
 			continue
 		}
 		idx := m[1]
@@ -390,7 +429,7 @@ func extractWANInfos(params map[string]string, mapper datamodel.Mapper) []device
 			MTU:            mtu,
 		}
 
-		uptimeStr := params[fmt.Sprintf("Device.IP.Interface.%s.X_TP_Uptime", idx)]
+		uptimeStr := params[strings.ReplaceAll(uptimePathTpl, "{i}", idx)]
 		if uptimeStr == "" {
 			uptimeStr = params[fmt.Sprintf("Device.IP.Interface.%s.LastChange", idx)]
 		}
@@ -441,6 +480,113 @@ func extractWANInfos(params map[string]string, mapper datamodel.Mapper) []device
 		seen[ipAddr] = true
 	}
 
+	sortWANInfosByPriority(wans)
+	return wans
+}
+
+func sortWANInfosByPriority(wans []device.WANInfo) {
+	sort.SliceStable(wans, func(i, j int) bool {
+		iPPPoE := strings.EqualFold(wans[i].ConnectionType, "PPPoE")
+		jPPPoE := strings.EqualFold(wans[j].ConnectionType, "PPPoE")
+		if iPPPoE != jPPPoE {
+			return iPPPoE
+		}
+		return false
+	})
+}
+
+type tr098WANEntry struct {
+	Base       string
+	Connection string
+	IPAddress  string
+	LinkStatus string
+	Service    string
+	Username   string
+}
+
+var (
+	reTR098WANIPField  = regexp.MustCompile(`^(InternetGatewayDevice\.WANDevice\.\d+\.WANConnectionDevice\.\d+\.WANIPConnection\.\d+)\.(.+)$`)
+	reTR098WANPPPField = regexp.MustCompile(`^(InternetGatewayDevice\.WANDevice\.\d+\.WANConnectionDevice\.\d+\.WANPPPConnection\.\d+)\.(.+)$`)
+)
+
+func extractWANInfosTR098(params map[string]string, seen map[string]bool, macAddress string) []device.WANInfo {
+	entries := map[string]*tr098WANEntry{}
+	isPPP := map[string]bool{}
+	for k, v := range params {
+		if m := reTR098WANIPField.FindStringSubmatch(k); m != nil {
+			base, field := m[1], m[2]
+			e := entries[base]
+			if e == nil {
+				e = &tr098WANEntry{Base: base, Connection: "IP_Routed"}
+				entries[base] = e
+			}
+			switch field {
+			case "ConnectionType":
+				if v != "" {
+					e.Connection = v
+				}
+			case "ConnectionStatus":
+				e.LinkStatus = v
+			case "ExternalIPAddress":
+				e.IPAddress = v
+			case "X_CT-COM_ServiceList":
+				e.Service = v
+			}
+		}
+		if m := reTR098WANPPPField.FindStringSubmatch(k); m != nil {
+			base, field := m[1], m[2]
+			isPPP[base] = true
+			e := entries[base]
+			if e == nil {
+				e = &tr098WANEntry{Base: base, Connection: "PPPoE"}
+				entries[base] = e
+			}
+			switch field {
+			case "ConnectionType":
+				if v != "" {
+					e.Connection = v
+				}
+			case "ConnectionStatus":
+				e.LinkStatus = v
+			case "ExternalIPAddress":
+				e.IPAddress = v
+			case "X_CT-COM_ServiceList":
+				e.Service = v
+			case "Username":
+				e.Username = v
+			}
+		}
+	}
+
+	bases := make([]string, 0, len(entries))
+	for base := range entries {
+		bases = append(bases, base)
+	}
+	sort.Strings(bases)
+
+	wans := make([]device.WANInfo, 0, len(bases))
+	for _, base := range bases {
+		e := entries[base]
+		if e == nil || e.IPAddress == "" || e.IPAddress == "0.0.0.0" || seen[e.IPAddress] {
+			continue
+		}
+		conn := e.Connection
+		if isPPP[base] && conn == "" {
+			conn = "PPPoE"
+		}
+		if conn == "" {
+			conn = "IP_Routed"
+		}
+		wans = append(wans, device.WANInfo{
+			ConnectionType: conn,
+			ServiceType:    e.Service,
+			IPAddress:      e.IPAddress,
+			LinkStatus:     e.LinkStatus,
+			MACAddress:     macAddress,
+			PPPoEUsername:  e.Username,
+		})
+		seen[e.IPAddress] = true
+	}
 	return wans
 }
 
@@ -450,22 +596,27 @@ func extractWANInfos(params map[string]string, mapper datamodel.Mapper) []device
 //
 // Example: "Device.IP.Interface.5.X_TP_ConnType" → ^Device\.IP\.Interface\.(\d+)\.X_TP_ConnType$
 // Falls back to the standard TR-181 path when the mapper returns "".
-func buildConnTypePattern(mapper datamodel.Mapper) *regexp.Regexp {
-	path := mapper.WANConnectionTypePath()
+func buildConnTypePatternFromPath(path string) *regexp.Regexp {
 	if path == "" {
 		path = "Device.IP.Interface.1.ConnectionType"
 	}
 	escaped := regexp.QuoteMeta(path)
+	if strings.Contains(path, "{i}") {
+		escaped = strings.ReplaceAll(escaped, `\{i\}`, `(\d+)`)
+	}
 	// Replace the quoted instance number with a capture group.
 	pat := regexp.MustCompile(`\\\.\d+\\\.`).ReplaceAllLiteralString(escaped, `\.(\d+)\.`)
 	return regexp.MustCompile("^" + pat + "$")
 }
 
+func buildConnTypePattern(mapper datamodel.Mapper) *regexp.Regexp {
+	return buildConnTypePatternFromPath(mapper.WANConnectionTypePath())
+}
+
 // serviceTypeSuffixFromMapper extracts the field suffix (the part after
 // "Device.IP.Interface.{n}.") from the mapper's WANServiceTypePath.
 // Returns "" when the path is empty or does not follow the expected structure.
-func serviceTypeSuffixFromMapper(mapper datamodel.Mapper) string {
-	path := mapper.WANServiceTypePath()
+func serviceTypeSuffixFromPath(path string) string {
 	if path == "" {
 		return ""
 	}
@@ -479,6 +630,10 @@ func serviceTypeSuffixFromMapper(mapper datamodel.Mapper) string {
 		return ""
 	}
 	return rest[dotIdx+1:]
+}
+
+func serviceTypeSuffixFromMapper(mapper datamodel.Mapper) string {
+	return serviceTypeSuffixFromPath(mapper.WANServiceTypePath())
 }
 
 // samePrefix returns true when the first two octets of a and b match.
@@ -495,8 +650,24 @@ func samePrefix(a, b string) bool {
 
 // parseConnectedHosts parses a Hosts.Host.{i}.* GetParameterValues response
 // into a slice of ConnectedHost structs.
-func parseConnectedHosts(params map[string]string, mapper datamodel.Mapper) []device.ConnectedHost {
+func parseConnectedHosts(params map[string]string, mapper datamodel.Mapper, driver *schema.DeviceDriver) []device.ConnectedHost {
 	base := mapper.HostsBasePath() // e.g. "Device.Hosts.Host."
+	hostTypePattern := (*regexp.Regexp)(nil)
+	wifiTypeVals := map[string]bool{"1": true}
+	lanTypeVals := map[string]bool{"0": true}
+	if driver != nil && driver.Discovery.HostConnTypePath != "" {
+		hostTypePattern = buildIndexedPathRegex(driver.Discovery.HostConnTypePath)
+		if len(driver.Discovery.HostConnTypeValues) > 0 {
+			wifiTypeVals = map[string]bool{}
+			lanTypeVals = map[string]bool{}
+			if v, ok := driver.Discovery.HostConnTypeValues["wifi"]; ok {
+				wifiTypeVals[v] = true
+			}
+			if v, ok := driver.Discovery.HostConnTypeValues["lan"]; ok {
+				lanTypeVals[v] = true
+			}
+		}
+	}
 
 	hostMap := make(map[int]*device.ConnectedHost)
 	for k, v := range params {
@@ -557,6 +728,19 @@ func parseConnectedHosts(params map[string]string, mapper datamodel.Mapper) []de
 		default:
 			// ignored
 		}
+
+		if hostTypePattern != nil {
+			if hm := hostTypePattern.FindStringSubmatch(k); hm != nil {
+				pathIdx, err := strconv.Atoi(hm[1])
+				if err == nil && pathIdx == idx {
+					if wifiTypeVals[v] {
+						h.Interface = "Wi-Fi"
+					} else if lanTypeVals[v] {
+						h.Interface = "LAN"
+					}
+				}
+			}
+		}
 	}
 
 	hosts := make([]device.ConnectedHost, 0, len(hostMap))
@@ -566,6 +750,21 @@ func parseConnectedHosts(params map[string]string, mapper datamodel.Mapper) []de
 		}
 	}
 	return hosts
+}
+
+func buildIndexedPathRegex(pathTemplate string) *regexp.Regexp {
+	if pathTemplate == "" {
+		return nil
+	}
+	escaped := regexp.QuoteMeta(pathTemplate)
+	if strings.Contains(pathTemplate, "{i}") {
+		escaped = strings.ReplaceAll(escaped, `\{i\}`, `(\d+)`)
+	}
+	re, err := regexp.Compile("^" + escaped + "$")
+	if err != nil {
+		return nil
+	}
+	return re
 }
 
 // parsePortMappingRules parses a PortMapping.{i}.* GetParameterValues response

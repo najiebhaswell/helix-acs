@@ -1,0 +1,26 @@
+id: wan_pppoe_update
+vendor: tplink
+model: tr181
+description: >
+  Credentials-only update for an existing PPPoE interface on TP-Link TR-181 devices.
+  Sent as a single atomic SetParameterValues RPC so an Inform cannot interrupt it.
+
+  Empty-value params (e.g. only username or only password provided) are automatically
+  omitted by the executor so only the supplied fields are written.
+
+  Input variables:
+    ip_iface_idx, ppp_iface_idx,
+    username (optional), password (optional)
+
+  Variables from driver config:
+    ppp_auth_protocol
+
+steps:
+  # Single atomic SetParameterValues — update credentials and ensure stack is enabled.
+  - kind: set
+    params:
+      "Device.PPP.Interface.{ppp_iface_idx}.Username": "{username}"
+      "Device.PPP.Interface.{ppp_iface_idx}.Password": "{password}"
+      "Device.PPP.Interface.{ppp_iface_idx}.AuthenticationProtocol": "{ppp_auth_protocol}"
+      "Device.PPP.Interface.{ppp_iface_idx}.Enable": "1"
+      "Device.IP.Interface.{ip_iface_idx}.Enable": "1"

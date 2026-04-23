@@ -10,6 +10,16 @@ import (
 	"strings"
 )
 
+// DiscoveryHints carries optional vendor-specific discovery paths and values.
+// All fields are optional; empty fields fall back to generic behavior.
+type DiscoveryHints struct {
+	WANTypePath        string
+	WANTypeValuesWAN   []string
+	WANTypeValuesLAN   []string
+	WANServiceTypePath string
+	GPONEnablePath     string
+}
+
 // InstanceMap holds the discovered instance indices for a CPE's key TR-069 objects.
 // Any field left at zero means "not discovered"; the mapper falls back to its
 // hardcoded default in that case.
@@ -56,9 +66,15 @@ type InstanceMap struct {
 // the appropriate scanner. Any indices that cannot be determined from the
 // available parameters are left at zero so the caller can apply safe defaults.
 func DiscoverInstances(params map[string]string) InstanceMap {
+	return DiscoverInstancesWithHints(params, nil)
+}
+
+// DiscoverInstancesWithHints is DiscoverInstances with optional vendor-specific
+// discovery hints (typically from a device driver).
+func DiscoverInstancesWithHints(params map[string]string, hints *DiscoveryHints) InstanceMap {
 	var im InstanceMap
 	if isTR181Params(params) {
-		discoverTR181(params, &im)
+		discoverTR181(params, &im, hints)
 	} else {
 		discoverTR098(params, &im)
 	}
@@ -96,21 +112,28 @@ var (
 	reSSIDAnything     = regexp.MustCompile(`^Device\.WiFi\.SSID\.(\d+)\.`)
 )
 
-func discoverTR181(params map[string]string, im *InstanceMap) {
-	discoverTR181WAN(params, im)
+func discoverTR181(params map[string]string, im *InstanceMap, hints *DiscoveryHints) {
+	discoverTR181WAN(params, im, hints)
 	discoverTR181PPP(params, im)
 	discoverTR181VLAN(params, im)
 	discoverTR181WiFi(params, im)
-	discoverTR181FreeGPON(params, im)
+	discoverTR181FreeGPON(params, im, hints)
 }
 
 var reGPONLinkEnable = regexp.MustCompile(`^Device\.X_TP_GPON\.Link\.(\d+)\.Enable$`)
 
 // discoverTR181FreeGPON finds the first disabled (Enable=0 or empty) GPON Link slot.
-func discoverTR181FreeGPON(params map[string]string, im *InstanceMap) {
+func discoverTR181FreeGPON(params map[string]string, im *InstanceMap, hints *DiscoveryHints) {
+	gponRegex := reGPONLinkEnable
+	if hints != nil && hints.GPONEnablePath != "" {
+		if re := regexFromIndexedPath(hints.GPONEnablePath); re != nil {
+			gponRegex = re
+		}
+	}
+
 	var candidates []int
 	for name, val := range params {
-		m := reGPONLinkEnable.FindStringSubmatch(name)
+		m := gponRegex.FindStringSubmatch(name)
 		if m == nil {
 			continue
 		}
@@ -125,20 +148,59 @@ func discoverTR181FreeGPON(params map[string]string, im *InstanceMap) {
 	}
 }
 
-func discoverTR181WAN(params map[string]string, im *InstanceMap) {
-	// Pass 0: check TP-Link specific X_TP_ConnType for robust mapping
-	for name, val := range params {
-		if strings.HasSuffix(name, ".X_TP_ConnType") {
-			m := reIPIfaceConnType.FindStringSubmatch(name)
-			if m != nil {
-				idx, _ := strconv.Atoi(m[1])
-				if val == "LAN" && im.LANIPIfaceIdx == 0 {
-					im.LANIPIfaceIdx = idx
-				} else if val == "PPPoE" && im.WANIPIfaceIdx == 0 {
-					im.WANIPIfaceIdx = idx
-				}
+func discoverTR181WAN(params map[string]string, im *InstanceMap, hints *DiscoveryHints) {
+	wanTypeRegex := reIPIfaceConnType
+	if hints != nil && hints.WANTypePath != "" {
+		if re := regexFromIndexedPath(hints.WANTypePath); re != nil {
+			wanTypeRegex = re
+		}
+	}
+
+	wanValues := map[string]bool{"PPPoE": true}
+	lanValues := map[string]bool{"LAN": true}
+	if hints != nil {
+		if len(hints.WANTypeValuesWAN) > 0 {
+			wanValues = make(map[string]bool, len(hints.WANTypeValuesWAN))
+			for _, v := range hints.WANTypeValuesWAN {
+				wanValues[v] = true
 			}
 		}
+		if len(hints.WANTypeValuesLAN) > 0 {
+			lanValues = make(map[string]bool, len(hints.WANTypeValuesLAN))
+			for _, v := range hints.WANTypeValuesLAN {
+				lanValues[v] = true
+			}
+		}
+	}
+
+	// Pass 0: use vendor-specific connection type path when available.
+	wanCandidateSet := make(map[int]bool)
+	lanCandidateSet := make(map[int]bool)
+	for name, val := range params {
+		m := wanTypeRegex.FindStringSubmatch(name)
+		if m != nil {
+			idx, _ := strconv.Atoi(m[1])
+			if lanValues[val] {
+				lanCandidateSet[idx] = true
+			} else if wanValues[val] {
+				wanCandidateSet[idx] = true
+			}
+		}
+	}
+	if len(lanCandidateSet) > 0 && im.LANIPIfaceIdx == 0 {
+		lanCandidates := make([]int, 0, len(lanCandidateSet))
+		for idx := range lanCandidateSet {
+			lanCandidates = append(lanCandidates, idx)
+		}
+		sort.Ints(lanCandidates)
+		im.LANIPIfaceIdx = lanCandidates[0]
+	}
+	if len(wanCandidateSet) > 0 && im.WANIPIfaceIdx == 0 {
+		wanCandidates := make([]int, 0, len(wanCandidateSet))
+		for idx := range wanCandidateSet {
+			wanCandidates = append(wanCandidates, idx)
+		}
+		im.WANIPIfaceIdx = chooseTR181WANCandidate(params, wanCandidates, hints)
 	}
 
 	// First pass: find public-IP interface (best case) and private LAN interface.
@@ -155,7 +217,8 @@ func discoverTR181WAN(params map[string]string, im *InstanceMap) {
 			im.WANIPIfaceIdx = idx
 		} else if isPrivateIP(val) && im.LANIPIfaceIdx == 0 {
 			// Avoid setting a WAN management IP as LAN
-			if connType := params[fmt.Sprintf("Device.IP.Interface.%d.X_TP_ConnType", idx)]; connType != "" && connType != "LAN" {
+			connType := tr181ConnTypeValue(params, idx, hints)
+			if connType != "" && !lanValues[connType] {
 				continue
 			}
 			im.LANIPIfaceIdx = idx
@@ -178,6 +241,58 @@ func discoverTR181WAN(params map[string]string, im *InstanceMap) {
 			}
 		}
 	}
+}
+
+func chooseTR181WANCandidate(params map[string]string, candidates []int, hints *DiscoveryHints) int {
+	if len(candidates) == 0 {
+		return 0
+	}
+	sort.Ints(candidates)
+	if hints != nil && hints.WANServiceTypePath != "" {
+		for _, idx := range candidates {
+			serviceType := strings.TrimSpace(params[indexedPath(hints.WANServiceTypePath, idx)])
+			if strings.EqualFold(serviceType, "Internet") {
+				return idx
+			}
+		}
+	}
+	return candidates[0]
+}
+
+func tr181ConnTypeValue(params map[string]string, idx int, hints *DiscoveryHints) string {
+	if hints != nil && hints.WANTypePath != "" {
+		if key := indexedPath(hints.WANTypePath, idx); key != "" {
+			return params[key]
+		}
+	}
+	return params[fmt.Sprintf("Device.IP.Interface.%d.X_TP_ConnType", idx)]
+}
+
+func indexedPath(pathTemplate string, idx int) string {
+	if pathTemplate == "" {
+		return ""
+	}
+	if strings.Contains(pathTemplate, "{i}") {
+		return strings.ReplaceAll(pathTemplate, "{i}", strconv.Itoa(idx))
+	}
+	return pathTemplate
+}
+
+func regexFromIndexedPath(pathTemplate string) *regexp.Regexp {
+	if pathTemplate == "" {
+		return nil
+	}
+	escaped := regexp.QuoteMeta(pathTemplate)
+	if strings.Contains(pathTemplate, "{i}") {
+		escaped = strings.ReplaceAll(escaped, `\{i\}`, `(\d+)`)
+	} else {
+		escaped = regexp.MustCompile(`\\\.\d+\\\.`).ReplaceAllLiteralString(escaped, `\.(\d+)\.`)
+	}
+	re, err := regexp.Compile("^" + escaped + "$")
+	if err != nil {
+		return nil
+	}
+	return re
 }
 
 func discoverTR181PPP(params map[string]string, im *InstanceMap) {

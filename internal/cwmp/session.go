@@ -44,13 +44,14 @@ type Session struct {
 	currentTask  *task.Task            // task currently awaiting a CPE response
 	mapper       datamodel.Mapper      // data-model mapper resolved during Inform
 	instanceMap  datamodel.InstanceMap // instance indices discovered during Inform / summon
+	driver       *schema.DeviceDriver  // YAML-driven device driver resolved during Inform
 
 	// Port-forwarding AddObject follow-up: after receiving AddObjectResponse
 	// this function is called with the new instance number to build the
 	// subsequent SetParameterValues request.
 	addObjFollowUp func(instanceNum int) ([]byte, error)
 
-	// wanProvision drives the multi-step TP-Link PPPoE provisioning state machine.
+	// wanProvision drives the multi-step vendor-agnostic provisioning state machine.
 	wanProvision *WANProvision
 
 	// Parameter summon state: after Inform, ACS fetches all CPE parameters
@@ -129,6 +130,8 @@ type Handler struct {
 	informInterval time.Duration
 	schemaRegistry *schema.Registry
 	schemaResolver *schema.Resolver
+	driverRegistry *schema.DeviceDriverRegistry
+	lastSummonTime sync.Map // serial → time.Time
 }
 
 // NewHandler creates a new CWMP Handler with the given dependencies and configuration.
@@ -140,6 +143,7 @@ func NewHandler(
 	username, password, acsURL string,
 	informInterval time.Duration,
 	schemaReg *schema.Registry,
+	driverReg *schema.DeviceDriverRegistry,
 ) *Handler {
 	return &Handler{
 		deviceSvc:      deviceSvc,
@@ -153,6 +157,7 @@ func NewHandler(
 		informInterval: informInterval,
 		schemaRegistry: schemaReg,
 		schemaResolver: schema.NewResolver(schemaReg),
+		driverRegistry: driverReg,
 	}
 }
 
@@ -263,7 +268,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleAddObjectResponse(ctx, w, session, env.Body.AddObjectResponse)
 
 	case env.Body.DeleteObjectResponse != nil:
-		h.handleTaskResponse(ctx, w, session, nil, "")
+		h.handleDeleteObjectResponse(ctx, w, session)
 
 	case env.Body.Fault != nil:
 		cwmpCode := env.Body.Fault.Detail.CWMPFault.FaultCode
@@ -330,7 +335,35 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	}
 
 	modelType := datamodel.DetectFromRootObject(firstRootObject(upsertReq.Parameters))
-	instanceMap := datamodel.DiscoverInstances(upsertReq.Parameters)
+
+	// Resolve device driver for vendor-specific provisioning.
+	var driver *schema.DeviceDriver
+	if h.driverRegistry != nil {
+		driver = h.driverRegistry.Resolve(
+			upsertReq.Manufacturer,
+			upsertReq.ProductClass,
+			string(modelType),
+		)
+		if driver != nil {
+			h.log.
+				WithField("serial", upsertReq.Serial).
+				WithField("driver", driver.ID).
+				Info("CWMP: resolved device driver")
+		}
+	}
+
+	// Use discovery hints from the resolved driver when available.
+	var discoveryHints *datamodel.DiscoveryHints
+	if driver != nil {
+		discoveryHints = &datamodel.DiscoveryHints{
+			WANTypePath:        driver.Discovery.WANTypePath,
+			WANTypeValuesWAN:   driver.Discovery.WANTypeValues.WAN,
+			WANTypeValuesLAN:   driver.Discovery.WANTypeValues.LAN,
+			WANServiceTypePath: driver.Discovery.WANServiceTypePath,
+			GPONEnablePath:     driver.Discovery.GPONEnablePath,
+		}
+	}
+	instanceMap := datamodel.DiscoverInstancesWithHints(upsertReq.Parameters, discoveryHints)
 
 	// Resolve the schema name for this device (e.g. "tr181", "vendor/huawei/tr181").
 	schemaName := h.schemaResolver.Resolve(upsertReq.Manufacturer, upsertReq.ProductClass, upsertReq.DataModel)
@@ -354,26 +387,43 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	// is included in the current session's pending queue.
 	h.detectAndHandleReset(ctx, upsertReq.Serial, env.Body.Inform, mapper)
 
-	// Trigger full parameter summon when PostgreSQL has fewer than 100 parameters
-	// for this device. Using the PostgreSQL count (not MongoDB's Inform-only 24)
-	// prevents re-triggering the summon on every Inform for devices that re-inform
-	// rapidly (e.g. CDATA/ZTE ONTs with very short periodic intervals), which
-	// would continuously interrupt the multi-batch GetParameterValues exchange.
-	pgCount, _ := h.parameterRepo.CountParameters(ctx, upsertReq.Serial)
-	if pgCount < 100 {
+	// Fetch real pending tasks first so we can factor them into the summon decision.
+	pendingTasks, err := h.taskQueue.DequeuePending(ctx, upsertReq.Serial)
+	if err != nil {
+		h.log.WithError(err).WithField("serial", upsertReq.Serial).Error("CWMP: Dequeue pending tasks failed")
+	}
+
+	// Trigger full parameter summon to keep device data (WAN, WiFi, LAN)
+	// up-to-date. Throttle to at most once every 2 minutes per device to avoid
+	// overwhelming devices with very short periodic inform intervals (e.g.
+	// CDATA/ZTE at 10s).
+	shouldSummon := true
+	if lastSummon, ok := h.lastSummonTime.Load(upsertReq.Serial); ok {
+		if time.Since(lastSummon.(time.Time)) < 2*time.Minute {
+			shouldSummon = false
+		}
+	}
+	// WAN tasks require accurate instance discovery (PPP/IP/VLAN indices).
+	// Force a summon even within the throttle window so that executeTask always
+	// sees the real instanceMap and chooses update vs. fresh-provision correctly.
+	if !shouldSummon {
+		for _, pt := range pendingTasks {
+			if pt.Type == task.TypeWAN {
+				shouldSummon = true
+				h.log.WithField("serial", upsertReq.Serial).
+					Info("CWMP: forcing summon for pending WAN task")
+				break
+			}
+		}
+	}
+	if shouldSummon {
 		session.mu.Lock()
 		session.summonPhase = 1
 		session.summonSchemaName = schemaName
 		session.mu.Unlock()
+		h.lastSummonTime.Store(upsertReq.Serial, time.Now())
 		h.log.WithField("serial", upsertReq.Serial).
-			WithField("pg_param_count", pgCount).
 			Info("CWMP: scheduling full parameter summon")
-	}
-
-	// Fetch real pending tasks.
-	pendingTasks, err := h.taskQueue.DequeuePending(ctx, upsertReq.Serial)
-	if err != nil {
-		h.log.WithError(err).WithField("serial", upsertReq.Serial).Error("CWMP: Dequeue pending tasks failed")
 	}
 
 	// On "8 DIAGNOSTICS COMPLETE", prepend synthetic result-collection tasks
@@ -407,6 +457,7 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	session.pendingTasks = allTasks
 	session.mapper = mapper
 	session.instanceMap = instanceMap
+	session.driver = driver
 	session.State = StateProcessing
 	session.mu.Unlock()
 
@@ -475,8 +526,8 @@ func (h *Handler) handleSetParamValuesResponse(ctx context.Context, w http.Respo
 	session.mu.Unlock()
 
 	if wp != nil {
-		h.log.WithField("step", wp.cur).
-			WithField("total", len(wp.steps)).
+		h.log.WithField("step", wp.stepIndex()).
+			WithField("total", wp.totalSteps()).
 			Info("CWMP: WAN provision SetParams response")
 		nextXML, err := wp.onSetParams()
 		if err != nil {
@@ -499,7 +550,7 @@ func (h *Handler) handleSetParamValuesResponse(ctx context.Context, w http.Respo
 		session.pendingWANCredentials = nil
 		serial := session.DeviceSerial
 		session.mu.Unlock()
-		h.log.WithField("task_id", wp.t.ID).Info("CWMP: WAN PPPoE provisioning complete")
+		h.log.WithField("task_id", wp.t.ID).Info("CWMP: WAN provisioning complete")
 		// Persist PPPoE credentials to PostgreSQL now that provisioning succeeded.
 		if len(creds) > 0 {
 			h.persistWANCredentials(ctx, serial, creds)
@@ -576,20 +627,18 @@ func (h *Handler) sendGetParameterNamesSummon(w http.ResponseWriter, session *Se
 	schemaName := session.summonSchemaName
 	session.mu.Unlock()
 
-	// Determine root path based on schema name or mapper type.
+	// Determine root path from data-model, not vendor name.
 	// TR-098 devices use "InternetGatewayDevice."; TR-181 devices use "Device."
-	// Priority: schema name → mapper type → default to Device
+	// Priority: schema name (contains tr098/tr181) → mapper type → default Device.
 	rootPath := "Device."
 
-	// Check schema name first (most reliable)
+	// Check schema name first (most reliable).
 	if schemaName != "" {
 		lowerSchema := strings.ToLower(schemaName)
-		// C-DATA, TP-Link, ZTE, and other TR-098 vendors
-		if strings.Contains(lowerSchema, "tr098") ||
-			strings.Contains(lowerSchema, "cdata") ||
-			strings.Contains(lowerSchema, "tplink") ||
-			strings.Contains(lowerSchema, "zte") {
+		if strings.Contains(lowerSchema, "tr098") {
 			rootPath = "InternetGatewayDevice."
+		} else if strings.Contains(lowerSchema, "tr181") {
+			rootPath = "Device."
 		}
 	}
 
@@ -619,12 +668,23 @@ func (h *Handler) sendGetParameterNamesSummon(w http.ResponseWriter, session *Se
 	writeXML(w, env)
 }
 
-// summonBatchSize is the number of parameter names sent per GetParameterValues RPC
-// during a parameter summon. A large value reduces round-trips, which is critical
-// for devices (e.g. CDATA/ZTE ONTs) that re-inform every few seconds and would
-// otherwise interrupt a multi-batch summon. Most ONTs can handle a single request
-// with several thousand parameter names.
-const summonBatchSize = 10000
+// summonBatchSizeDefault is the default number of parameter names sent per
+// GetParameterValues RPC during a parameter summon. Keep this small for TR-181
+// TP-Link devices that can disconnect on large batches.
+const summonBatchSizeDefault = 500
+
+// summonBatchSizeTR098 is used for TR-098 devices to reduce the number of
+// summon round-trips. This helps devices with very short Inform intervals
+// (e.g. 10s) complete full summons before the next Inform starts.
+const summonBatchSizeTR098 = 5000
+
+func summonBatchSizeForSchema(schemaName string) int {
+	lower := strings.ToLower(schemaName)
+	if strings.Contains(lower, "tr098") {
+		return summonBatchSizeTR098
+	}
+	return summonBatchSizeDefault
+}
 
 // handleGetParameterNamesResponse collects all leaf parameter names from the
 // CPE's response and starts the first batched GetParameterValues fetch.
@@ -636,6 +696,7 @@ func (h *Handler) handleGetParameterNamesResponse(
 ) {
 	session.mu.Lock()
 	serial := session.DeviceSerial
+	schemaName := session.summonSchemaName
 	session.mu.Unlock()
 
 	// Collect only leaf parameters (skip object paths ending in ".").
@@ -646,10 +707,11 @@ func (h *Handler) handleGetParameterNamesResponse(
 		}
 	}
 
-	nBatches := (len(names) + summonBatchSize - 1) / summonBatchSize
+	batchSize := summonBatchSizeForSchema(schemaName)
+	nBatches := (len(names) + batchSize - 1) / batchSize
 	h.log.WithField("serial", serial).
 		WithField("total", len(names)).
-		WithField("batch_size", summonBatchSize).
+		WithField("batch_size", batchSize).
 		WithField("batches", nBatches).
 		Info("CWMP: GetParameterNames received, starting batched fetch")
 
@@ -677,15 +739,17 @@ func (h *Handler) sendNextSummonBatch(ctx context.Context, w http.ResponseWriter
 	names := session.summonAllNames
 	idx := session.summonBatchIdx
 	serial := session.DeviceSerial
+	schemaName := session.summonSchemaName
 	session.mu.Unlock()
 
-	start := idx * summonBatchSize
+	batchSize := summonBatchSizeForSchema(schemaName)
+	start := idx * batchSize
 	if start >= len(names) {
 		// All batches done — save and finish.
 		h.finishSummon(ctx, w, session)
 		return
 	}
-	end := start + summonBatchSize
+	end := start + batchSize
 	if end > len(names) {
 		end = len(names)
 	}
@@ -693,7 +757,7 @@ func (h *Handler) sendNextSummonBatch(ctx context.Context, w http.ResponseWriter
 
 	h.log.WithField("serial", serial).
 		WithField("batch", idx+1).
-		WithField("of", (len(names)+summonBatchSize-1)/summonBatchSize).
+		WithField("of", (len(names)+batchSize-1)/batchSize).
 		WithField("params", len(batch)).
 		Info("CWMP: fetching parameter batch")
 
@@ -740,7 +804,20 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 	}
 
 	// Rebuild mapper with newly discovered instance indices from full param set.
-	instanceMap := datamodel.DiscoverInstances(params)
+	session.mu.Lock()
+	drv := session.driver
+	session.mu.Unlock()
+	var discoveryHints *datamodel.DiscoveryHints
+	if drv != nil {
+		discoveryHints = &datamodel.DiscoveryHints{
+			WANTypePath:        drv.Discovery.WANTypePath,
+			WANTypeValuesWAN:   drv.Discovery.WANTypeValues.WAN,
+			WANTypeValuesLAN:   drv.Discovery.WANTypeValues.LAN,
+			WANServiceTypePath: drv.Discovery.WANServiceTypePath,
+			GPONEnablePath:     drv.Discovery.GPONEnablePath,
+		}
+	}
+	instanceMap := datamodel.DiscoverInstancesWithHints(params, discoveryHints)
 	h.log.WithField("serial", serial).
 		WithField("wan_iface", instanceMap.WANIPIfaceIdx).
 		WithField("lan_iface", instanceMap.LANIPIfaceIdx).
@@ -788,7 +865,7 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 		WithField("dhcp_enabled", lanInfo.DHCPEnabled).
 		Info("CWMP: extractLANInfo from summon")
 
-	wansInfo := extractWANInfos(params, newMapper)
+	wansInfo := extractWANInfos(params, newMapper, drv)
 	stats, _ := parseCPEStats(params, newMapper)
 
 	// Determine best WAN IP for root (prefer PPPoE, then anything non-empty).
@@ -897,6 +974,7 @@ func (h *Handler) handleGetParamValuesResponse(
 	t := session.currentTask
 	session.currentTask = nil
 	mapper := session.mapper
+	drv := session.driver
 	session.mu.Unlock()
 
 	if t == nil {
@@ -930,7 +1008,7 @@ func (h *Handler) handleGetParamValuesResponse(
 		h.persistDiagToDevice(ctx, origTask.Serial, p.OriginalTaskType, result, params, mapper)
 
 	case task.TypeConnectedDevices:
-		hosts := parseConnectedHosts(params, mapper)
+		hosts := parseConnectedHosts(params, mapper, drv)
 		now := time.Now().UTC()
 		t.CompletedAt = &now
 		t.Status = task.StatusDone
@@ -996,9 +1074,9 @@ func (h *Handler) handleAddObjectResponse(ctx context.Context, w http.ResponseWr
 	session.mu.Unlock()
 
 	if wp != nil {
-		h.log.WithField("step", wp.cur).
+		h.log.WithField("step", wp.stepIndex()).
+			WithField("total", wp.totalSteps()).
 			WithField("instance", resp.InstanceNumber).
-			WithField("fillVar", wp.steps[wp.cur].fillVar).
 			Info("CWMP: WAN provision AddObject response")
 		nextXML, err := wp.onAddObject(resp.InstanceNumber)
 		if err != nil {
@@ -1009,8 +1087,16 @@ func (h *Handler) handleAddObjectResponse(ctx context.Context, w http.ResponseWr
 			h.handleTaskResponse(ctx, w, session, nil, err.Error())
 			return
 		}
-		// nextXML is always a SetParams step — currentTask remains in-flight.
-		writeXML(w, nextXML)
+		if nextXML != nil {
+			writeXML(w, nextXML)
+			return
+		}
+		// All steps complete.
+		session.mu.Lock()
+		session.wanProvision = nil
+		session.mu.Unlock()
+		h.log.WithField("task_id", wp.t.ID).Info("CWMP: WAN provisioning complete")
+		h.handleTaskResponse(ctx, w, session, nil, "")
 		return
 	}
 
@@ -1026,6 +1112,43 @@ func (h *Handler) handleAddObjectResponse(ctx context.Context, w http.ResponseWr
 		return
 	}
 	writeXML(w, taskXML)
+}
+
+// handleDeleteObjectResponse handles DeleteObjectResponse.
+// If a WANProvision delete flow is running, advances the state machine.
+func (h *Handler) handleDeleteObjectResponse(ctx context.Context, w http.ResponseWriter, session *Session) {
+	session.mu.Lock()
+	wp := session.wanProvision
+	session.mu.Unlock()
+
+	if wp != nil {
+		h.log.WithField("step", wp.stepIndex()).
+			WithField("total", wp.totalSteps()).
+			Info("CWMP: WAN provision DeleteObject response")
+		nextXML, err := wp.onDeleteObject()
+		if err != nil {
+			h.log.WithError(err).Error("CWMP: WAN provision Delete step failed")
+			session.mu.Lock()
+			session.wanProvision = nil
+			session.mu.Unlock()
+			h.handleTaskResponse(ctx, w, session, nil, err.Error())
+			return
+		}
+		if nextXML != nil {
+			writeXML(w, nextXML)
+			return
+		}
+		// All steps complete.
+		session.mu.Lock()
+		session.wanProvision = nil
+		session.mu.Unlock()
+		h.log.WithField("task_id", wp.t.ID).Info("CWMP: WAN provisioning (delete+add) complete")
+		h.handleTaskResponse(ctx, w, session, nil, "")
+		return
+	}
+
+	// No provision running — simple delete task completed.
+	h.handleTaskResponse(ctx, w, session, nil, "")
 }
 
 // handleTaskResponse marks the current in-flight task done or failed and
@@ -1098,7 +1221,20 @@ func (h *Handler) dispatchTask(ctx context.Context, w http.ResponseWriter, sessi
 // executeTask converts a Task into CWMP XML bytes.
 // For port-forwarding add it also configures session.addObjFollowUp and returns nil.
 func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamodel.Mapper, session *Session, w http.ResponseWriter) ([]byte, error) {
-	exe := task.NewExecutor()
+	// Build executor with driver hints for vendor-specific behaviour.
+	session.mu.Lock()
+	drv := session.driver
+	session.mu.Unlock()
+
+	var exe *task.Executor
+	if drv != nil {
+		exe = task.NewExecutorWithHints(&task.DriverHints{
+			BandSteeringPath:   drv.WiFi.BandSteeringPath,
+			SecurityModeMapper: drv.MapSecurityMode,
+		})
+	} else {
+		exe = task.NewExecutor()
+	}
 
 	switch t.Type {
 
@@ -1130,25 +1266,48 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 				return nil, fmt.Errorf("WAN full provisioning requires PPPoE username")
 			}
 
-			if mapper.WANProvisioningType() == "add_object" {
-				// TP-Link (and similar GPON ONTs): multi-step AddObject provisioning.
-				wp := newWANProvision(t, im.FreeGPONLinkIdx, p.VLAN, p.Username, p.Password)
-				session.mu.Lock()
-				session.wanProvision = wp
-				session.currentTask = t
-				// Store credentials for persistence after provisioning succeeds.
-				session.pendingWANCredentials = buildWANCredentialMap(p)
-				session.mu.Unlock()
+			session.mu.Lock()
+			drv := session.driver
+			session.mu.Unlock()
+
+			var wp *WANProvision
+			if drv != nil && drv.GetProvisionFlow("wan_pppoe_new") != nil {
+				// Use YAML-driven provisioning flow from device driver.
+				var err error
+				wp, err = newWANProvisionFromDriver(t, drv, "wan_pppoe_new", map[string]string{
+					"vlan_id":  strconv.Itoa(p.VLAN),
+					"username": p.Username,
+					"password": p.Password,
+					"gpon_idx": strconv.Itoa(im.FreeGPONLinkIdx),
+				})
+				if err != nil {
+					return nil, fmt.Errorf("create driver provision flow: %w", err)
+				}
+				h.log.WithField("task_id", t.ID).
+					WithField("driver", drv.ID).
+					WithField("flow", "wan_pppoe_new").
+					WithField("gpon_idx", im.FreeGPONLinkIdx).
+					WithField("vlan", p.VLAN).
+					Info("CWMP: starting driver-based WAN PPPoE provisioning")
+			} else if mapper.WANProvisioningType() == "add_object" {
+				// Legacy add_object fallback (no driver loaded).
+				wp = newWANProvision(t, im.FreeGPONLinkIdx, p.VLAN, p.Username, p.Password)
 				h.log.WithField("task_id", t.ID).
 					WithField("gpon_idx", im.FreeGPONLinkIdx).
 					WithField("vlan", p.VLAN).
-					WithField("user", "[REDACTED]").
-					Info("CWMP: starting full TP-Link PPPoE provisioning (add_object)")
+					Info("CWMP: starting legacy WAN PPPoE provisioning (add_object)")
+			}
+
+			if wp != nil {
+				session.mu.Lock()
+				session.wanProvision = wp
+				session.currentTask = t
+				session.pendingWANCredentials = buildWANCredentialMap(p)
+				session.mu.Unlock()
 				xmlBytes, err := wp.buildCurrentXML()
 				if err != nil {
 					return nil, err
 				}
-				h.log.WithField("xml_out", string(xmlBytes)).Info("CWMP: WAN provision step 0 XML")
 				writeXML(w, xmlBytes)
 				return nil, nil // response already written
 			}
@@ -1160,7 +1319,6 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 			}
 			h.log.WithField("task_id", t.ID).
 				WithField("provisioning_type", mapper.WANProvisioningType()).
-				WithField("user", "[REDACTED]").
 				Info("CWMP: starting generic PPPoE provisioning (set_params)")
 			// Store credentials for persistence after task succeeds.
 			session.mu.Lock()
@@ -1177,100 +1335,99 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 			credentialsChanging := p.Username != "" || p.Password != ""
 
 			if vlanChanging {
-				// VLAN change detected: disable → modify VLAN → update credentials → enable
-				h.log.WithField("task_id", t.ID).
-					WithField("ppp_idx", im.PPPIfaceIdx).
-					WithField("vlan_term_idx", im.WANVLANTermIdx).
-					WithField("req_vlan", p.VLAN).
-					WithField("current_vlan", im.WANCurrentVLAN).
-					WithField("req_user", "[REDACTED]").
-					Info("CWMP: WAN PPPoE VLAN change - using disable-modify-enable approach")
-
 				if p.Username == "" {
 					return nil, fmt.Errorf("WAN PPPoE VLAN change requires PPPoE username")
 				}
-
-				// Build parameters for disable→modify→enable sequence
-				params := make(map[string]string)
-
-				// Phase 1: Disable IP Interface (this disables PPPoE without deleting)
-				ipDisablePath := fmt.Sprintf("Device.IP.Interface.%d.Enable", im.WANIPIfaceIdx)
-				params[ipDisablePath] = "0"
-
-				// Phase 2: Update VLAN on VLANTermination
-				vlanIDPath := fmt.Sprintf("Device.Ethernet.VLANTermination.%d.VLANID", im.WANVLANTermIdx)
-				params[vlanIDPath] = strconv.Itoa(p.VLAN)
-
-				// Ensure VLAN is enabled
-				vlanEnablePath := fmt.Sprintf("Device.Ethernet.VLANTermination.%d.Enable", im.WANVLANTermIdx)
-				params[vlanEnablePath] = "1"
-
-				// Phase 3: Update PPPoE credentials
-				params[mapper.WANPPPoEUserPath()] = p.Username
-				params[mapper.WANPPPoEPassPath()] = p.Password
-
-				// Ensure PPP Interface settings
-				pppAuthPath := fmt.Sprintf("Device.PPP.Interface.%d.AuthenticationProtocol", im.PPPIfaceIdx)
-				params[pppAuthPath] = "AUTO_AUTH"
-
-				// Phase 4: Re-enable IP Interface (triggers PPPoE reconnect with new VLAN/credentials)
-				params[ipDisablePath] = "1"
-
-				h.log.WithField("task_id", t.ID).
-					WithField("old_vlan", im.WANCurrentVLAN).
-					WithField("new_vlan", p.VLAN).
-					WithField("param_count", len(params)).
-					Info("CWMP: Building WAN SetParameterValues for disable-modify-enable")
-
-				// Store credentials for persistence after task succeeds.
-				session.mu.Lock()
-				session.pendingWANCredentials = buildWANCredentialMap(p)
-				session.mu.Unlock()
-				return h.buildSetParamsXML(session, t.ID, params)
 			}
 
-			if !credentialsChanging {
+			if !vlanChanging && !credentialsChanging {
 				return nil, fmt.Errorf("WAN update: no credentials or VLAN change provided")
 			}
 
-			// Credentials-only update (no VLAN change): use simple SetParameterValues
-			// Do NOT set X_TP_ConnType — it is read-only on an active connection.
+			session.mu.Lock()
+			drv := session.driver
+			session.mu.Unlock()
+
+			if drv != nil {
+				// Choose the correct update flow.
+				// Both flows are single-step YAML (single SetParameterValues RPC) so
+				// an Inform arriving mid-flow cannot leave the device in a broken state.
+				// BuildSetParameterValues sorts: Enable=0 → VLANID → credentials → Enable=1.
+				flowName := "wan_pppoe_update"
+				inputVars := map[string]string{
+					"ip_iface_idx":  strconv.Itoa(im.WANIPIfaceIdx),
+					"ppp_iface_idx": strconv.Itoa(im.PPPIfaceIdx),
+					"username":      p.Username,
+					"password":      p.Password,
+				}
+
+				if vlanChanging {
+					if im.WANIPIfaceIdx == 0 || im.PPPIfaceIdx == 0 || im.WANVLANTermIdx == 0 {
+						return nil, fmt.Errorf("WAN PPPoE VLAN change requires instance map (ip=%d ppp=%d vlan=%d)",
+							im.WANIPIfaceIdx, im.PPPIfaceIdx, im.WANVLANTermIdx)
+					}
+					flowName = "wan_pppoe_update_vlan"
+					inputVars["vlan_id"] = strconv.Itoa(p.VLAN)
+					inputVars["vlan_term_idx"] = strconv.Itoa(im.WANVLANTermIdx)
+				}
+
+				wp, err := newWANProvisionFromDriver(t, drv, flowName, inputVars)
+				if err != nil {
+					return nil, fmt.Errorf("create driver WAN update flow %q: %w", flowName, err)
+				}
+
+				h.log.WithField("task_id", t.ID).
+					WithField("driver", drv.ID).
+					WithField("flow", flowName).
+					WithField("ppp_idx", im.PPPIfaceIdx).
+					WithField("ip_idx", im.WANIPIfaceIdx).
+					WithField("old_vlan", im.WANCurrentVLAN).
+					WithField("new_vlan", p.VLAN).
+					WithField("vlan_change", vlanChanging).
+					Info("CWMP: WAN PPPoE update via driver YAML flow (atomic single-step)")
+
+				session.mu.Lock()
+				session.wanProvision = wp
+				session.currentTask = t
+				session.pendingWANCredentials = buildWANCredentialMap(p)
+				session.mu.Unlock()
+
+				xmlBytes, err := wp.buildCurrentXML()
+				if err != nil {
+					return nil, err
+				}
+				writeXML(w, xmlBytes)
+				return nil, nil
+			}
+
+			// Fallback: no driver loaded — build params directly using mapper paths.
+			// This path is only hit for devices without a YAML driver registered.
 			params := make(map[string]string)
-
 			h.log.WithField("task_id", t.ID).
-				WithField("req_user", "[REDACTED]").
-				WithField("req_pass", "[REDACTED]").
-				Info("CWMP: WAN credentials-only update request")
+				WithField("vlan_change", vlanChanging).
+				Info("CWMP: WAN PPPoE update fallback (no driver, set_params)")
 
-			// Update credentials if provided
 			if p.Username != "" {
 				params[mapper.WANPPPoEUserPath()] = p.Username
 			}
 			if p.Password != "" {
 				params[mapper.WANPPPoEPassPath()] = p.Password
 			}
-
-			// Always ensure PPPoE configuration is complete
+			if vlanChanging && im.WANVLANTermIdx > 0 {
+				params[fmt.Sprintf("Device.Ethernet.VLANTermination.%d.VLANID", im.WANVLANTermIdx)] = strconv.Itoa(p.VLAN)
+				params[fmt.Sprintf("Device.IP.Interface.%d.Enable", im.WANIPIfaceIdx)] = "0"
+			}
 			if im.PPPIfaceIdx > 0 {
-				pppAuthPath := fmt.Sprintf("Device.PPP.Interface.%d.AuthenticationProtocol", im.PPPIfaceIdx)
-				params[pppAuthPath] = "AUTO_AUTH"
-
-				// Ensure PPP Interface is enabled
-				pppEnablePath := fmt.Sprintf("Device.PPP.Interface.%d.Enable", im.PPPIfaceIdx)
-				params[pppEnablePath] = "1"
-
-				// Ensure IP Interface is enabled
-				if im.WANIPIfaceIdx > 0 {
-					ipEnablePath := fmt.Sprintf("Device.IP.Interface.%d.Enable", im.WANIPIfaceIdx)
-					params[ipEnablePath] = "1"
-				}
+				params[fmt.Sprintf("Device.PPP.Interface.%d.AuthenticationProtocol", im.PPPIfaceIdx)] = "AUTO_AUTH"
+				params[fmt.Sprintf("Device.PPP.Interface.%d.Enable", im.PPPIfaceIdx)] = "1"
+			}
+			if im.WANIPIfaceIdx > 0 {
+				params[fmt.Sprintf("Device.IP.Interface.%d.Enable", im.WANIPIfaceIdx)] = "1"
+			}
+			if len(params) == 0 {
+				return nil, fmt.Errorf("WAN update fallback: no parameters could be built")
 			}
 
-			h.log.WithField("task_id", t.ID).
-				WithField("param_count", len(params)).
-				Info("CWMP: Building WAN SetParameterValues for credentials update")
-
-			// Store credentials for persistence after task succeeds.
 			session.mu.Lock()
 			session.pendingWANCredentials = buildWANCredentialMap(p)
 			session.mu.Unlock()
@@ -1382,11 +1539,21 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 
 			// Also sync security mode to both bands if it was set in the payload
 			if wifiPayload.Security != "" {
-				mode := wifiPayload.Security
-				if wifiPayload.Security == "WPA2-PSK" {
-					mode = "WPA2-Personal"
-				} else if wifiPayload.Security == "WPA-WPA2-PSK" {
-					mode = "WPA-WPA2-Personal"
+				session.mu.Lock()
+				drv := session.driver
+				session.mu.Unlock()
+
+				var mode string
+				if drv != nil {
+					mode = drv.MapSecurityMode(wifiPayload.Security)
+				} else {
+					// Legacy hardcoded mapping as fallback
+					mode = wifiPayload.Security
+					if wifiPayload.Security == "WPA2-PSK" {
+						mode = "WPA2-Personal"
+					} else if wifiPayload.Security == "WPA-WPA2-PSK" {
+						mode = "WPA-WPA2-Personal"
+					}
 				}
 
 				if secPath24 != "" && secPath5 != "" {

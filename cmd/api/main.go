@@ -110,6 +110,7 @@ func run(ctx context.Context, cfg config.ConfigProvider, appLogger l.Logger) err
 	jwtSvc := initJWTService(appCfg.GetJWT())
 	taskQueue := initTaskQueue(cacheDB, appLogger, cacheCC.GetTTL(), tsk.GetMaxAttempts())
 	schemaReg := initSchemaRegistry(acsConfig.GetSchemasDir(), appLogger)
+	driverReg := initDriverRegistry(acsConfig.GetSchemasDir(), appLogger)
 
 	// Initialize parameter repository (PostgreSQL)
 	paramRepo, err := initParameterRepository(ctx, appCfg.GetPostgreSQL(), cacheDB, appLogger)
@@ -122,7 +123,7 @@ func run(ctx context.Context, cfg config.ConfigProvider, appLogger l.Logger) err
 	paramCfg := appCfg.GetParameters()
 	initParameterScheduler(ctx, paramRepo, paramCfg, appLogger)
 
-	cwmpSrv := initCWMPServer(deviceSvc, taskQueue, paramRepo, acsConfig, appLogger, schemaReg)
+	cwmpSrv := initCWMPServer(deviceSvc, taskQueue, paramRepo, acsConfig, appLogger, schemaReg, driverReg)
 	cwmpSrv.StartPresenceMonitor(ctx)
 
 	routerCfg := api.Config{
@@ -245,8 +246,28 @@ func initSchemaRegistry(schemasDir string, appLogger l.Logger) *schema.Registry 
 	return reg
 }
 
+// initDriverRegistry loads device driver YAML files from the schemas directory.
+// On failure it logs a warning and returns an empty registry so that device
+// connections are not blocked.
+func initDriverRegistry(schemasDir string, appLogger l.Logger) *schema.DeviceDriverRegistry {
+	reg := schema.NewDeviceDriverRegistry()
+	if err := reg.LoadDir(schemasDir); err != nil {
+		appLogger.WithError(err).
+			WithField("dir", schemasDir).
+			Warn("Failed to load device drivers, provisioning will use legacy code")
+		return reg
+	}
+	for name, drv := range reg.All() {
+		appLogger.WithField("name", name).
+			WithField("driver", drv.ID).
+			WithField("vendor", drv.Vendor).
+			Info("Loaded device driver")
+	}
+	return reg
+}
+
 // initCWMPServer builds the CWMP handler and returns the server.
-func initCWMPServer(deviceSvc device.Service, taskQueue *task.RedisQueue, paramRepo parameter.Repository, acs config.ACSConfigProvider, appLogger l.Logger, schemaReg *schema.Registry) *cwmpserver.Server {
+func initCWMPServer(deviceSvc device.Service, taskQueue *task.RedisQueue, paramRepo parameter.Repository, acs config.ACSConfigProvider, appLogger l.Logger, schemaReg *schema.Registry, driverReg *schema.DeviceDriverRegistry) *cwmpserver.Server {
 	handler := cwmpserver.NewHandler(
 		deviceSvc,
 		taskQueue,
@@ -257,6 +278,7 @@ func initCWMPServer(deviceSvc device.Service, taskQueue *task.RedisQueue, paramR
 		acs.GetURL(),
 		acs.GetInformInterval(),
 		schemaReg,
+		driverReg,
 	)
 	digestAuth := auth.NewDigestAuth(appLogger, "ACS", acs.GetUsername(), acs.GetPassword())
 	return cwmpserver.NewServer(handler, digestAuth, appLogger)

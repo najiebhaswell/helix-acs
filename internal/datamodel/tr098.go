@@ -194,7 +194,8 @@ func (m *TR098Mapper) WANMACPath() string {
 	return fmt.Sprintf("InternetGatewayDevice.WANDevice.%d.WANEthernetInterfaceConfig.MACAddress", m.wanDev())
 }
 func (m *TR098Mapper) WANStatusPath() string {
-	return fmt.Sprintf("%s.WANIPConnection.%d.ConnectionStatus", m.wanBase(), m.wanIPConn())
+	// TR-098 GPON ONUs commonly report active internet state on WANPPPConnection.
+	return fmt.Sprintf("%s.WANPPPConnection.%d.ConnectionStatus", m.wanBase(), m.wanPPPConn())
 }
 func (m *TR098Mapper) WANBytesSentPath() string {
 	return fmt.Sprintf("InternetGatewayDevice.WANDevice.%d.WANCommonInterfaceConfig.TotalBytesSent", m.wanDev())

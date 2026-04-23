@@ -29,6 +29,23 @@ func TestDiscoverTR181WANDefaultOrder(t *testing.T) {
 	assert.Equal(t, 2, im.LANIPIfaceIdx)
 }
 
+func TestDiscoverTR181WANWithHintsPrefersInternetServiceType(t *testing.T) {
+	params := map[string]string{
+		"Device.IP.Interface.1.X_TP_ConnType":    "PPPoE",
+		"Device.IP.Interface.1.X_TP_ServiceType": "TR069_INTERNET",
+		"Device.IP.Interface.2.X_TP_ConnType":    "PPPoE",
+		"Device.IP.Interface.2.X_TP_ServiceType": "Internet",
+	}
+	hints := &DiscoveryHints{
+		WANTypePath:        "Device.IP.Interface.{i}.X_TP_ConnType",
+		WANTypeValuesWAN:   []string{"PPPoE", "DHCP", "Static"},
+		WANServiceTypePath: "Device.IP.Interface.{i}.X_TP_ServiceType",
+	}
+
+	im := DiscoverInstancesWithHints(params, hints)
+	assert.Equal(t, 2, im.WANIPIfaceIdx, "WAN interface should prefer ServiceType=Internet")
+}
+
 func TestDiscoverTR181NoIPParams(t *testing.T) {
 	// Without IP parameters the indices stay zero (mapper falls back to defaults).
 	params := map[string]string{
