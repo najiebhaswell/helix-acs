@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -211,4 +212,54 @@ func (h *DeviceHandler) GetProvisionInfo(w http.ResponseWriter, r *http.Request)
 	}
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// trafficSeriesResponse is returned by GET .../traffic (average rate between samples).
+type trafficSeriesResponse struct {
+	Serial string                     `json:"serial"`
+	Since  time.Time                  `json:"since"`
+	Points []parameter.TrafficRatePoint `json:"points"`
+}
+
+// GetTraffic handles GET /api/v1/devices/:serial/traffic
+// Query: hours (default 24, max 168), limit (max samples pulled, default 2000).
+// Points are derived from cumulative WAN byte counters: Δbytes / Δtime → bps.
+func (h *DeviceHandler) GetTraffic(w http.ResponseWriter, r *http.Request) {
+	serial := mux.Vars(r)["serial"]
+	if serial == "" {
+		writeError(w, http.StatusBadRequest, "serial is required")
+		return
+	}
+
+	hours := 24
+	if v := r.URL.Query().Get("hours"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			hours = n
+		}
+	}
+	if hours > 168 {
+		hours = 168
+	}
+
+	limit := 2000
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = n
+		}
+	}
+
+	since := time.Now().UTC().Add(-time.Duration(hours) * time.Hour)
+
+	samples, err := h.paramRepo.ListWANTrafficSamples(r.Context(), serial, since, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list traffic samples")
+		return
+	}
+
+	points := parameter.TrafficSamplesToRatePoints(samples)
+	writeJSON(w, http.StatusOK, trafficSeriesResponse{
+		Serial: serial,
+		Since:  since,
+		Points: points,
+	})
 }

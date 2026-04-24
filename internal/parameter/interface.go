@@ -32,6 +32,11 @@ type Repository interface {
 	DeleteOldHistory(ctx context.Context, daysOld int) error
 	CaptureAllDeviceSnapshots(ctx context.Context) error
 
+	// WAN traffic samples (cumulative counters for rate graphs)
+	RecordWANTrafficSample(ctx context.Context, serial string, recordedAt time.Time, bytesSent, bytesReceived int64) error
+	ListWANTrafficSamples(ctx context.Context, serial string, since time.Time, limit int) ([]TrafficSample, error)
+	DeleteOldTrafficSamples(ctx context.Context, daysOld int) error
+
 	// Connection
 	HealthCheck(ctx context.Context) error
 	Close() error

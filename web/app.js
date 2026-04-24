@@ -140,6 +140,15 @@ function fmtBytes(bytes) {
   return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
 }
 
+/** Bits per second → human-readable bitrate (for WAN graph axes). */
+function fmtMbpsFromBps(bps) {
+  if (bps == null || !isFinite(bps) || bps <= 0) return '0 Mbps';
+  const mbps = bps / 1e6;
+  if (mbps < 0.01) return (bps / 1e3).toFixed(1) + ' Kbps';
+  if (mbps < 10) return mbps.toFixed(2) + ' Mbps';
+  return mbps.toFixed(1) + ' Mbps';
+}
+
 function fmtUptime(seconds) {
   if (!seconds) return '';
   const d = Math.floor(seconds / 86400);
@@ -1111,6 +1120,21 @@ async function renderNetworkTab(dev, serial) {
 
   document.getElementById('tab-network').innerHTML = `
     <div class="row g-3">
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white fw-semibold small">
+            <i class="bi bi-graph-up-arrow me-1 text-info"></i>WAN traffic <span class="text-muted fw-normal">(average rate between counter samples, not real-time)</span>
+          </div>
+          <div class="card-body py-2">
+            <canvas id="wan-traffic-canvas" width="800" height="220" style="width:100%;max-height:220px;height:220px;display:block"></canvas>
+            <div class="d-flex flex-wrap justify-content-between align-items-center small text-muted mt-1 gap-2">
+              <span><span class="text-success">●</span> Download (RX)</span>
+              <span><span class="text-primary">●</span> Upload (TX)</span>
+              <span id="wan-traffic-hint"></span>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="col-md-6 d-flex flex-column gap-3">
         ${wanCards}
         ${lanCard}
@@ -1121,6 +1145,106 @@ async function renderNetworkTab(dev, serial) {
         ${noWifi}
       </div>
     </div>`;
+
+  loadAndDrawWanTrafficChart(serial || dev.serial);
+}
+
+/**
+ * Fetches /devices/:serial/traffic and draws RX/TX average bitrate polylines (bps from Δbytes/Δt).
+ */
+async function loadAndDrawWanTrafficChart(serial) {
+  const canvas = document.getElementById('wan-traffic-canvas');
+  const hint = document.getElementById('wan-traffic-hint');
+  if (!canvas || !serial) return;
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.getBoundingClientRect();
+  const cssW = Math.max(320, rect.width || canvas.parentElement?.clientWidth || 800);
+  const cssH = 220;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(cssW * dpr);
+  canvas.height = Math.floor(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = cssW;
+  const H = cssH;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#f8f9fa';
+  ctx.fillRect(0, 0, W, H);
+
+  const drawEmpty = (msg) => {
+    ctx.fillStyle = '#6c757d';
+    ctx.font = '13px system-ui,sans-serif';
+    ctx.fillText(msg, 12, H / 2);
+    if (hint) hint.textContent = '';
+  };
+
+  try {
+    const data = await API.get(`/devices/${encodeURIComponent(serial)}/traffic?hours=24`);
+    const pts = data.points || [];
+    if (pts.length === 0) {
+      drawEmpty('Need at least two counter samples to show a rate (wait for the next Inform / summon).');
+      if (hint) hint.textContent = 'Belum ada cukup data.';
+      return;
+    }
+    if (hint) {
+      hint.textContent = `${pts.length} interval · last 24h (Δbytes/Δtime)`;
+    }
+    let maxBps = 1e3;
+    for (const p of pts) {
+      if (p.valid) {
+        maxBps = Math.max(maxBps, p.rx_bps || 0, p.tx_bps || 0);
+      }
+    }
+    maxBps *= 1.08;
+    const padL = 44;
+    const padR = 8;
+    const padT = 14;
+    const padB = 6;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+    const plotY = padT;
+    ctx.strokeStyle = '#dee2e6';
+    ctx.lineWidth = 1;
+    for (let g = 0; g <= 4; g++) {
+      const y = plotY + (g / 4) * plotH;
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(W - padR, y);
+      ctx.stroke();
+    }
+    const n = pts.length;
+    const toX = (i) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+    const toY = (bps) => plotY + plotH - (Math.min(bps, maxBps) / maxBps) * plotH;
+    const drawSeries = (pick, color) => {
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < n; i++) {
+        const p = pts[i];
+        if (!p.valid) {
+          started = false;
+          continue;
+        }
+        const x = toX(i);
+        const y = toY(pick(p));
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    };
+    drawSeries((p) => p.rx_bps, '#198754');
+    drawSeries((p) => p.tx_bps, '#0d6efd');
+    ctx.fillStyle = '#495057';
+    ctx.font = '11px system-ui,sans-serif';
+    ctx.fillText(fmtMbpsFromBps(maxBps), 4, 11);
+  } catch (_) {
+    drawEmpty('Could not load traffic series.');
+    if (hint) hint.textContent = 'Gagal memuat data traffic.';
+  }
 }
 
 // Toggle PPPoE password visibility in WAN card

@@ -86,6 +86,9 @@ func (s *Scheduler) StartHourlyCleanup(ctx context.Context, retentionDays int) {
 			if err := s.repo.DeleteOldHistory(ctx, retentionDays); err != nil {
 				s.log.WithError(err).Error("cleanup failed")
 			}
+			if err := s.repo.DeleteOldTrafficSamples(ctx, retentionDays); err != nil {
+				s.log.WithError(err).Error("wan traffic samples cleanup failed")
+			}
 		}
 	}
 }

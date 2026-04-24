@@ -54,6 +54,19 @@ CREATE INDEX IF NOT EXISTS idx_history_changed_at ON device_parameter_history(ch
 CREATE INDEX IF NOT EXISTS idx_history_param_name ON device_parameter_history(param_name);
 
 -- ============================================================
+-- 3b. WAN traffic samples (cumulative counters → average rate graph)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS device_wan_traffic_samples (
+    id BIGSERIAL PRIMARY KEY,
+    device_serial VARCHAR(64) NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    bytes_sent BIGINT NOT NULL DEFAULT 0,
+    bytes_received BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_wan_traffic_serial_time ON device_wan_traffic_samples (device_serial, recorded_at DESC);
+
+-- ============================================================
 -- 4. Device Parameter Metadata
 -- ============================================================
 CREATE TABLE IF NOT EXISTS device_parameter_metadata (

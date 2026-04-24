@@ -507,6 +507,17 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	session.State = StateProcessing
 	session.mu.Unlock()
 
+	// WAN traffic graph: sample when Inform carries byte counter parameters (~periodic inform).
+	if h.parameterRepo != nil {
+		serial := upsertReq.Serial
+		pcopy := upsertReq.Parameters
+		go func() {
+			tctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			h.maybeRecordWANTrafficFromInformParams(tctx, serial, pcopy, mapper)
+		}()
+	}
+
 	respXML, err := BuildInformResponse(id)
 	if err != nil {
 		h.log.WithError(err).Error("CWMP: Build InformResponse failed")
@@ -1043,6 +1054,13 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 		h.log.WithField("serial", serial).Info("CWMP: persist WAN/WiFi/LAN info success")
 	}
 
+	// WAN traffic graph: sample after full summon (complete counter snapshot).
+	{
+		tctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		h.recordWANTrafficFromSummonedParams(tctx, serial, params, newMapper)
+		cancel()
+	}
+
 	// Enforce driver default_params: push any param whose current value differs
 	// from the required default. Runs once per full-summon cycle (≈ every 2 min).
 	h.injectDefaultParamTask(session, serial, drv, params)
@@ -1097,6 +1115,39 @@ func (h *Handler) injectDefaultParamTask(session *Session, serial string, drv *s
 	session.mu.Lock()
 	session.pendingTasks = append([]*task.Task{synth}, session.pendingTasks...)
 	session.mu.Unlock()
+}
+
+// recordWANTrafficFromSummonedParams stores cumulative WAN octet counters for bitrate graphs.
+func (h *Handler) recordWANTrafficFromSummonedParams(ctx context.Context, serial string, params map[string]string, mapper datamodel.Mapper) {
+	if h.parameterRepo == nil || serial == "" || mapper == nil || len(params) == 0 {
+		return
+	}
+	_, wanSt := parseCPEStats(params, mapper)
+	if err := h.parameterRepo.RecordWANTrafficSample(ctx, serial, time.Now().UTC(), wanSt.BytesSent, wanSt.BytesReceived); err != nil {
+		h.log.WithError(err).WithField("serial", serial).Debug("CWMP: RecordWANTrafficSample failed")
+	}
+}
+
+// maybeRecordWANTrafficFromInformParams records a sample only if Inform included counter paths
+// (sparse Informs often omit them — then we rely on the full summon path).
+func (h *Handler) maybeRecordWANTrafficFromInformParams(ctx context.Context, serial string, params map[string]string, mapper datamodel.Mapper) {
+	if h.parameterRepo == nil || serial == "" || mapper == nil || len(params) == 0 {
+		return
+	}
+	sentPath := mapper.WANBytesSentPath()
+	recvPath := mapper.WANBytesReceivedPath()
+	sentKeyPresent := sentPath != ""
+	if sentKeyPresent {
+		_, sentKeyPresent = params[sentPath]
+	}
+	recvKeyPresent := recvPath != ""
+	if recvKeyPresent {
+		_, recvKeyPresent = params[recvPath]
+	}
+	if !sentKeyPresent && !recvKeyPresent {
+		return
+	}
+	h.recordWANTrafficFromSummonedParams(ctx, serial, params, mapper)
 }
 
 // handleGetParamValuesResponse routes the parsed parameter map to the correct

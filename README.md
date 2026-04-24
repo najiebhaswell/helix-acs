@@ -10,6 +10,8 @@
 
 Servidor de configuração automática (ACS) para gerenciamento de equipamentos CPE via protocolo TR-069 (CWMP). Permite provisionar, monitorar e executar tarefas remotas em roteadores e modems de qualquer fabricante que implemente os modelos de dados TR-181 ou TR-098.
 
+Os parâmetros completos da CPE (após *summon*) são persistidos em **PostgreSQL** (histórico consultável); **MongoDB** guarda o documento do dispositivo; **Redis** fila as tarefas CWMP.
+
 ## Sumário
 
 - [Visão geral](#visão-geral)
@@ -23,6 +25,7 @@ Servidor de configuração automática (ACS) para gerenciamento de equipamentos 
 - [Tarefas CWMP](#tarefas-cwmp)
 - [Modelos de dados](#modelos-de-dados)
 - [Esquemas de parâmetros](#esquemas-de-parâmetros)
+- [Drivers de dispositivo (YAML)](#drivers-de-dispositivo-yaml)
 - [Desenvolvimento](#desenvolvimento)
 
 ---
@@ -80,9 +83,11 @@ Dois servidores HTTP rodam simultaneamente:
 
 **Gerenciamento de dispositivos**
 - Registro automático de CPEs no primeiro contato (Inform)
-- Descoberta dinâmica de números de instância TR-181 e TR-098
+- Descoberta dinâmica de números de instância TR-181 e TR-098 (com *hints* opcionais por modelo no `driver.yaml`)
 - Detecção automática do modelo de dados (TR-181 ou TR-098)
-- Resolução automática de esquema por fabricante (ex: Huawei, ZTE) com fallback para o esquema genérico
+- Resolução automática de esquema por fabricante (ex: Huawei, ZTE, TP-Link) com fallback para o esquema genérico
+- **Drivers YAML** por fabricante/modelo: fluxos de provisionamento (WAN/WiFi), `default_params` aplicados após *full summon*, e mapeamento WiFi (ex.: SSID ↔ banda quando `LowerLayers` não existe)
+- **Summon**: atualização completa de parâmetros com *throttle* (~2 min); com tarefa WiFi/WAN pendente dentro da janela, *summon* pode ser **direcionado** (`Device.WiFi.`, `Device.IP.Interface.`, etc.) para uma ida e volta mais rápida
 - Filtro e paginação na listagem de dispositivos
 - Edição de tags e metadados
 
@@ -115,13 +120,14 @@ CPE (roteador/modem)
       |
       v
 +---------------------+        +----------+
-|  Servidor CWMP      |        |          |
-|  porta 7547         +------->+ MongoDB  |
-|                     |        | (devices)|
+|  Servidor CWMP      |        | MongoDB  |
+|  porta 7547         +------->+ (devices)|
+|                     |        +----------+
 |  Digest Auth        |        +----------+
-+---------------------+
++---------------------+        |PostgreSQL|
+                               | (params) |
                                +----------+
-+---------------------+        |          |
++---------------------+        +----------+
 |  API REST + Web UI  +------->+  Redis   |
 |  porta 8080         |        | (tasks)  |
 |                     |        +----------+
@@ -142,7 +148,8 @@ CPE (roteador/modem)
 | `internal/device` | Modelo de dispositivo, repositório MongoDB e serviço |
 | `internal/task` | Tipos de tarefa, payloads, fila Redis e executor |
 | `internal/datamodel` | Interface `Mapper`, mappers TR-181 e TR-098 com descoberta dinâmica de instâncias |
-| `internal/schema` | Carregamento de esquemas YAML, resolução por fabricante e `SchemaMapper` |
+| `internal/schema` | Registry de esquemas YAML, `SchemaMapper`, registry de drivers (`driver.yaml` + provisions) |
+| `internal/parameter` | Persistência e histórico de parâmetros TR-069 (PostgreSQL, cache Redis opcional) |
 | `internal/auth` | JWT e Digest Auth |
 | `internal/config` | Carregamento e validação de configuração (Viper) |
 | `web` | Interface web incorporada ao binário (HTML, CSS, JS) |
@@ -151,6 +158,7 @@ CPE (roteador/modem)
 
 - Go 1.25 ou superior
 - MongoDB 7
+- PostgreSQL 16+ (armazenamento de parâmetros / histórico; ver `application.postgresql` e `scripts/schema-postgresql.sql` no Compose)
 - Redis 7
 - Docker e Docker Compose (opcional, para execução em contêiner)
 
@@ -171,6 +179,8 @@ Os campos obrigatórios que devem ser alterados antes da primeira execução sã
 | `application.acs.url` | URL pública do ACS provisionada nas CPEs (deve ser acessível pela rede das CPEs). |
 | `databases.cache.uri` | URI de conexão com o Redis. |
 | `databases.storage.uri` | URI de conexão com o MongoDB. |
+| `application.postgresql.*` | Host, porta, usuário, senha e banco usados pelo repositório de parâmetros. |
+| `application.parameters.*` | Backend de parâmetros (`postgresql`), cache, histórico e *snapshots* diários. |
 
 Consulte o arquivo [configs/config.example.yml](configs/config.example.yml) para a descrição completa de cada campo.
 
@@ -331,6 +341,7 @@ Resposta:
 | PUT | `/api/v1/devices/{serial}` | Atualiza metadados (tags, alias) |
 | DELETE | `/api/v1/devices/{serial}` | Remove um dispositivo |
 | GET | `/api/v1/devices/{serial}/parameters` | Retorna todos os parâmetros TR-069 da CPE |
+| GET | `/api/v1/devices/{serial}/traffic` | Série de taxa média WAN (bps) derivada de Δbytes/Δt entre amostras; query `hours` (padrão 24, máx. 168), `limit` (máx. 5000) |
 
 **Filtros disponíveis em `GET /api/v1/devices`:**
 
@@ -436,11 +447,11 @@ O modelo é detectado automaticamente no primeiro Inform, com base no objeto rai
 
 CPEs diferentes podem atribuir números de instância distintos às interfaces. Por exemplo, o WAN pode estar em `Device.IP.Interface.1` ou `Device.IP.Interface.3`, dependendo do fabricante.
 
-A cada Inform, o sistema executa `DiscoverInstances` que varre os parâmetros recebidos e identifica os índices reais de:
+A cada Inform, o sistema executa `DiscoverInstances` (e variantes com *hints* do driver) que varre os parâmetros recebidos e identifica os índices reais de:
 
 - Interface WAN e LAN (por classificação de IP público/privado)
-- Interface PPP
-- Rádios Wi-Fi, SSIDs e Access Points (por `OperatingFrequencyBand`, com fallback por ordem de índice)
+- Interface PPP, terminações VLAN e *links* Ethernet (TR-181)
+- Rádios Wi-Fi, SSIDs e Access Points (por `OperatingFrequencyBand` e `LowerLayers`; em CPEs sem `LowerLayers` no SSID, o **driver YAML** pode definir estratégias como `pair_block_mod2` ou mapas `explicit` por índice de SSID)
 - Dispositivos WAN e conexões TR-098
 
 Dessa forma as tarefas são sempre enviadas para o caminho correto, independentemente do fabricante.
@@ -470,9 +481,18 @@ schemas/
 ├── tr098/                        # Caminhos padrão TR-098
 │   └── ...                       # mesma estrutura
 └── vendors/
+    ├── tplink/
+    │   ├── tr181/
+    │   │   ├── driver.yaml            # driver + default_params + provisions
+    │   │   ├── provision_wan.yaml
+    │   │   └── …
+    │   └── models/
+    │       └── XC220-G3/
+    │           └── tr181/
+    │               └── driver.yaml    # overrides por modelo
     ├── huawei/
     │   └── tr181/
-    │       └── change_password.yaml   # sobrescreve apenas o que difere
+    │       └── change_password.yaml
     └── zte/
         └── tr098/
             └── change_password.yaml
@@ -524,6 +544,32 @@ EOF
 
 Reinicie a aplicação. Nenhuma alteração de código é necessária.
 
+## Drivers de dispositivo (YAML)
+
+Além dos **esquemas de parâmetros** (`wifi.yaml`, `wan.yaml`, …), o diretório `schemas/vendors/` pode conter um **`driver.yaml`** por fabricante ou por modelo. O registry carrega esses arquivos na **inicialização**; alterações no YAML exigem **reinício** do processo (não é necessário recompilar).
+
+### Resolução
+
+1. `vendors/<vendor>/models/<productClass>/<tr181|tr098>/driver.yaml` — específico do modelo (maior prioridade)
+2. `vendors/<vendor>/<tr181|tr098>/driver.yaml` — padrão do fabricante
+
+Os campos `default_params` do arquivo **vendor** são **fundidos** com os do driver do modelo (o modelo sobrescreve chaves iguais).
+
+### O que pode ir no `driver.yaml`
+
+| Área | Descrição |
+|------|-----------|
+| `features`, `config`, `security_modes`, `wifi` | Comportamento e caminhos *vendor* (ex.: band steering TP-Link) |
+| `discovery` | *Paths* para tipo de WAN, GPON, tipo de serviço, e opções WiFi sem `LowerLayers` (`wifi_ssid_band_without_lower_layers`) |
+| `default_params` | Mapa `caminho TR-069 absoluto → valor`. Após cada **summon completo**, o ACS compara com os valores obtidos da CPE e envia `SetParameterValues` apenas onde difere |
+| `provisions` | Arquivos YAML de passos (WAN PPPoE, atualização WiFi, etc.) referenciados por nome |
+
+### Summon e `default_params`
+
+- O **summon completo** (GetParameterNames + lotes de GetParameterValues) é limitado em frequência (~2 min por dispositivo) para não sobrecarregar a CPE.
+- Os `default_params` são avaliados **no fim** de um summon completo (quando o mapa de parâmetros está completo).
+- Com tarefa **WiFi** ou **WAN** pendente dentro da janela de *throttle*, o ACS pode fazer um **summon direcionado** (subárvores como `Device.WiFi.` ou `Device.IP.Interface.`) para atualizar índices antes de despachar a tarefa, sem esperar o summon completo.
+
 ## Desenvolvimento
 
 ### Executar testes
@@ -537,6 +583,8 @@ go test ./...
 ```bash
 go build -o helix ./cmd/api
 ```
+
+O binário `helix` não é versionado no Git (ver `.gitignore`). Use o nome que preferir; o exemplo acima corresponde à documentação em [Execução](#execução).
 
 ### Build da imagem Docker
 
@@ -564,7 +612,8 @@ O Dockerfile usa multi-stage build: compila em `golang:1.25-alpine` e gera uma i
 |   +-- datamodel/     Interface Mapper, TR-181 e TR-098, descoberta de instâncias
 |   +-- device/        Modelo, repositório MongoDB e serviço de dispositivos
 |   +-- logger/        Wrapper do logger
-|   +-- schema/        Registry, Resolver e SchemaMapper orientados a YAML
+|   +-- parameter/     Parâmetros TR-069: PostgreSQL, cache, histórico
+|   +-- schema/        Registry de esquemas, drivers YAML, SchemaMapper
 |   +-- task/          Tipos de tarefa, fila Redis e executor
 +-- web/               Interface web (HTML, CSS, JS) incorporada ao binário
 +-- examples/          Simulador de CPE para testes locais

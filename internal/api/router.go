@@ -42,6 +42,7 @@ type Config struct {
 //	PUT    /api/v1/devices/{serial}
 //	DELETE /api/v1/devices/{serial}
 //	GET    /api/v1/devices/{serial}/parameters
+//	GET    /api/v1/devices/{serial}/traffic
 //
 //	POST /api/v1/devices/{serial}/tasks/wifi
 //	POST /api/v1/devices/{serial}/tasks/wan
@@ -98,6 +99,7 @@ func NewRouter(
 	api.HandleFunc("/devices/{serial}", deviceHandler.Update).Methods(http.MethodPut)
 	api.HandleFunc("/devices/{serial}", deviceHandler.Delete).Methods(http.MethodDelete)
 	api.HandleFunc("/devices/{serial}/parameters", deviceHandler.GetParameters).Methods(http.MethodGet)
+	api.HandleFunc("/devices/{serial}/traffic", deviceHandler.GetTraffic).Methods(http.MethodGet)
 	api.HandleFunc("/devices/{serial}/provision", deviceHandler.GetProvisionInfo).Methods(http.MethodGet)
 
 	// Snapshot routes

@@ -526,6 +526,83 @@ func (r *PostgreSQLRepository) CaptureAllDeviceSnapshots(ctx context.Context) er
 }
 
 // ============================================================
+// WAN traffic samples
+// ============================================================
+
+// RecordWANTrafficSample inserts cumulative WAN byte counters for graphing.
+func (r *PostgreSQLRepository) RecordWANTrafficSample(
+	ctx context.Context,
+	serial string,
+	recordedAt time.Time,
+	bytesSent, bytesReceived int64,
+) error {
+	if serial == "" {
+		return nil
+	}
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO device_wan_traffic_samples (device_serial, recorded_at, bytes_sent, bytes_received)
+		 VALUES ($1, $2, $3, $4)`,
+		serial, recordedAt.UTC(), bytesSent, bytesReceived,
+	)
+	if err != nil {
+		return fmt.Errorf("insert wan traffic sample: %w", err)
+	}
+	return nil
+}
+
+// ListWANTrafficSamples returns samples with recorded_at >= since, oldest first.
+func (r *PostgreSQLRepository) ListWANTrafficSamples(
+	ctx context.Context,
+	serial string,
+	since time.Time,
+	limit int,
+) ([]TrafficSample, error) {
+	if limit < 1 {
+		limit = 500
+	}
+	if limit > 5000 {
+		limit = 5000
+	}
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT recorded_at, bytes_sent, bytes_received
+		 FROM device_wan_traffic_samples
+		 WHERE device_serial = $1 AND recorded_at >= $2
+		 ORDER BY recorded_at ASC
+		 LIMIT $3`,
+		serial, since.UTC(), limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list wan traffic samples: %w", err)
+	}
+	defer rows.Close()
+
+	var out []TrafficSample
+	for rows.Next() {
+		var s TrafficSample
+		if err := rows.Scan(&s.RecordedAt, &s.BytesSent, &s.BytesReceived); err != nil {
+			return nil, fmt.Errorf("scan wan traffic sample: %w", err)
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// DeleteOldTrafficSamples removes samples older than daysOld (UTC).
+func (r *PostgreSQLRepository) DeleteOldTrafficSamples(ctx context.Context, daysOld int) error {
+	if daysOld < 1 {
+		daysOld = 30
+	}
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM device_wan_traffic_samples WHERE recorded_at < NOW() - $1 * INTERVAL '1 day'`,
+		daysOld,
+	)
+	if err != nil {
+		return fmt.Errorf("delete old wan traffic samples: %w", err)
+	}
+	return nil
+}
+
+// ============================================================
 // Connection Management
 // ============================================================
 
