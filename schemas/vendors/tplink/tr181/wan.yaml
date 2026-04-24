@@ -16,3 +16,13 @@ parameters:
   - name: wan.provisioning_type
     path: "add_object"
     type: string
+  # TP-Link GPON ONTs expose total WAN traffic on the optical uplink interface.
+  # IP.Interface stats are per-connection and the discovered {wan} index often
+  # points to an inactive interface. Optical.Interface.1 always reflects the
+  # full cumulative bytes flowing through the WAN PON uplink.
+  - name: wan.stats.bytes_sent
+    path: "Device.Optical.Interface.1.Stats.BytesSent"
+    type: unsignedInt
+  - name: wan.stats.bytes_received
+    path: "Device.Optical.Interface.1.Stats.BytesReceived"
+    type: unsignedInt

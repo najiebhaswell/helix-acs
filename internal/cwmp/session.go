@@ -103,12 +103,17 @@ type Session struct {
 	// Targeted summon (triggered before WiFi/WAN task to refresh only relevant subtree):
 	//   phase 3 → send single GetParameterValues([paths…])
 	//   phase 4 → receive response → rebuild mapper, do NOT write to DB
+	//
+	// Traffic-only targeted summon (triggered every Inform when full summon is throttled):
+	//   phase 5 → send GetParameterValues([WAN bytes sent, WAN bytes received])
+	//   (response handled inline in handleGetParamValuesResponse → records traffic sample)
 	summonPhase       int
 	summonSchemaName  string
 	summonAllNames    []string          // full summon: leaf names from GetParameterNames
 	summonBatchIdx    int               // full summon: current batch index
 	summonAllParams   map[string]string // full summon: accumulated params
 	summonTargetPaths []string          // targeted summon: object paths to fetch
+	pendingFullSummon bool              // if true, phase 5 completion chains into phase 1 full summon
 
 	// lastSetParams holds the parameters sent in the most recent SetParameterValues
 	// dispatch so that handleSetParamValuesResponse can sync them to PostgreSQL.
@@ -246,6 +251,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if summonPhase == 3 {
 			h.sendTargetedSummon(ctx, w, session)
+			return
+		}
+		if summonPhase == 5 {
+			h.sendTrafficSummon(ctx, w, session)
 			return
 		}
 
@@ -447,13 +456,26 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	}
 	if shouldSummon {
 		// Full summon: refresh all device parameters (runs at most once per 2 minutes).
-		session.mu.Lock()
-		session.summonPhase = 1
-		session.summonSchemaName = schemaName
-		session.mu.Unlock()
+		// First send a traffic-only GPV (phase 5) to capture WAN byte counters
+		// immediately — even if the full summon later fails to complete.
+		trafficPaths := wanTrafficPaths(mapper)
+		if len(trafficPaths) > 0 && h.parameterRepo != nil {
+			session.mu.Lock()
+			session.summonPhase = 5
+			session.pendingFullSummon = true
+			session.summonSchemaName = schemaName
+			session.mu.Unlock()
+			h.log.WithField("serial", upsertReq.Serial).
+				Info("CWMP: scheduling traffic GPV then full parameter summon")
+		} else {
+			session.mu.Lock()
+			session.summonPhase = 1
+			session.summonSchemaName = schemaName
+			session.mu.Unlock()
+			h.log.WithField("serial", upsertReq.Serial).
+				Info("CWMP: scheduling full parameter summon")
+		}
 		h.lastSummonTime.Store(upsertReq.Serial, time.Now())
-		h.log.WithField("serial", upsertReq.Serial).
-			Info("CWMP: scheduling full parameter summon")
 	} else {
 		// Within throttle window: if a WiFi or WAN task is pending, do a targeted
 		// summon that fetches only the relevant subtree (one GPV round-trip) so
@@ -469,6 +491,19 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 				WithField("task_type", targetedType).
 				WithField("paths", targetedPaths).
 				Info("CWMP: scheduling targeted summon for task requiring instance discovery")
+		} else {
+			// No task-driven targeted summon needed. Send a lightweight traffic-only
+			// GetParameterValues (phase 5) so WAN byte counters are sampled on every
+			// Inform even when the full summon is throttled.
+			trafficPaths := wanTrafficPaths(mapper)
+			if len(trafficPaths) > 0 && h.parameterRepo != nil {
+				session.mu.Lock()
+				session.summonPhase = 5
+				session.mu.Unlock()
+				h.log.WithField("serial", upsertReq.Serial).
+					WithField("paths", trafficPaths).
+					Debug("CWMP: scheduling traffic-only targeted GPV")
+			}
 		}
 	}
 
@@ -802,10 +837,20 @@ const summonBatchSizeDefault = 500
 // (e.g. 10s) complete full summons before the next Inform starts.
 const summonBatchSizeTR098 = 5000
 
+// summonBatchSizeTR181 is used for TR-181 devices. Larger than the old default
+// (500) to reduce round-trips; small enough that TP-Link XC220-G3 firmware
+// doesn't drop the TCP connection mid-summon. 5230 params / 750 = 7 batches,
+// which finishes well within the 2-minute Inform interval throttle window so
+// that phase 5 (traffic-only GPV) can fire on the next Inform.
+const summonBatchSizeTR181 = 750
+
 func summonBatchSizeForSchema(schemaName string) int {
 	lower := strings.ToLower(schemaName)
 	if strings.Contains(lower, "tr098") {
 		return summonBatchSizeTR098
+	}
+	if strings.Contains(lower, "tr181") {
+		return summonBatchSizeTR181
 	}
 	return summonBatchSizeDefault
 }
@@ -1128,6 +1173,59 @@ func (h *Handler) recordWANTrafficFromSummonedParams(ctx context.Context, serial
 	}
 }
 
+// wanTrafficPaths returns the WAN BytesSent and BytesReceived parameter paths
+// from the given mapper (skipping empty paths). Used for the traffic-only GPV.
+func wanTrafficPaths(mapper datamodel.Mapper) []string {
+	if mapper == nil {
+		return nil
+	}
+	var paths []string
+	if p := mapper.WANBytesSentPath(); p != "" {
+		paths = append(paths, p)
+	}
+	if p := mapper.WANBytesReceivedPath(); p != "" {
+		paths = append(paths, p)
+	}
+	return paths
+}
+
+// sendTrafficSummon sends a targeted GetParameterValues for WAN byte counters only
+// (phase 5). This provides traffic graph data points on every Inform cycle even
+// when the full parameter summon is throttled (once per 2 minutes).
+func (h *Handler) sendTrafficSummon(ctx context.Context, w http.ResponseWriter, session *Session) {
+	session.mu.Lock()
+	mapper := session.mapper
+	serial := session.DeviceSerial
+	session.summonPhase = 5
+	session.mu.Unlock()
+
+	paths := wanTrafficPaths(mapper)
+	if len(paths) == 0 {
+		session.mu.Lock()
+		session.summonPhase = 0
+		session.mu.Unlock()
+		h.dispatchNextOrClose(ctx, w, session)
+		return
+	}
+
+	h.log.WithField("serial", serial).
+		WithField("paths", paths).
+		Debug("CWMP: sending traffic-only GetParameterValues")
+
+	id := uuid.NewString()
+	env, err := BuildGetParameterValues(id, paths)
+	if err != nil {
+		h.log.WithError(err).WithField("serial", serial).Error("CWMP: build traffic GPV failed")
+		session.mu.Lock()
+		session.summonPhase = 0
+		session.mu.Unlock()
+		h.dispatchNextOrClose(ctx, w, session)
+		return
+	}
+	writeXML(w, env)
+}
+
+
 // maybeRecordWANTrafficFromInformParams records a sample only if Inform included counter paths
 // (sparse Informs often omit them — then we rely on the full summon path).
 func (h *Handler) maybeRecordWANTrafficFromInformParams(ctx context.Context, serial string, params map[string]string, mapper datamodel.Mapper) {
@@ -1179,6 +1277,35 @@ func (h *Handler) handleGetParamValuesResponse(
 	}
 	if summonPhase == 4 {
 		h.handleTargetedSummonResponse(ctx, w, session, params)
+		return
+	}
+	if summonPhase == 5 {
+		// Traffic-only targeted GPV response: record sample first.
+		session.mu.Lock()
+		mapperT := session.mapper
+		serialT := session.DeviceSerial
+		chainFullSummon := session.pendingFullSummon
+		session.pendingFullSummon = false
+		session.mu.Unlock()
+		if mapperT != nil && h.parameterRepo != nil {
+			tctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			h.recordWANTrafficFromSummonedParams(tctx, serialT, params, mapperT)
+			cancel()
+		}
+		// If a full summon was scheduled after this traffic GPV, chain into it now.
+		if chainFullSummon {
+			session.mu.Lock()
+			session.summonPhase = 1
+			session.mu.Unlock()
+			h.log.WithField("serial", serialT).
+				Info("CWMP: traffic sample recorded, continuing to full parameter summon")
+			h.sendGetParameterNamesSummon(w, session)
+			return
+		}
+		session.mu.Lock()
+		session.summonPhase = 0
+		session.mu.Unlock()
+		h.dispatchNextOrClose(ctx, w, session)
 		return
 	}
 

@@ -1121,16 +1121,16 @@ async function renderNetworkTab(dev, serial) {
   document.getElementById('tab-network').innerHTML = `
     <div class="row g-3">
       <div class="col-12">
-        <div class="card border-0 shadow-sm">
-          <div class="card-header bg-white fw-semibold small">
-            <i class="bi bi-graph-up-arrow me-1 text-info"></i>WAN traffic <span class="text-muted fw-normal">(average rate between counter samples, not real-time)</span>
+        <div class="card border-0 shadow-sm overflow-hidden">
+          <div class="card-header bg-white fw-semibold small d-flex align-items-center justify-content-between">
+            <span><i class="bi bi-graph-up-arrow me-1 text-primary"></i>WAN Traffic <span class="text-muted fw-normal" style="font-size:11px">(avg bitrate · not real-time)</span></span>
+            <span id="wan-traffic-hint" class="text-muted fw-normal" style="font-size:11px"></span>
           </div>
-          <div class="card-body py-2">
-            <canvas id="wan-traffic-canvas" width="800" height="220" style="width:100%;max-height:220px;height:220px;display:block"></canvas>
-            <div class="d-flex flex-wrap justify-content-between align-items-center small text-muted mt-1 gap-2">
-              <span><span class="text-success">●</span> Download (RX)</span>
-              <span><span class="text-primary">●</span> Upload (TX)</span>
-              <span id="wan-traffic-hint"></span>
+          <div class="card-body p-0">
+            <canvas id="wan-traffic-canvas" width="800" height="240" style="width:100%;height:240px;display:block;cursor:crosshair"></canvas>
+            <div class="d-flex gap-3 px-3 py-2 border-top" style="font-size:11px">
+              <span class="text-muted"><span style="color:#059669;font-size:14px">●</span> Download (RX)</span>
+              <span class="text-muted"><span style="color:#2563eb;font-size:14px">●</span> Upload (TX)</span>
             </div>
           </div>
         </div>
@@ -1150,102 +1150,212 @@ async function renderNetworkTab(dev, serial) {
 }
 
 /**
- * Fetches /devices/:serial/traffic and draws RX/TX average bitrate polylines (bps from Δbytes/Δt).
+ * Fetches /devices/:serial/traffic and draws a premium animated RX/TX area chart.
+ * Features: smooth bezier curves, gradient fills, animated draw-in (ease-out cubic),
+ * interactive crosshair tooltip, auto-scaling Y-axis (bps/Kbps/Mbps/Gbps), dark theme.
  */
 async function loadAndDrawWanTrafficChart(serial) {
   const canvas = document.getElementById('wan-traffic-canvas');
-  const hint = document.getElementById('wan-traffic-hint');
+  const hint   = document.getElementById('wan-traffic-hint');
   if (!canvas || !serial) return;
-  const ctx = canvas.getContext('2d');
-  const rect = canvas.getBoundingClientRect();
-  const cssW = Math.max(320, rect.width || canvas.parentElement?.clientWidth || 800);
-  const cssH = 220;
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.floor(cssW * dpr);
+
+  const dpr  = window.devicePixelRatio || 1;
+  const cssW = Math.max(320, canvas.parentElement?.clientWidth || 800);
+  const cssH = 240;
+  canvas.width  = Math.floor(cssW * dpr);
   canvas.height = Math.floor(cssH * dpr);
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const W = cssW;
-  const H = cssH;
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#f8f9fa';
-  ctx.fillRect(0, 0, W, H);
+  const W = cssW, H = cssH;
+
+  const paintBg = () => {
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, W, H);
+  };
+  paintBg();
 
   const drawEmpty = (msg) => {
-    ctx.fillStyle = '#6c757d';
-    ctx.font = '13px system-ui,sans-serif';
-    ctx.fillText(msg, 12, H / 2);
+    paintBg();
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '13px Inter,system-ui,sans-serif';
+    ctx.fillText(msg, 16, H / 2);
     if (hint) hint.textContent = '';
   };
 
+  let pts = [];
   try {
     const data = await API.get(`/devices/${encodeURIComponent(serial)}/traffic?hours=24`);
-    const pts = data.points || [];
-    if (pts.length === 0) {
-      drawEmpty('Need at least two counter samples to show a rate (wait for the next Inform / summon).');
-      if (hint) hint.textContent = 'Belum ada cukup data.';
-      return;
-    }
-    if (hint) {
-      hint.textContent = `${pts.length} interval · last 24h (Δbytes/Δtime)`;
-    }
-    let maxBps = 1e3;
-    for (const p of pts) {
-      if (p.valid) {
-        maxBps = Math.max(maxBps, p.rx_bps || 0, p.tx_bps || 0);
-      }
-    }
-    maxBps *= 1.08;
-    const padL = 44;
-    const padR = 8;
-    const padT = 14;
-    const padB = 6;
-    const plotW = W - padL - padR;
-    const plotH = H - padT - padB;
-    const plotY = padT;
-    ctx.strokeStyle = '#dee2e6';
-    ctx.lineWidth = 1;
-    for (let g = 0; g <= 4; g++) {
-      const y = plotY + (g / 4) * plotH;
-      ctx.beginPath();
-      ctx.moveTo(padL, y);
-      ctx.lineTo(W - padR, y);
-      ctx.stroke();
-    }
-    const n = pts.length;
-    const toX = (i) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-    const toY = (bps) => plotY + plotH - (Math.min(bps, maxBps) / maxBps) * plotH;
-    const drawSeries = (pick, color) => {
-      ctx.beginPath();
-      let started = false;
-      for (let i = 0; i < n; i++) {
-        const p = pts[i];
-        if (!p.valid) {
-          started = false;
-          continue;
-        }
-        const x = toX(i);
-        const y = toY(pick(p));
-        if (!started) {
-          ctx.moveTo(x, y);
-          started = true;
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    };
-    drawSeries((p) => p.rx_bps, '#198754');
-    drawSeries((p) => p.tx_bps, '#0d6efd');
-    ctx.fillStyle = '#495057';
-    ctx.font = '11px system-ui,sans-serif';
-    ctx.fillText(fmtMbpsFromBps(maxBps), 4, 11);
+    pts = (data.points || []).filter(p => p.valid);
   } catch (_) {
-    drawEmpty('Could not load traffic series.');
-    if (hint) hint.textContent = 'Gagal memuat data traffic.';
+    drawEmpty('Gagal memuat data traffic.');
+    return;
   }
+  if (pts.length < 2) {
+    drawEmpty('Menunggu minimal 2 sample counter (tunggu Inform berikutnya)...');
+    if (hint) hint.textContent = '';
+    return;
+  }
+  if (hint) hint.textContent = `${pts.length} interval · last 24h`;
+
+  const maxRaw = pts.reduce((m, p) => Math.max(m, p.rx_bps, p.tx_bps), 1e3);
+  const maxBps = maxRaw * 1.15;
+
+  const fmtAxis = (bps) => {
+    if (bps >= 1e9) return (bps / 1e9).toFixed(1) + 'G';
+    if (bps >= 1e6) return (bps / 1e6).toFixed(1) + 'M';
+    if (bps >= 1e3) return (bps / 1e3).toFixed(0) + 'K';
+    return bps.toFixed(0);
+  };
+  const fmtTip = (bps) => {
+    if (bps >= 1e9) return (bps / 1e9).toFixed(2) + ' Gbps';
+    if (bps >= 1e6) return (bps / 1e6).toFixed(2) + ' Mbps';
+    if (bps >= 1e3) return (bps / 1e3).toFixed(1) + ' Kbps';
+    return bps.toFixed(0) + ' bps';
+  };
+
+  const padL = 52, padR = 12, padT = 18, padB = 24;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const plotY = padT;
+  const n = pts.length;
+
+  const toX = (i) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+  const toY = (bps) => plotY + plotH - (Math.min(bps, maxBps) / maxBps) * plotH;
+
+  const buildCurve = (pick) => {
+    const xs = pts.map((_, i) => toX(i));
+    const ys = pts.map(p => toY(pick(p)));
+    const path = new Path2D();
+    path.moveTo(xs[0], ys[0]);
+    for (let i = 0; i < xs.length - 1; i++) {
+      const cpx = (xs[i] + xs[i + 1]) / 2;
+      path.bezierCurveTo(cpx, ys[i], cpx, ys[i + 1], xs[i + 1], ys[i + 1]);
+    }
+    return { path, xs, ys };
+  };
+
+  const drawFrame = (progress) => {
+    paintBg();
+    ctx.font = '10px Inter,system-ui,sans-serif';
+    ctx.textAlign = 'right';
+    for (let g = 0; g <= 4; g++) {
+      const t = g / 4, y = plotY + t * plotH, bps = maxBps * (1 - t);
+      ctx.strokeStyle = g === 4 ? '#cbd5e1' : '#e2e8f0';
+      ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(fmtAxis(bps), padL - 5, y + 4);
+    }
+    ctx.textAlign = 'left';
+
+    // X-axis time labels
+    ctx.font = '10px Inter,system-ui,sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'center';
+    const maxLabels = Math.min(n, Math.floor(plotW / 70));
+    const step = maxLabels > 1 ? Math.ceil(n / maxLabels) : n;
+    for (let i = 0; i < n; i += step) {
+      const p = pts[i];
+      if (p.until) {
+        const d = new Date(p.until);
+        const label = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        ctx.fillText(label, toX(i), plotY + plotH + 16);
+      }
+    }
+    // Always draw last label
+    if (n > 1 && pts[n - 1].until) {
+      const d = new Date(pts[n - 1].until);
+      ctx.fillText(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), toX(n - 1), plotY + plotH + 16);
+    }
+    ctx.textAlign = 'left';
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(padL, padT - 4, plotW * progress + 4, plotH + padB + 8);
+    ctx.clip();
+
+    const drawSeries = (pick, lineColor, fillTop, fillBot) => {
+      const { path, xs, ys } = buildCurve(pick);
+      const grad = ctx.createLinearGradient(0, plotY, 0, plotY + plotH);
+      grad.addColorStop(0, fillTop); grad.addColorStop(1, fillBot);
+      const area = new Path2D(path);
+      area.lineTo(xs[n - 1], plotY + plotH);
+      area.lineTo(xs[0], plotY + plotH);
+      area.closePath();
+      ctx.fillStyle = grad; ctx.fill(area);
+      ctx.strokeStyle = lineColor; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+      ctx.setLineDash([]); ctx.stroke(path);
+      if (progress >= 0.99) {
+        const lx = xs[n - 1], ly = ys[n - 1];
+        ctx.beginPath(); ctx.arc(lx, ly, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = lineColor; ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+      }
+    };
+
+    drawSeries(p => p.rx_bps, '#059669', 'rgba(5,150,105,0.18)',  'rgba(5,150,105,0.01)');
+    drawSeries(p => p.tx_bps, '#2563eb', 'rgba(37,99,235,0.15)', 'rgba(37,99,235,0.01)');
+    ctx.restore();
+  };
+
+  const duration = 800, startTs = performance.now();
+  const animate = (ts) => {
+    const p = Math.min((ts - startTs) / duration, 1);
+    drawFrame(1 - Math.pow(1 - p, 3));
+    if (p < 1) { requestAnimationFrame(animate); return; }
+
+    // Crosshair tooltip after animation completes
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      if (mx < padL || mx > W - padR) { drawFrame(1); return; }
+      drawFrame(1);
+      let best = 0, bestD = Infinity;
+      for (let i = 0; i < n; i++) {
+        const d = Math.abs(toX(i) - mx);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      const pt = pts[best], px = toX(best);
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, plotY); ctx.lineTo(px, plotY + plotH); ctx.stroke();
+      ctx.setLineDash([]);
+      [[pt.rx_bps, '#059669'], [pt.tx_bps, '#2563eb']].forEach(([bps, col]) => {
+        ctx.beginPath(); ctx.arc(px, toY(bps), 5, 0, Math.PI * 2);
+        ctx.fillStyle = col; ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+      });
+      const rxT = `\u2193 ${fmtTip(pt.rx_bps)}`, txT = `\u2191 ${fmtTip(pt.tx_bps)}`;
+      const timeT = pt.until ? new Date(pt.until).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+      ctx.font = 'bold 12px Inter,system-ui,sans-serif';
+      const tw = Math.max(ctx.measureText(rxT).width, ctx.measureText(txT).width, ctx.measureText(timeT).width) + 24;
+      const th = timeT ? 64 : 50;
+      let tx = px + 12; if (tx + tw > W - padR) tx = px - tw - 12;
+      const ty = plotY + 6, r = 7;
+      ctx.fillStyle = 'rgba(15,23,42,0.92)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(tx+r,ty); ctx.lineTo(tx+tw-r,ty); ctx.quadraticCurveTo(tx+tw,ty,tx+tw,ty+r);
+      ctx.lineTo(tx+tw,ty+th-r); ctx.quadraticCurveTo(tx+tw,ty+th,tx+tw-r,ty+th);
+      ctx.lineTo(tx+r,ty+th); ctx.quadraticCurveTo(tx,ty+th,tx,ty+th-r);
+      ctx.lineTo(tx,ty+r); ctx.quadraticCurveTo(tx,ty,tx+r,ty); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      if (timeT) {
+        ctx.fillStyle = '#d1d5db'; ctx.font = '10px Inter,system-ui,sans-serif';
+        ctx.fillText(timeT, tx+12, ty+14);
+      }
+      ctx.font = 'bold 12px Inter,system-ui,sans-serif';
+      ctx.fillStyle = '#059669'; ctx.fillText(rxT, tx+12, ty+(timeT?30:18));
+      ctx.fillStyle = '#2563eb'; ctx.fillText(txT, tx+12, ty+(timeT?48:36));
+    });
+    canvas.addEventListener('mouseleave', () => drawFrame(1));
+  };
+  requestAnimationFrame(animate);
 }
+
+
 
 // Toggle PPPoE password visibility in WAN card
 function togglePPPoEPass(pass) {
