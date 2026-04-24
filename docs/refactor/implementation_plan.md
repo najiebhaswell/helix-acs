@@ -2,7 +2,9 @@
 
 ## Goal
 
-Mengganti semua vendor-specific hardcode (terutama TP-Link) dengan arsitektur **"device driver"** berbasis YAML. Setiap brand dan bahkan type ONT punya driver sendiri yang mendefinisikan:
+Mengganti semua vendor-specific hardcode (terutama TP-Link) dengan arsitektur **"device driver"** berbasis YAML. Penambahan merek/model baru seharusnya cukup dengan **driver YAML** (termasuk WiFi SSID→band lewat `wifi_ssid_band_without_lower_layers` strategy `explicit`); perubahan Go hanya bila pola baru membutuhkan **strategy** yang belum ada di engine.
+
+Setiap brand dan bahkan type ONT punya driver sendiri yang mendefinisikan:
 - Provisioning flow (WAN PPPoE, WAN DHCP, dll)
 - Device config (MTU, auth protocol, security mode mappings)
 - Feature flags (GPON support, band steering, dll)
@@ -158,6 +160,13 @@ discovery:
   host_conn_type_values:
     wifi: "1"
     lan: "0"
+  # Optional: WiFi SSID→band when SSID.LowerLayers is absent (no Go change for new models
+  # if you use strategy "explicit" and list indices per band).
+  # wifi_ssid_band_without_lower_layers:
+  #   strategy: pair_block_mod2   # or explicit / legacy_tplink_multi
+  #   explicit:
+  #     "0": [1, 2, 5, 6]
+  #     "1": [3, 4, 7, 8]
 
 # Provisioning flows — reference to YAML step-sequence files
 provisions:

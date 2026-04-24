@@ -27,7 +27,7 @@ func makeTask(taskType Type, payload any) *Task {
 	}
 }
 
-// BuildSetParams: WiFi 2.4 GHz
+// BuildSetParams: WiFi is handled in session via YAML flow.
 
 func TestBuildSetParamsWifi24(t *testing.T) {
 	enabled := true
@@ -44,17 +44,12 @@ func TestBuildSetParamsWifi24(t *testing.T) {
 	mapper := datamodel.NewMapper(datamodel.TR181)
 
 	params, err := executor.BuildSetParams(context.Background(), task, mapper)
-	require.NoError(t, err)
-	require.NotNil(t, params)
-
-	// Band 0 → index 1 in TR181
-	assert.Equal(t, "HomeNet", params["Device.WiFi.SSID.1.SSID"])
-	assert.Equal(t, "p@ssw0rd", params["Device.WiFi.AccessPoint.1.Security.KeyPassphrase"])
-	assert.Equal(t, "true", params["Device.WiFi.SSID.1.Enable"])
-	assert.Equal(t, "6", params["Device.WiFi.Radio.1.Channel"])
+	assert.Error(t, err)
+	assert.Nil(t, params)
+	assert.Contains(t, err.Error(), "wifi set params is handled by driver YAML flow")
 }
 
-// BuildSetParams: WiFi 5 GHz
+// BuildSetParams: WiFi is handled in session via YAML flow.
 
 func TestBuildSetParamsWifi5(t *testing.T) {
 	enabled := false
@@ -71,17 +66,12 @@ func TestBuildSetParamsWifi5(t *testing.T) {
 	mapper := datamodel.NewMapper(datamodel.TR181)
 
 	params, err := executor.BuildSetParams(context.Background(), task, mapper)
-	require.NoError(t, err)
-	require.NotNil(t, params)
-
-	// Band 1 → index 2 in TR181
-	assert.Equal(t, "HomeNet5G", params["Device.WiFi.SSID.2.SSID"])
-	assert.Equal(t, "5gpass", params["Device.WiFi.AccessPoint.2.Security.KeyPassphrase"])
-	assert.Equal(t, "false", params["Device.WiFi.SSID.2.Enable"])
-	assert.Equal(t, "36", params["Device.WiFi.Radio.2.Channel"])
+	assert.Error(t, err)
+	assert.Nil(t, params)
+	assert.Contains(t, err.Error(), "wifi set params is handled by driver YAML flow")
 }
 
-// BuildSetParams: WiFi TR098 mapper
+// BuildSetParams: WiFi is handled in session via YAML flow.
 
 func TestBuildSetParamsWifi24TR098(t *testing.T) {
 	payload := WiFiPayload{
@@ -95,11 +85,9 @@ func TestBuildSetParamsWifi24TR098(t *testing.T) {
 	mapper := datamodel.NewMapper(datamodel.TR098)
 
 	params, err := executor.BuildSetParams(context.Background(), task, mapper)
-	require.NoError(t, err)
-	require.NotNil(t, params)
-
-	assert.Equal(t, "LegacyNet", params["InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID"])
-	assert.Equal(t, "legacypass", params["InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase"])
+	assert.Error(t, err)
+	assert.Nil(t, params)
+	assert.Contains(t, err.Error(), "wifi set params is handled by driver YAML flow")
 }
 
 // BuildSetParams: WAN PPPoE
@@ -119,7 +107,7 @@ func TestBuildSetParamsWAN(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, params)
 
-	assert.Equal(t, "pppoe", params["Device.IP.Interface.1.IPv4Address.1.AddressingType"])
+	assert.Equal(t, "pppoe", params[mapper.WANConnectionTypePath()])
 	assert.Equal(t, "ppp_user", params["Device.PPP.Interface.1.Username"])
 	assert.Equal(t, "ppp_pass", params["Device.PPP.Interface.1.Password"])
 }
@@ -140,7 +128,7 @@ func TestBuildSetParamsWANWithIP(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, params)
 
-	assert.Equal(t, "static", params["Device.IP.Interface.1.IPv4Address.1.AddressingType"])
+	assert.Equal(t, "static", params[mapper.WANConnectionTypePath()])
 	assert.Equal(t, "203.0.113.5", params["Device.IP.Interface.1.IPv4Address.1.IPAddress"])
 }
 

@@ -1,7 +1,9 @@
 package api
 
 import (
+	"io/fs"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/redis/go-redis/v9"
@@ -124,9 +126,36 @@ func NewRouter(
 	api.HandleFunc("/tasks/{task_id}", taskHandler.Get).Methods(http.MethodGet)
 	api.HandleFunc("/tasks/{task_id}", taskHandler.Cancel).Methods(http.MethodDelete)
 
+	// Embedded UI assets: avoid stale browsers holding old app.js after deploy.
+	r.HandleFunc("/app.js", func(w http.ResponseWriter, r *http.Request) {
+		serveEmbeddedStatic(w, r, "app.js", "application/javascript; charset=utf-8")
+	}).Methods(http.MethodGet, http.MethodHead)
+	r.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
+		serveEmbeddedStatic(w, r, "style.css", "text/css; charset=utf-8")
+	}).Methods(http.MethodGet, http.MethodHead)
+
 	// Serve embedded Web UI for direct access.
 	webFS := http.FileServer(http.FS(webUI.FS))
 	r.PathPrefix("/").Handler(http.StripPrefix("/", webFS))
 
 	return r
+}
+
+// serveEmbeddedStatic serves one file from the embedded web UI with headers
+// that discourage long-lived caching (UI is embedded in the binary and
+// changes on every deploy).
+func serveEmbeddedStatic(w http.ResponseWriter, r *http.Request, name, contentType string) {
+	b, err := fs.ReadFile(webUI.FS, name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+	w.Header().Set("Content-Length", strconv.Itoa(len(b)))
+	if r.Method == http.MethodHead {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	_, _ = w.Write(b)
 }

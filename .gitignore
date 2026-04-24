@@ -16,7 +16,8 @@ dist/
 bin/
 out/
 build/
-api
+/api
+helix
 
 # Device parameter dumps
 *.csv

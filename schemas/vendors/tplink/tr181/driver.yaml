@@ -21,6 +21,11 @@ config:
   gpon_root: "Device.X_TP_GPON.Link"
   provisioning_code: "helix.rPPP"
 
+# Pushed to the CPE once per full-summon cycle if current value differs.
+default_params:
+  "Device.IP.Interface.4.X_TP_ServiceType": "TR069"
+  "Device.ManagementServer.PeriodicInformInterval": "30"
+
 security_modes:
   "WPA2-PSK": "WPA2-Personal"
   "WPA-WPA2-PSK": "WPA-WPA2-Personal"
@@ -58,3 +63,4 @@ provisions:
   wan_pppoe_delete_add: "provision_wan_delete_add.yaml"
   wan_pppoe_update: "provision_wan_update.yaml"
   wan_pppoe_update_vlan: "provision_wan_update_vlan.yaml"
+  wifi_update: "provision_wifi.yaml"

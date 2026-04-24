@@ -1521,6 +1521,7 @@ const TASK_FORMS = {
         <select class="form-select" id="tf-band">
           <option value="2.4">2.4 GHz</option>
           <option value="5">5 GHz</option>
+          <option value="steering">2.4 GHz &amp; 5 GHz (band steering)</option>
         </select>
       </div>
       <div class="col-sm-8">
@@ -1547,10 +1548,6 @@ const TASK_FORMS = {
         <div class="form-check">
           <input class="form-check-input" type="checkbox" id="tf-enabled" checked>
           <label class="form-check-label">Enabled</label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="tf-band-steering">
-          <label class="form-check-label" title="Enable Smart Connect (Band Steering)">Smart Connect</label>
         </div>
       </div>
     </div>`,
@@ -1864,18 +1861,20 @@ async function submitTask() {
     switch (type) {
       case 'wifi': {
         const enabled = document.getElementById('tf-enabled').checked;
-        const steering = document.getElementById('tf-band-steering').checked;
+        const bandSel = document.getElementById('tf-band').value;
+        const steeringOn = bandSel === 'steering';
+        const band = steeringOn ? '2.4' : bandSel;
         const security = document.getElementById('tf-security').value;
         const password = document.getElementById('tf-pass').value;
         
         payload = {
-          band:     document.getElementById('tf-band').value,
+          band,
           ssid:     document.getElementById('tf-ssid').value,
           password: password,
           security: security,
           channel:  parseInt(document.getElementById('tf-channel').value) || 0,
           enabled,
-          band_steering_enabled: steering,
+          band_steering_enabled: steeringOn,
         };
         if (!payload.ssid) throw new Error('SSID is required');
         if (security !== 'None' && password.length < 8) throw new Error('Password must be at least 8 characters');

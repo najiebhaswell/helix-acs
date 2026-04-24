@@ -13,6 +13,7 @@ package schema
 import (
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +29,7 @@ import (
 type DriverYAML struct {
 	ID          string            `yaml:"id"`
 	Vendor      string            `yaml:"vendor"`
-	Model       string            `yaml:"model"` // data-model: "tr181" or "tr098"
+	Model       string            `yaml:"model"`                  // data-model: "tr181" or "tr098"
 	DeviceModel string            `yaml:"device_model,omitempty"` // specific ONT model, e.g. "XC220-G3v"
 	Description string            `yaml:"description,omitempty"`
 	Features    map[string]bool   `yaml:"features,omitempty"`
@@ -36,9 +37,14 @@ type DriverYAML struct {
 
 	SecurityModes map[string]string `yaml:"security_modes,omitempty"`
 
-	WiFi      WiFiDriverYAML      `yaml:"wifi,omitempty"`
-	Discovery DiscoveryYAML       `yaml:"discovery,omitempty"`
-	Provisions map[string]string  `yaml:"provisions,omitempty"` // flow-name → filename
+	// DefaultParams are pushed to the CPE once per full-summon cycle (≈ every 2 min)
+	// if the current device value differs. Use absolute TR-069 parameter paths.
+	// Example: "Device.IP.Interface.4.X_TP_ServiceType": "TR069"
+	DefaultParams map[string]string `yaml:"default_params,omitempty"`
+
+	WiFi       WiFiDriverYAML    `yaml:"wifi,omitempty"`
+	Discovery  DiscoveryYAML     `yaml:"discovery,omitempty"`
+	Provisions map[string]string `yaml:"provisions,omitempty"` // flow-name → filename
 }
 
 // WiFiDriverYAML holds vendor-specific WiFi configuration.
@@ -53,7 +59,7 @@ type WiFiDriverYAML struct {
 // DiscoveryYAML holds vendor-specific instance discovery hints.
 type DiscoveryYAML struct {
 	// WAN interface type detection
-	WANTypePath   string            `yaml:"wan_type_path,omitempty"`   // e.g. "Device.IP.Interface.{i}.X_TP_ConnType"
+	WANTypePath   string            `yaml:"wan_type_path,omitempty"` // e.g. "Device.IP.Interface.{i}.X_TP_ConnType"
 	WANTypeValues DiscoveryWANTypes `yaml:"wan_type_values,omitempty"`
 
 	// GPON/optical link detection
@@ -64,8 +70,21 @@ type DiscoveryYAML struct {
 	WANServiceTypePath string `yaml:"wan_service_type_path,omitempty"` // e.g. "Device.IP.Interface.{i}.X_TP_ServiceType"
 
 	// Connected host type detection
-	HostConnTypePath   string            `yaml:"host_conn_type_path,omitempty"` // e.g. "Hosts.Host.{i}.X_TP_LanConnType"
+	HostConnTypePath   string            `yaml:"host_conn_type_path,omitempty"`   // e.g. "Hosts.Host.{i}.X_TP_LanConnType"
 	HostConnTypeValues map[string]string `yaml:"host_conn_type_values,omitempty"` // "wifi" → "1", "lan" → "0"
+
+	// WiFi SSID→band when SSID.LowerLayers is missing (per-model driver YAML).
+	WiFiSSIDBandWithoutLowerLayers *WiFiSSIDBandWithoutLowerLayersYAML `yaml:"wifi_ssid_band_without_lower_layers,omitempty"`
+}
+
+// WiFiSSIDBandWithoutLowerLayersYAML configures TR-181 SSID instance index → band
+// (0=2.4GHz, 1=5GHz, …) for discovery. Built-in strategies (see datamodel):
+//   - pair_block_mod2 — band = ((ssidIndex-1)/2)%2 (TP-Link XC220-G3 style)
+//   - explicit — list SSID indices per band; use for arbitrary layouts without Go changes
+//   - legacy_tplink_multi — historical TP-Link multi-SSID switch
+type WiFiSSIDBandWithoutLowerLayersYAML struct {
+	Strategy string           `yaml:"strategy,omitempty"`
+	Explicit map[string][]int `yaml:"explicit,omitempty"` // keys "0","1","2" → SSID indices
 }
 
 // DiscoveryWANTypes maps semantic roles to parameter values.
@@ -90,6 +109,9 @@ type DeviceDriver struct {
 	Features      map[string]bool
 	Config        map[string]string
 	SecurityModes map[string]string
+	// DefaultParams are enforced on every full-summon cycle.
+	// Keys are absolute TR-069 paths; values are the required values.
+	DefaultParams map[string]string
 	WiFi          WiFiDriverYAML
 	Discovery     DiscoveryYAML
 	Provisions    map[string]*ProvisionFlow // loaded step sequences
@@ -204,6 +226,7 @@ func LoadDriverFileWithProvisions(path string) (*DeviceDriver, error) {
 		Features:      raw.Features,
 		Config:        raw.Config,
 		SecurityModes: raw.SecurityModes,
+		DefaultParams: raw.DefaultParams,
 		WiFi:          raw.WiFi,
 		Discovery:     raw.Discovery,
 		Provisions:    make(map[string]*ProvisionFlow),
@@ -262,11 +285,39 @@ func driverNameFromPath(root, path string) string {
 	return dir
 }
 
+// mergedDefaultParams combines vendor-level default_params with a model-specific
+// driver: vendor entries apply first, then model entries override.
+func mergedDefaultParams(vendor, model *DeviceDriver) map[string]string {
+	if vendor == nil || len(vendor.DefaultParams) == 0 {
+		if model == nil {
+			return nil
+		}
+		return model.DefaultParams
+	}
+	if model == nil {
+		return maps.Clone(vendor.DefaultParams)
+	}
+	if len(model.DefaultParams) == 0 {
+		return maps.Clone(vendor.DefaultParams)
+	}
+	out := make(map[string]string, len(vendor.DefaultParams)+len(model.DefaultParams))
+	for k, v := range vendor.DefaultParams {
+		out[k] = v
+	}
+	for k, v := range model.DefaultParams {
+		out[k] = v
+	}
+	return out
+}
+
 // Resolve returns the best-matching DeviceDriver for a device.
 //
 // Resolution priority (highest first):
 //  1. vendor/<vendor>/<model>/<dataModel>   — model-specific
 //  2. vendor/<vendor>/<dataModel>           — vendor default
+//
+// When a model-specific driver is used, default_params from the vendor default
+// driver are merged underneath model default_params (model wins on key conflict).
 //
 // Returns nil when no driver is registered for the device.
 func (r *DeviceDriverRegistry) Resolve(vendor, model, dataModel string) *DeviceDriver {
@@ -277,20 +328,28 @@ func (r *DeviceDriverRegistry) Resolve(vendor, model, dataModel string) *DeviceD
 	vendorSlug := normaliseVendor(vendor)
 	modelSlug := normaliseModel(model)
 
+	var vendorDrv *DeviceDriver
+	if vendorSlug != "" {
+		vendorDrv = r.drivers["vendor/"+vendorSlug+"/"+dataModel]
+	}
+
 	// Priority 1: model-specific driver
 	if vendorSlug != "" && modelSlug != "" {
-		key := "vendor/" + vendorSlug + "/" + modelSlug + "/" + dataModel
-		if d, ok := r.drivers[key]; ok {
-			return d
+		modelKey := "vendor/" + vendorSlug + "/" + modelSlug + "/" + dataModel
+		if chosen, ok := r.drivers[modelKey]; ok {
+			effective := mergedDefaultParams(vendorDrv, chosen)
+			if maps.Equal(effective, chosen.DefaultParams) {
+				return chosen
+			}
+			merged := *chosen
+			merged.DefaultParams = effective
+			return &merged
 		}
 	}
 
 	// Priority 2: vendor default driver
-	if vendorSlug != "" {
-		key := "vendor/" + vendorSlug + "/" + dataModel
-		if d, ok := r.drivers[key]; ok {
-			return d
-		}
+	if vendorDrv != nil {
+		return vendorDrv
 	}
 
 	return nil

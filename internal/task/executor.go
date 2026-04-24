@@ -45,66 +45,9 @@ func (e *Executor) BuildSetParams(ctx context.Context, t *Task, mapper datamodel
 	_ = ctx
 	switch t.Type {
 
-	// WiFi
+	// WiFi is handled by driver YAML flow in cwmp/session.go.
 	case TypeWifi:
-		var p WiFiPayload
-		if err := json.Unmarshal(t.Payload, &p); err != nil {
-			return nil, fmt.Errorf("unmarshal wifi payload: %w", err)
-		}
-
-		params := make(map[string]string)
-
-		// If Band Steering is being set, apply it first
-		if p.BandSteeringEnabled != nil {
-			// Use vendor-specific path from driver, or skip if not supported.
-			bandSteeringPath := ""
-			if e.Hints != nil && e.Hints.BandSteeringPath != "" {
-				bandSteeringPath = e.Hints.BandSteeringPath
-			}
-			if bandSteeringPath != "" {
-				params[bandSteeringPath] = strconv.FormatBool(*p.BandSteeringEnabled)
-			}
-		}
-
-		// Handle SSID/password for specific band
-		// If Band Steering will be enabled, these will be synced to both bands in session.go
-		bandIdx := 0
-		if p.Band == "5" {
-			bandIdx = 1
-		}
-		if p.SSID != "" {
-			params[mapper.WiFiSSIDPath(bandIdx)] = p.SSID
-		}
-
-		// Handle security mode and password
-		if p.Security != "" {
-			if p.Security == "None" {
-				params[mapper.WiFiSecurityModePath(bandIdx)] = "None"
-			} else {
-				// Map UI values to TR-069 values using driver hints or fallback.
-				mode := e.mapSecurityMode(p.Security)
-				params[mapper.WiFiSecurityModePath(bandIdx)] = mode
-				if p.Password != "" {
-					params[mapper.WiFiPasswordPath(bandIdx)] = p.Password
-				}
-			}
-		} else if p.Password != "" {
-			// If password is provided but security mode is not explicitly set,
-			// assume WPA2-Personal and set both
-			params[mapper.WiFiSecurityModePath(bandIdx)] = e.mapSecurityMode("WPA2-PSK")
-			params[mapper.WiFiPasswordPath(bandIdx)] = p.Password
-		}
-
-		if p.Enabled != nil {
-			params[mapper.WiFiEnabledPath(bandIdx)] = strconv.FormatBool(*p.Enabled)
-		}
-		if p.Channel != 0 {
-			params[mapper.WiFiChannelPath(bandIdx)] = strconv.Itoa(p.Channel)
-		}
-		if len(params) == 0 {
-			return nil, fmt.Errorf("wifi payload has no settable fields")
-		}
-		return params, nil
+		return nil, fmt.Errorf("wifi set params is handled by driver YAML flow")
 
 	// WAN
 	case TypeWAN:
@@ -369,20 +312,3 @@ func BuildDiagResultPaths(taskType Type, mapper datamodel.Mapper) []string {
 	return nil
 }
 
-// mapSecurityMode maps a UI security mode label to the TR-069 value.
-// Uses DriverHints.SecurityModeMapper if set, otherwise falls back to
-// a default mapping.
-func (e *Executor) mapSecurityMode(uiMode string) string {
-	if e.Hints != nil && e.Hints.SecurityModeMapper != nil {
-		return e.Hints.SecurityModeMapper(uiMode)
-	}
-	// Default fallback mapping.
-	switch uiMode {
-	case "WPA2-PSK":
-		return "WPA2-Personal"
-	case "WPA-WPA2-PSK":
-		return "WPA-WPA2-Personal"
-	default:
-		return uiMode
-	}
-}

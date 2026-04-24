@@ -1,0 +1,20 @@
+id: wifi_update
+vendor: tplink
+model: tr181
+description: >
+  WiFi update flow for TP-Link TR-181 devices.
+  All parameter paths are injected as input vars from Go (mapper + driver),
+  so this flow remains model-aware while keeping write logic in YAML.
+
+steps:
+  - kind: set
+    params:
+      "{band_steering_path}": "{band_steering_enabled}"
+      "{ssid_path}": "{ssid}"
+      "{security_path}": "{security_mode}"
+      "{password_path}": "{password}"
+      "{enabled_path}": "{enabled}"
+      "{channel_path}": "{channel}"
+      "{sync_ssid_path}": "{sync_ssid}"
+      "{sync_security_path}": "{sync_security_mode}"
+      "{sync_password_path}": "{sync_password}"

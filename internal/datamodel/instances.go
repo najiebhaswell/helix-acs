@@ -3,12 +3,19 @@ package datamodel
 import (
 	"fmt"
 	"net"
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 )
+
+// WiFiSSIDBandWithoutLowerLayersHints is the runtime form of driver YAML
+// discovery.wifi_ssid_band_without_lower_layers (see schema package).
+type WiFiSSIDBandWithoutLowerLayersHints struct {
+	Strategy string
+	// ExplicitSSIDBand maps SSID instance index → band when Strategy == "explicit".
+	ExplicitSSIDBand map[int]int
+}
 
 // DiscoveryHints carries optional vendor-specific discovery paths and values.
 // All fields are optional; empty fields fall back to generic behavior.
@@ -18,6 +25,10 @@ type DiscoveryHints struct {
 	WANTypeValuesLAN   []string
 	WANServiceTypePath string
 	GPONEnablePath     string
+
+	// WiFiSSIDBandWithoutLowerLayers selects SSID index → band when TR-181
+	// SSID.LowerLayers is absent (from driver YAML). Nil = legacy TP-Link heuristic.
+	WiFiSSIDBandWithoutLowerLayers *WiFiSSIDBandWithoutLowerLayersHints
 }
 
 // InstanceMap holds the discovered instance indices for a CPE's key TR-069 objects.
@@ -116,7 +127,7 @@ func discoverTR181(params map[string]string, im *InstanceMap, hints *DiscoveryHi
 	discoverTR181WAN(params, im, hints)
 	discoverTR181PPP(params, im)
 	discoverTR181VLAN(params, im)
-	discoverTR181WiFi(params, im)
+	discoverTR181WiFi(params, im, hints)
 	discoverTR181FreeGPON(params, im, hints)
 }
 
@@ -400,7 +411,79 @@ func discoverTR181VLAN(params map[string]string, im *InstanceMap) {
 	}
 }
 
-func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
+// wifiSSIDPairBlockMod2Band implements strategy "pair_block_mod2":
+// (1,2),(5,6),(9,10),… → band 0; (3,4),(7,8),(11,12),… → band 1.
+func wifiSSIDPairBlockMod2Band(ssidIdx int) int {
+	if ssidIdx < 1 {
+		return 0
+	}
+	return ((ssidIdx - 1) / 2) % 2
+}
+
+// tplinkLegacyMultiRadioNoLowerLayersBand is the pre-XC220-specific heuristic
+// for TP-Link (and similar) CPEs without SSID.LowerLayers; differs from
+// wifiSSIDPairBlockMod2Band for some high SSID indices (e.g. 9 vs 10).
+func tplinkLegacyMultiRadioNoLowerLayersBand(ssidIdx int) int {
+	switch ssidIdx {
+	case 1, 2, 5, 6, 9, 11, 13:
+		return 0 // 2.4GHz
+	case 3, 4, 7, 8, 10, 12, 14:
+		return 1 // 5GHz
+	default:
+		if ssidIdx%2 == 1 {
+			return 0
+		}
+		return 1
+	}
+}
+
+func wifiSSIDBandWithoutLowerLayersFromHints(hints *DiscoveryHints) *WiFiSSIDBandWithoutLowerLayersHints {
+	if hints == nil {
+		return nil
+	}
+	return hints.WiFiSSIDBandWithoutLowerLayers
+}
+
+func driverWiFiBandWithoutLowerLayersActive(cfg *WiFiSSIDBandWithoutLowerLayersHints) bool {
+	if cfg == nil {
+		return false
+	}
+	switch strings.TrimSpace(cfg.Strategy) {
+	case "pair_block_mod2", "legacy_tplink_multi":
+		return true
+	case "explicit":
+		return len(cfg.ExplicitSSIDBand) > 0
+	default:
+		return false
+	}
+}
+
+func wifiSSIDBandForIndex(ssidIdx int, cfg *WiFiSSIDBandWithoutLowerLayersHints) int {
+	if cfg == nil || strings.TrimSpace(cfg.Strategy) == "" {
+		return tplinkLegacyMultiRadioNoLowerLayersBand(ssidIdx)
+	}
+	switch strings.TrimSpace(cfg.Strategy) {
+	case "legacy_tplink_multi":
+		return tplinkLegacyMultiRadioNoLowerLayersBand(ssidIdx)
+	case "pair_block_mod2":
+		return wifiSSIDPairBlockMod2Band(ssidIdx)
+	case "explicit":
+		if cfg.ExplicitSSIDBand != nil {
+			if b, ok := cfg.ExplicitSSIDBand[ssidIdx]; ok {
+				return b
+			}
+		}
+		return tplinkLegacyMultiRadioNoLowerLayersBand(ssidIdx)
+	default:
+		return tplinkLegacyMultiRadioNoLowerLayersBand(ssidIdx)
+	}
+}
+
+func tr181WiFiSSIDBandWithoutLowerLayers(ssidIdx int, hints *DiscoveryHints) int {
+	return wifiSSIDBandForIndex(ssidIdx, wifiSSIDBandWithoutLowerLayersFromHints(hints))
+}
+
+func discoverTR181WiFi(params map[string]string, im *InstanceMap, hints *DiscoveryHints) {
 	// Step 1: map Radio instance → band via OperatingFrequencyBand or OperatingStandards.
 	radioToBand := map[int]int{}
 
@@ -472,18 +555,10 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 		}
 	}
 
-	// Fallback: if LowerLayers are absent, use heuristic to assign bands.
-	// For TP-Link Band Steering with detected Radio bands:
-	// - Map SSIDs to bands based on detected Radio band info
-	// For TP-Link Band Steering (2 radio, 4 SSIDs):
-	// - SSID 1,2 → band 0 (2.4GHz)
-	// - SSID 3,4 → band 1 (5GHz)
-	// For TP-Link Band Steering with many SSIDs (8+ SSIDs, 2 radios):
-	// - SSID 1,3,5,7... → band 0 (2.4GHz)
-	// - SSID 2,4,6,8... → band 1 (5GHz)
+	// Fallback: if LowerLayers are absent, use driver YAML strategy (if any)
+	// or tplinkLegacyMultiRadioNoLowerLayersBand.
 	if len(ssidToBand) == 0 && len(radioToBand) > 0 {
 		// We have Radio band info but SSIDs lack LowerLayers
-		// Use alternating pattern for multi-SSID TP-Link devices
 		var indices []int
 		seen := map[int]bool{}
 		for name := range params {
@@ -499,22 +574,9 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 		}
 		sort.Ints(indices)
 
-		// For TP-Link with 2 radios and band steering, alternate odd/even or pattern
 		if len(indices) >= 4 && len(radioToBand) == 2 {
-			// TP-Link pattern: SSIDs interleave between bands in blocks of 2 usually
 			for _, ssidIdx := range indices {
-				switch ssidIdx {
-				case 1, 2, 5, 6, 9, 11, 13:
-					ssidToBand[ssidIdx] = 0 // 2.4GHz
-				case 3, 4, 7, 8, 10, 12, 14:
-					ssidToBand[ssidIdx] = 1 // 5GHz
-				default:
-					if ssidIdx%2 == 1 {
-						ssidToBand[ssidIdx] = 0
-					} else {
-						ssidToBand[ssidIdx] = 1
-					}
-				}
+				ssidToBand[ssidIdx] = tr181WiFiSSIDBandWithoutLowerLayers(ssidIdx, hints)
 			}
 		} else {
 			// Fallback: assign each index to a unique band in round-robin
@@ -542,14 +604,22 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 		}
 		sort.Ints(indices)
 
-		// Special case: TP-Link Band Steering with 4 SSIDs (1,2,3,4)
-		if len(indices) == 4 && indices[0] == 1 && indices[1] == 2 && indices[2] == 3 && indices[3] == 4 {
-			// SSID 1,2 → band 0 (2.4GHz)
-			// SSID 3,4 → band 1 (5GHz)
-			ssidToBand[1] = 0
-			ssidToBand[2] = 0
-			ssidToBand[3] = 1
-			ssidToBand[4] = 1
+		if len(indices) >= 4 {
+			cfg := wifiSSIDBandWithoutLowerLayersFromHints(hints)
+			if driverWiFiBandWithoutLowerLayersActive(cfg) {
+				for _, idx := range indices {
+					ssidToBand[idx] = wifiSSIDBandForIndex(idx, cfg)
+				}
+			} else if len(indices) == 4 && indices[0] == 1 && indices[1] == 2 && indices[2] == 3 && indices[3] == 4 {
+				ssidToBand[1] = 0
+				ssidToBand[2] = 0
+				ssidToBand[3] = 1
+				ssidToBand[4] = 1
+			} else {
+				for band, idx := range indices {
+					ssidToBand[idx] = band
+				}
+			}
 		} else {
 			// Fallback: assign each index to a unique band
 			for band, idx := range indices {
@@ -603,7 +673,6 @@ func discoverTR181WiFi(params map[string]string, im *InstanceMap) {
 			// If this AP index has a corresponding SSID with same index, use same band
 			if band, ok := ssidToBand[apIdx]; ok {
 				apToBand[apIdx] = band
-				fmt.Fprintf(os.Stderr, "DEBUG: AP.%d matched to SSID.%d band=%d\n", apIdx, apIdx, band)
 			}
 		}
 	}

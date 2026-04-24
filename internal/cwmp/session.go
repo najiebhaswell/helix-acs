@@ -33,6 +33,46 @@ const (
 	StateDone                           // session complete
 )
 
+// wifiSSIDBandHintsFromYAML converts driver WiFi SSID→band YAML into runtime hints.
+func wifiSSIDBandHintsFromYAML(y *schema.WiFiSSIDBandWithoutLowerLayersYAML) *datamodel.WiFiSSIDBandWithoutLowerLayersHints {
+	if y == nil {
+		return nil
+	}
+	strategy := strings.TrimSpace(y.Strategy)
+	h := &datamodel.WiFiSSIDBandWithoutLowerLayersHints{Strategy: strategy}
+	if strategy == "explicit" && len(y.Explicit) > 0 {
+		h.ExplicitSSIDBand = make(map[int]int)
+		for bandStr, ssids := range y.Explicit {
+			band, err := strconv.Atoi(strings.TrimSpace(bandStr))
+			if err != nil {
+				continue
+			}
+			for _, ssidIdx := range ssids {
+				if ssidIdx < 1 {
+					continue
+				}
+				h.ExplicitSSIDBand[ssidIdx] = band
+			}
+		}
+	}
+	return h
+}
+
+// discoveryHintsFromDriver builds datamodel.DiscoveryHints from a loaded driver.
+func discoveryHintsFromDriver(drv *schema.DeviceDriver) *datamodel.DiscoveryHints {
+	if drv == nil {
+		return nil
+	}
+	return &datamodel.DiscoveryHints{
+		WANTypePath:                    drv.Discovery.WANTypePath,
+		WANTypeValuesWAN:               drv.Discovery.WANTypeValues.WAN,
+		WANTypeValuesLAN:               drv.Discovery.WANTypeValues.LAN,
+		WANServiceTypePath:             drv.Discovery.WANServiceTypePath,
+		GPONEnablePath:                 drv.Discovery.GPONEnablePath,
+		WiFiSSIDBandWithoutLowerLayers: wifiSSIDBandHintsFromYAML(drv.Discovery.WiFiSSIDBandWithoutLowerLayers),
+	}
+}
+
 // Session tracks per-connection CWMP state.
 type Session struct {
 	ID           string
@@ -54,14 +94,21 @@ type Session struct {
 	// wanProvision drives the multi-step vendor-agnostic provisioning state machine.
 	wanProvision *WANProvision
 
-	// Parameter summon state: after Inform, ACS fetches all CPE parameters
-	// via GetParameterNames → batched GetParameterValues and stores them in MongoDB.
-	// summonPhase: 0=inactive, 1=waiting GetParameterNamesResponse, 2=waiting GetParameterValuesResponse batch
-	summonPhase      int
-	summonSchemaName string
-	summonAllNames   []string          // all leaf names discovered by GetParameterNames
-	summonBatchIdx   int               // index of current batch being fetched
-	summonAllParams  map[string]string // accumulated params from all completed batches
+	// Parameter summon state.
+	//
+	// Full summon  (triggered periodically):
+	//   phase 1 → send GetParameterNames
+	//   phase 2 → receive/accumulate batched GetParameterValues, save to DB, rebuild mapper
+	//
+	// Targeted summon (triggered before WiFi/WAN task to refresh only relevant subtree):
+	//   phase 3 → send single GetParameterValues([paths…])
+	//   phase 4 → receive response → rebuild mapper, do NOT write to DB
+	summonPhase       int
+	summonSchemaName  string
+	summonAllNames    []string          // full summon: leaf names from GetParameterNames
+	summonBatchIdx    int               // full summon: current batch index
+	summonAllParams   map[string]string // full summon: accumulated params
+	summonTargetPaths []string          // targeted summon: object paths to fetch
 
 	// lastSetParams holds the parameters sent in the most recent SetParameterValues
 	// dispatch so that handleSetParamValuesResponse can sync them to PostgreSQL.
@@ -195,6 +242,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		if summonPhase == 1 {
 			h.sendGetParameterNamesSummon(w, session)
+			return
+		}
+		if summonPhase == 3 {
+			h.sendTargetedSummon(ctx, w, session)
 			return
 		}
 
@@ -353,16 +404,7 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	}
 
 	// Use discovery hints from the resolved driver when available.
-	var discoveryHints *datamodel.DiscoveryHints
-	if driver != nil {
-		discoveryHints = &datamodel.DiscoveryHints{
-			WANTypePath:        driver.Discovery.WANTypePath,
-			WANTypeValuesWAN:   driver.Discovery.WANTypeValues.WAN,
-			WANTypeValuesLAN:   driver.Discovery.WANTypeValues.LAN,
-			WANServiceTypePath: driver.Discovery.WANServiceTypePath,
-			GPONEnablePath:     driver.Discovery.GPONEnablePath,
-		}
-	}
+	discoveryHints := discoveryHintsFromDriver(driver)
 	instanceMap := datamodel.DiscoverInstancesWithHints(upsertReq.Parameters, discoveryHints)
 
 	// Resolve the schema name for this device (e.g. "tr181", "vendor/huawei/tr181").
@@ -403,20 +445,8 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 			shouldSummon = false
 		}
 	}
-	// WAN tasks require accurate instance discovery (PPP/IP/VLAN indices).
-	// Force a summon even within the throttle window so that executeTask always
-	// sees the real instanceMap and chooses update vs. fresh-provision correctly.
-	if !shouldSummon {
-		for _, pt := range pendingTasks {
-			if pt.Type == task.TypeWAN {
-				shouldSummon = true
-				h.log.WithField("serial", upsertReq.Serial).
-					Info("CWMP: forcing summon for pending WAN task")
-				break
-			}
-		}
-	}
 	if shouldSummon {
+		// Full summon: refresh all device parameters (runs at most once per 2 minutes).
 		session.mu.Lock()
 		session.summonPhase = 1
 		session.summonSchemaName = schemaName
@@ -424,6 +454,22 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 		h.lastSummonTime.Store(upsertReq.Serial, time.Now())
 		h.log.WithField("serial", upsertReq.Serial).
 			Info("CWMP: scheduling full parameter summon")
+	} else {
+		// Within throttle window: if a WiFi or WAN task is pending, do a targeted
+		// summon that fetches only the relevant subtree (one GPV round-trip) so
+		// that instanceMap is accurate before the task is dispatched.
+		targetedPaths, targetedType := targetedSummonPaths(schemaName, pendingTasks)
+		if len(targetedPaths) > 0 {
+			session.mu.Lock()
+			session.summonPhase = 3
+			session.summonSchemaName = schemaName
+			session.summonTargetPaths = targetedPaths
+			session.mu.Unlock()
+			h.log.WithField("serial", upsertReq.Serial).
+				WithField("task_type", targetedType).
+				WithField("paths", targetedPaths).
+				Info("CWMP: scheduling targeted summon for task requiring instance discovery")
+		}
 	}
 
 	// On "8 DIAGNOSTICS COMPLETE", prepend synthetic result-collection tasks
@@ -668,6 +714,73 @@ func (h *Handler) sendGetParameterNamesSummon(w http.ResponseWriter, session *Se
 	writeXML(w, env)
 }
 
+// sendTargetedSummon sends a single GetParameterValues for specific object
+// path prefixes (e.g. "Device.WiFi." or "Device.IP.Interface."), fetching only
+// the parameters needed for instance discovery before a WiFi or WAN task.
+// This completes in one round-trip instead of the full 10-batch summon.
+func (h *Handler) sendTargetedSummon(ctx context.Context, w http.ResponseWriter, session *Session) {
+	session.mu.Lock()
+	paths := session.summonTargetPaths
+	serial := session.DeviceSerial
+	session.summonPhase = 4 // waiting targeted GetParameterValuesResponse
+	session.mu.Unlock()
+
+	h.log.WithField("serial", serial).
+		WithField("paths", paths).
+		Info("CWMP: sending targeted GetParameterValues for instance discovery")
+
+	id := uuid.NewString()
+	env, err := BuildGetParameterValues(id, paths)
+	if err != nil {
+		h.log.WithError(err).WithField("serial", serial).Error("CWMP: build targeted GetParameterValues failed")
+		session.mu.Lock()
+		session.summonPhase = 0
+		session.mu.Unlock()
+		h.dispatchNextOrClose(ctx, w, session)
+		return
+	}
+	writeXML(w, env)
+}
+
+// handleTargetedSummonResponse processes the GetParameterValuesResponse for a
+// targeted summon (phase 4). It rebuilds the session mapper from the returned
+// params WITHOUT touching MongoDB/PostgreSQL, then dispatches the pending task.
+func (h *Handler) handleTargetedSummonResponse(ctx context.Context, w http.ResponseWriter, session *Session, params map[string]string) {
+	session.mu.Lock()
+	serial := session.DeviceSerial
+	drv := session.driver
+	schemaName := session.summonSchemaName
+	session.summonPhase = 0
+	session.summonTargetPaths = nil
+	session.mu.Unlock()
+
+	discoveryHints := discoveryHintsFromDriver(drv)
+	instanceMap := datamodel.DiscoverInstancesWithHints(params, discoveryHints)
+
+	h.log.WithField("serial", serial).
+		WithField("wifi_ssid_indices", instanceMap.WiFiSSIDIndices).
+		WithField("wifi_ap_indices", instanceMap.WiFiAPIndices).
+		WithField("ppp_iface", instanceMap.PPPIfaceIdx).
+		WithField("wan_iface", instanceMap.WANIPIfaceIdx).
+		WithField("vlan_term", instanceMap.WANVLANTermIdx).
+		Info("CWMP: targeted summon DiscoverInstances result")
+
+	modelType := datamodel.DetectFromRootObject(firstRootObject(params))
+	var newMapper datamodel.Mapper
+	if sm := schema.NewSchemaMapper(h.schemaRegistry, schemaName, instanceMap); sm != nil {
+		newMapper = sm
+	} else {
+		newMapper = datamodel.ApplyInstanceMap(datamodel.NewMapper(modelType), instanceMap)
+	}
+
+	session.mu.Lock()
+	session.mapper = newMapper
+	session.instanceMap = instanceMap
+	session.mu.Unlock()
+
+	h.dispatchNextOrClose(ctx, w, session)
+}
+
 // summonBatchSizeDefault is the default number of parameter names sent per
 // GetParameterValues RPC during a parameter summon. Keep this small for TR-181
 // TP-Link devices that can disconnect on large batches.
@@ -807,16 +920,7 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 	session.mu.Lock()
 	drv := session.driver
 	session.mu.Unlock()
-	var discoveryHints *datamodel.DiscoveryHints
-	if drv != nil {
-		discoveryHints = &datamodel.DiscoveryHints{
-			WANTypePath:        drv.Discovery.WANTypePath,
-			WANTypeValuesWAN:   drv.Discovery.WANTypeValues.WAN,
-			WANTypeValuesLAN:   drv.Discovery.WANTypeValues.LAN,
-			WANServiceTypePath: drv.Discovery.WANServiceTypePath,
-			GPONEnablePath:     drv.Discovery.GPONEnablePath,
-		}
-	}
+	discoveryHints := discoveryHintsFromDriver(drv)
 	instanceMap := datamodel.DiscoverInstancesWithHints(params, discoveryHints)
 	h.log.WithField("serial", serial).
 		WithField("wan_iface", instanceMap.WANIPIfaceIdx).
@@ -939,7 +1043,60 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 		h.log.WithField("serial", serial).Info("CWMP: persist WAN/WiFi/LAN info success")
 	}
 
+	// Enforce driver default_params: push any param whose current value differs
+	// from the required default. Runs once per full-summon cycle (≈ every 2 min).
+	h.injectDefaultParamTask(session, serial, drv, params)
+
 	h.dispatchNextOrClose(ctx, w, session)
+}
+
+// injectDefaultParamTask prepends a synthetic SetParameterValues task for any
+// default_params entry that does not match the device's current (summoned) value.
+// Runs only after a full parameter summon (not targeted summon), so currentParams
+// contains the complete leaf set from the CPE.
+func (h *Handler) injectDefaultParamTask(session *Session, serial string, drv *schema.DeviceDriver, currentParams map[string]string) {
+	if drv == nil || len(drv.DefaultParams) == 0 {
+		return
+	}
+	h.log.WithField("serial", serial).
+		WithField("driver", drv.ID).
+		WithField("default_param_keys", len(drv.DefaultParams)).
+		Info("CWMP: evaluating driver default_params (post full summon)")
+
+	toSet := make(map[string]string, len(drv.DefaultParams))
+	for path, want := range drv.DefaultParams {
+		cur := ""
+		if currentParams != nil {
+			cur = currentParams[path]
+		}
+		if strings.TrimSpace(cur) != strings.TrimSpace(want) {
+			toSet[path] = want
+		}
+	}
+	if len(toSet) == 0 {
+		h.log.WithField("serial", serial).
+			WithField("driver", drv.ID).
+			Info("CWMP: driver default_params already match CPE; skipping SetParameterValues")
+		return
+	}
+	payload, err := json.Marshal(task.SetParamsPayload{Parameters: toSet})
+	if err != nil {
+		h.log.WithError(err).WithField("serial", serial).Warn("CWMP: marshal default_params payload failed")
+		return
+	}
+	synth := &task.Task{
+		ID:      "default_params_" + serial,
+		Serial:  serial,
+		Type:    task.TypeSetParams,
+		Payload: json.RawMessage(payload),
+		Status:  task.StatusPending,
+	}
+	h.log.WithField("serial", serial).
+		WithField("params", toSet).
+		Info("CWMP: enforcing driver default_params via SetParameterValues")
+	session.mu.Lock()
+	session.pendingTasks = append([]*task.Task{synth}, session.pendingTasks...)
+	session.mu.Unlock()
 }
 
 // handleGetParamValuesResponse routes the parsed parameter map to the correct
@@ -967,6 +1124,10 @@ func (h *Handler) handleGetParamValuesResponse(
 		session.mu.Unlock()
 		// Send next batch or finish if all done.
 		h.sendNextSummonBatch(ctx, w, session)
+		return
+	}
+	if summonPhase == 4 {
+		h.handleTargetedSummonResponse(ctx, w, session, params)
 		return
 	}
 
@@ -1157,9 +1318,16 @@ func (h *Handler) handleTaskResponse(ctx context.Context, w http.ResponseWriter,
 	session.mu.Lock()
 	t := session.currentTask
 	session.currentTask = nil
+	serial := session.DeviceSerial
 	session.mu.Unlock()
 
 	if t != nil {
+		// After a successful WAN task, force a fresh full summon on the next Inform
+		// so UI sections (Network / Information) are updated immediately with the
+		// latest interface state instead of waiting for summon throttle timeout.
+		if t.Type == task.TypeWAN && errMsg == "" {
+			h.lastSummonTime.Delete(serial)
+		}
 		h.completeTask(ctx, t, result, errMsg)
 	}
 
@@ -1257,8 +1425,12 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 			isPPPoE = p.Username != "" || p.Password != "" || p.VLAN > 0
 		}
 
-		if isPPPoE && im.WANIPIfaceIdx == 0 {
-			// No working WAN IP interface: device needs full provisioning.
+		if isPPPoE && (im.WANIPIfaceIdx == 0 || im.PPPIfaceIdx == 0) {
+			// Missing WAN/PPP runtime interface: device needs full PPPoE provisioning.
+			// This commonly happens after WAN is deleted from the ONT web UI: WAN IP
+			// objects may still exist, but PPP interface is gone. In that case we must
+			// not fall back to generic SetParameterValues (it can push invalid
+			// X_TP_ConnType/PPP paths and trigger 9003 faults).
 			if p.VLAN == 0 {
 				return nil, fmt.Errorf("WAN full provisioning requires VLAN ID")
 			}
@@ -1444,7 +1616,7 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 		}
 		return h.buildSetParamsXML(session, t.ID, params)
 
-	// WiFi task with Band Steering support
+	// WiFi task: YAML-driven via device driver flow.
 	case task.TypeWifi:
 		var wifiPayload task.WiFiPayload
 		if err := json.Unmarshal(t.Payload, &wifiPayload); err != nil {
@@ -1460,13 +1632,29 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 			WithField("channel", wifiPayload.Channel).
 			Info("CWMP: WiFi task payload received")
 
-		params, err := exe.BuildSetParams(ctx, t, mapper)
+		session.mu.Lock()
+		drv := session.driver
+		session.mu.Unlock()
+
+		if drv == nil {
+			return nil, fmt.Errorf("wifi update requires device driver")
+		}
+		if drv.GetProvisionFlow("wifi_update") == nil {
+			return nil, fmt.Errorf("wifi update flow %q not found in driver %s", "wifi_update", drv.ID)
+		}
+
+		params, err := buildWiFiParamsFromDriverFlow(t, drv, mapper, wifiPayload)
 		if err != nil {
 			return nil, err
 		}
 		if len(params) == 0 {
 			return nil, fmt.Errorf("task %s produced no parameters", t.ID)
 		}
+
+		h.log.WithField("task_id", t.ID).
+			WithField("driver", drv.ID).
+			WithField("flow", "wifi_update").
+			Info("CWMP: WiFi update via driver YAML flow")
 
 		// Log all parameters being sent for WiFi task
 		for path, value := range params {
@@ -1482,96 +1670,6 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 					Debug("CWMP: WiFi parameter to be set")
 			}
 		}
-
-		// Log mapper path information for debugging
-		h.log.WithField("task_id", t.ID).
-			WithField("secPath0", mapper.WiFiSecurityModePath(0)).
-			WithField("secPath1", mapper.WiFiSecurityModePath(1)).
-			WithField("passwdPath0", mapper.WiFiPasswordPath(0)).
-			WithField("passwdPath1", mapper.WiFiPasswordPath(1)).
-			WithField("payloadSecurity", wifiPayload.Security).
-			WithField("payloadPassword", wifiPayload.Password != "").
-			Debug("CWMP: WiFi mapper paths and payload validation")
-
-		// Only sync SSID/password/security to both bands if Band Steering is EXPLICITLY being enabled in this task
-		// Don't sync based on device's current state - only if this task is turning Band Steering ON
-		bandSteeringWillBeEnabled := wifiPayload.BandSteeringEnabled != nil && *wifiPayload.BandSteeringEnabled
-
-		// If Band Steering is enabled in this task, sync SSID, password, and security mode to both bands
-		if bandSteeringWillBeEnabled && (wifiPayload.SSID != "" || wifiPayload.Password != "") {
-			ssidPath24 := mapper.WiFiSSIDPath(0)
-			ssidPath5 := mapper.WiFiSSIDPath(1)
-			passwdPath24 := mapper.WiFiPasswordPath(0)
-			passwdPath5 := mapper.WiFiPasswordPath(1)
-			secPath24 := mapper.WiFiSecurityModePath(0)
-			secPath5 := mapper.WiFiSecurityModePath(1)
-
-			if wifiPayload.SSID != "" {
-				// Sync SSID to both bands - only if paths are valid
-				if ssidPath24 != "" && ssidPath5 != "" {
-					params[ssidPath24] = wifiPayload.SSID
-					params[ssidPath5] = wifiPayload.SSID
-					h.log.WithField("task_id", t.ID).
-						WithField("ssid", wifiPayload.SSID).
-						Info("CWMP: Band Steering enabled - syncing SSID to both bands")
-				} else {
-					h.log.WithField("task_id", t.ID).
-						WithField("path24", ssidPath24).
-						WithField("path5", ssidPath5).
-						Warn("CWMP: SSID paths invalid for Band Steering sync")
-				}
-			}
-
-			if wifiPayload.Password != "" {
-				// Sync password to both bands - only if paths are valid
-				if passwdPath24 != "" && passwdPath5 != "" {
-					params[passwdPath24] = wifiPayload.Password
-					params[passwdPath5] = wifiPayload.Password
-					h.log.WithField("task_id", t.ID).
-						Info("CWMP: Band Steering enabled - syncing password to both bands")
-				} else {
-					h.log.WithField("task_id", t.ID).
-						WithField("path24", passwdPath24).
-						WithField("path5", passwdPath5).
-						Warn("CWMP: Password paths invalid for Band Steering sync")
-				}
-			}
-
-			// Also sync security mode to both bands if it was set in the payload
-			if wifiPayload.Security != "" {
-				session.mu.Lock()
-				drv := session.driver
-				session.mu.Unlock()
-
-				var mode string
-				if drv != nil {
-					mode = drv.MapSecurityMode(wifiPayload.Security)
-				} else {
-					// Legacy hardcoded mapping as fallback
-					mode = wifiPayload.Security
-					if wifiPayload.Security == "WPA2-PSK" {
-						mode = "WPA2-Personal"
-					} else if wifiPayload.Security == "WPA-WPA2-PSK" {
-						mode = "WPA-WPA2-Personal"
-					}
-				}
-
-				if secPath24 != "" && secPath5 != "" {
-					params[secPath24] = mode
-					params[secPath5] = mode
-					h.log.WithField("task_id", t.ID).
-						WithField("security_mode", mode).
-						Info("CWMP: Band Steering enabled - syncing security mode to both bands")
-				} else {
-					h.log.WithField("task_id", t.ID).
-						WithField("path24", secPath24).
-						WithField("path5", secPath5).
-						WithField("security_mode", mode).
-						Warn("CWMP: Security mode paths invalid for Band Steering sync")
-				}
-			}
-		}
-
 		return h.buildSetParamsXML(session, t.ID, params)
 
 	// SetParameterValues-based tasks
@@ -1930,6 +2028,38 @@ func headerID(env *Envelope) string {
 
 // firstRootObject returns the dominant root object namespace present in params.
 // InternetGatewayDevice. (TR-098) takes priority when both prefixes coexist,
+// targetedSummonPaths returns the GPV object paths needed for a targeted summon
+// and the task type that triggered it. Returns nil, "" if no targeted summon is needed.
+//
+//   WiFi  task → Device.WiFi.                           (TR-181)
+//              → InternetGatewayDevice.LANDevice.        (TR-098)
+//   WAN   task → Device.IP.Interface. + Device.PPP.Interface. + vlan/link subtrees  (TR-181)
+//              → InternetGatewayDevice.WANDevice.        (TR-098)
+func targetedSummonPaths(schemaName string, pending []*task.Task) ([]string, string) {
+	isTR098 := strings.Contains(strings.ToLower(schemaName), "tr098")
+
+	for _, pt := range pending {
+		switch pt.Type {
+		case task.TypeWifi:
+			if isTR098 {
+				return []string{"InternetGatewayDevice.LANDevice."}, string(pt.Type)
+			}
+			return []string{"Device.WiFi."}, string(pt.Type)
+		case task.TypeWAN:
+			if isTR098 {
+				return []string{"InternetGatewayDevice.WANDevice."}, string(pt.Type)
+			}
+			return []string{
+				"Device.IP.Interface.",
+				"Device.PPP.Interface.",
+				"Device.Ethernet.VLANTermination.",
+				"Device.Ethernet.Link.",
+			}, string(pt.Type)
+		}
+	}
+	return nil, ""
+}
+
 // because some CDATA/ZTE ONTs report both namespaces in a single session.
 func firstRootObject(params map[string]string) string {
 	hasIGD, hasDev := false, false
@@ -1955,6 +2085,126 @@ func diagnosticStatePath(diagType string, mapper datamodel.Mapper) string {
 		return mapper.TracerouteDiagBasePath() + "DiagnosticsState"
 	}
 	return mapper.PingDiagBasePath() + "DiagnosticsState"
+}
+
+// buildWiFiParamsFromDriverFlow resolves WiFi parameters using a YAML flow
+// from the resolved device driver (flow name: "wifi_update").
+func buildWiFiParamsFromDriverFlow(
+	t *task.Task,
+	drv *schema.DeviceDriver,
+	mapper datamodel.Mapper,
+	p task.WiFiPayload,
+) (map[string]string, error) {
+	flow := drv.GetProvisionFlow("wifi_update")
+	if flow == nil {
+		return nil, fmt.Errorf("driver %s has no provision flow %q", drv.ID, "wifi_update")
+	}
+
+	bandIdx := 0
+	if p.Band == "5" {
+		bandIdx = 1
+	}
+	otherBandIdx := 1
+	if bandIdx == 1 {
+		otherBandIdx = 0
+	}
+
+	securityMode := ""
+	if p.Security != "" {
+		if p.Security == "None" {
+			securityMode = "None"
+		} else {
+			securityMode = drv.MapSecurityMode(p.Security)
+		}
+	} else if p.Password != "" {
+		// Keep current behavior: password-only update implies WPA2-Personal.
+		securityMode = drv.MapSecurityMode("WPA2-PSK")
+	}
+
+	password := p.Password
+	if securityMode == "None" {
+		password = ""
+	}
+
+	enabledVal := ""
+	if p.Enabled != nil {
+		enabledVal = strconv.FormatBool(*p.Enabled)
+	}
+	channelVal := ""
+	if p.Channel != 0 {
+		channelVal = strconv.Itoa(p.Channel)
+	}
+
+	bandSteeringPath := strings.TrimSpace(drv.WiFi.BandSteeringPath)
+	bandSteeringEnabled := ""
+	if p.BandSteeringEnabled != nil && bandSteeringPath != "" {
+		bandSteeringEnabled = strconv.FormatBool(*p.BandSteeringEnabled)
+	}
+
+	// When a task explicitly enables band steering, sync SSID/password/security
+	// to the other radio band so both profiles stay aligned.
+	steeringSync := p.BandSteeringEnabled != nil && *p.BandSteeringEnabled
+
+	ssidPath := strings.TrimSpace(mapper.WiFiSSIDPath(bandIdx))
+	securityPath := strings.TrimSpace(mapper.WiFiSecurityModePath(bandIdx))
+	passwordPath := strings.TrimSpace(mapper.WiFiPasswordPath(bandIdx))
+	enabledPath := strings.TrimSpace(mapper.WiFiEnabledPath(bandIdx))
+	channelPath := strings.TrimSpace(mapper.WiFiChannelPath(bandIdx))
+
+	syncSSIDPath := ""
+	syncSecurityPath := ""
+	syncPasswordPath := ""
+	syncSSID := ""
+	syncSecurityMode := ""
+	syncPassword := ""
+	if steeringSync {
+		syncSSIDPath = strings.TrimSpace(mapper.WiFiSSIDPath(otherBandIdx))
+		syncSecurityPath = strings.TrimSpace(mapper.WiFiSecurityModePath(otherBandIdx))
+		syncPasswordPath = strings.TrimSpace(mapper.WiFiPasswordPath(otherBandIdx))
+		syncSSID = p.SSID
+		syncSecurityMode = securityMode
+		syncPassword = password
+	}
+
+	// Guard against empty parameter keys: when a path is empty, force value empty
+	// so ProvisionExecutor.resolveParams() drops that entry.
+	valueIfPath := func(path, val string) string {
+		if strings.TrimSpace(path) == "" {
+			return ""
+		}
+		return val
+	}
+
+	inputVars := map[string]string{
+		"band_steering_path":    bandSteeringPath,
+		"band_steering_enabled": valueIfPath(bandSteeringPath, bandSteeringEnabled),
+		"ssid_path":             ssidPath,
+		"ssid":                  valueIfPath(ssidPath, p.SSID),
+		"security_path":         securityPath,
+		"security_mode":         valueIfPath(securityPath, securityMode),
+		"password_path":         passwordPath,
+		"password":              valueIfPath(passwordPath, password),
+		"enabled_path":          enabledPath,
+		"enabled":               valueIfPath(enabledPath, enabledVal),
+		"channel_path":          channelPath,
+		"channel":               valueIfPath(channelPath, channelVal),
+		"sync_ssid_path":        syncSSIDPath,
+		"sync_ssid":             valueIfPath(syncSSIDPath, syncSSID),
+		"sync_security_path":    syncSecurityPath,
+		"sync_security_mode":    valueIfPath(syncSecurityPath, syncSecurityMode),
+		"sync_password_path":    syncPasswordPath,
+		"sync_password":         valueIfPath(syncPasswordPath, syncPassword),
+	}
+
+	exe := schema.NewProvisionExecutor(flow, drv, inputVars)
+	step := exe.CurrentStep()
+	if step == nil {
+		return nil, fmt.Errorf("driver wifi flow %q has no executable step", flow.ID)
+	}
+	if step.Kind != schema.StepSet {
+		return nil, fmt.Errorf("driver wifi flow %q must start with set step", flow.ID)
+	}
+	return step.Params, nil
 }
 
 func unmarshalPayload(t *task.Task, dst any) error {
@@ -2126,8 +2376,17 @@ func (h *Handler) restoreWiFiConfig(ctx context.Context, serial string, snapshot
 	// Rebuild mapper from snapshot (full param set) so instance discovery is accurate.
 	// Bootstrap Inform carries only a few params and defaults to SSID.1/SSID.2,
 	// but the device may use SSID.3 (or higher) for 5GHz.
-	snapshotInstanceMap := datamodel.DiscoverInstances(snapshot)
 	modelType := datamodel.DetectFromRootObject(firstRootObject(snapshot))
+	var discoveryHints *datamodel.DiscoveryHints
+	if h.driverRegistry != nil {
+		drv := h.driverRegistry.Resolve(
+			snapshot["Device.DeviceInfo.Manufacturer"],
+			snapshot["Device.DeviceInfo.ProductClass"],
+			string(modelType),
+		)
+		discoveryHints = discoveryHintsFromDriver(drv)
+	}
+	snapshotInstanceMap := datamodel.DiscoverInstancesWithHints(snapshot, discoveryHints)
 	snapshotMapper := datamodel.ApplyInstanceMap(datamodel.NewMapper(modelType), snapshotInstanceMap)
 
 	h.log.WithField("serial", serial).

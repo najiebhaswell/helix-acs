@@ -35,6 +35,10 @@ wifi:
   sync_bands_on_steering: true
 
 discovery:
+  # When SSID.LowerLayers is missing: pair_block_mod2 = (1,2),(5,6),… → 2.4 GHz;
+  # (3,4),(7,8),… → 5 GHz. Other models can use strategy: explicit + explicit: map.
+  wifi_ssid_band_without_lower_layers:
+    strategy: pair_block_mod2
   wan_type_path: "Device.IP.Interface.{i}.X_TP_ConnType"
   wan_type_values:
     wan:
@@ -58,3 +62,4 @@ provisions:
   wan_pppoe_delete_add: "../../../tr181/provision_wan_delete_add.yaml"
   wan_pppoe_update: "../../../tr181/provision_wan_update.yaml"
   wan_pppoe_update_vlan: "../../../tr181/provision_wan_update_vlan.yaml"
+  wifi_update: "../../../tr181/provision_wifi.yaml"

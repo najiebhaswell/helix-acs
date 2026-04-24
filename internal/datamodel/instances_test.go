@@ -1,6 +1,7 @@
 package datamodel
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -110,6 +111,71 @@ func TestDiscoverTR181WiFiViaFrequencyBand(t *testing.T) {
 	assert.Equal(t, []int{1, 2}, im.WiFiRadioIndices)
 	assert.Equal(t, []int{1, 2}, im.WiFiSSIDIndices)
 	assert.Equal(t, []int{1, 2}, im.WiFiAPIndices)
+}
+
+func TestDiscoverTR181WiFiTPLinkFourSSIDNoLowerLayers(t *testing.T) {
+	// TP-Link block layout without SSID LowerLayers: SSID 1–2 → 2.4 GHz, 3–4 → 5 GHz.
+	params := map[string]string{
+		"Device.WiFi.Radio.1.OperatingFrequencyBand": "2.4GHz",
+		"Device.WiFi.Radio.2.OperatingFrequencyBand": "5GHz",
+		"Device.WiFi.SSID.1.SSID":                    "HOME_24_A",
+		"Device.WiFi.SSID.2.SSID":                    "HOME_24_B",
+		"Device.WiFi.SSID.3.SSID":                    "HOME_5_PRIMARY",
+		"Device.WiFi.SSID.4.SSID":                    "HOME_5_GUEST",
+	}
+	hints := &DiscoveryHints{
+		WiFiSSIDBandWithoutLowerLayers: &WiFiSSIDBandWithoutLowerLayersHints{Strategy: "pair_block_mod2"},
+	}
+	im := DiscoverInstancesWithHints(params, hints)
+
+	assert.Equal(t, 1, im.WiFiSSIDIndices[0], "2.4 GHz primary SSID should be smallest in block {1,2}")
+	assert.Equal(t, 3, im.WiFiSSIDIndices[1], "5 GHz primary SSID should be smallest in block {3,4} → SSID.3")
+}
+
+func TestDiscoverTR181WiFiTPLinkEightSSIDNoLowerLayers(t *testing.T) {
+	// Pairs (1,2),(5,6) → 2.4 GHz; (3,4),(7,8) → 5 GHz (TP-Link multi-SSID, no LowerLayers).
+	params := map[string]string{
+		"Device.WiFi.Radio.1.OperatingFrequencyBand": "2.4GHz",
+		"Device.WiFi.Radio.2.OperatingFrequencyBand": "5GHz",
+	}
+	for i := 1; i <= 8; i++ {
+		params[fmt.Sprintf("Device.WiFi.SSID.%d.SSID", i)] = fmt.Sprintf("S%d", i)
+	}
+	hints := &DiscoveryHints{
+		WiFiSSIDBandWithoutLowerLayers: &WiFiSSIDBandWithoutLowerLayersHints{Strategy: "pair_block_mod2"},
+	}
+	im := DiscoverInstancesWithHints(params, hints)
+
+	assert.Equal(t, 1, im.WiFiSSIDIndices[0], "primary 2.4 GHz = min of {1,2,5,6}")
+	assert.Equal(t, 3, im.WiFiSSIDIndices[1], "primary 5 GHz = min of {3,4,7,8}")
+}
+
+func TestTPLinkXC220G3BlockPairVsLegacyOnSSID10(t *testing.T) {
+	assert.Equal(t, 0, wifiSSIDPairBlockMod2Band(10), "pair_block_mod2: SSID 10 → 2.4 GHz block")
+	assert.Equal(t, 1, tplinkLegacyMultiRadioNoLowerLayersBand(10), "legacy TP-Link heuristic: SSID 10 → 5 GHz")
+}
+
+func TestWiFiSSIDBandExplicitStrategy(t *testing.T) {
+	params := map[string]string{
+		"Device.WiFi.Radio.1.OperatingFrequencyBand": "2.4GHz",
+		"Device.WiFi.Radio.2.OperatingFrequencyBand": "5GHz",
+		"Device.WiFi.SSID.1.SSID":                    "A",
+		"Device.WiFi.SSID.2.SSID":                    "B",
+		"Device.WiFi.SSID.3.SSID":                    "C",
+		"Device.WiFi.SSID.4.SSID":                    "D",
+	}
+	hints := &DiscoveryHints{
+		WiFiSSIDBandWithoutLowerLayers: &WiFiSSIDBandWithoutLowerLayersHints{
+			Strategy: "explicit",
+			ExplicitSSIDBand: map[int]int{
+				1: 0, 3: 0,
+				2: 1, 4: 1,
+			},
+		},
+	}
+	im := DiscoverInstancesWithHints(params, hints)
+	assert.Equal(t, 1, im.WiFiSSIDIndices[0], "2.4 GHz min SSID index = 1")
+	assert.Equal(t, 2, im.WiFiSSIDIndices[1], "5 GHz min SSID index = 2")
 }
 
 func TestDiscoverTR181WiFiNonStandardIndices(t *testing.T) {
