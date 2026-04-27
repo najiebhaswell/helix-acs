@@ -1,0 +1,37 @@
+id: wan
+model: tr098
+vendor: huawei
+description: >
+  WAN interface parameters for Huawei TR-098 devices (HG8145V5 and similar).
+  Huawei uses X_HW_SERVICELIST (uppercase) for service type detection.
+  PPPoE WAN: WANPPPConnection (X_HW_SERVICELIST=INTERNET)
+  TR069 WAN:  WANIPConnection  (X_HW_SERVICELIST=TR069)
+
+parameters:
+  # Huawei service type is in X_HW_SERVICELIST (uppercase suffix).
+  # Detected generically by case-insensitive "servicelist" suffix check.
+  - name: wan.service_type
+    path: ""
+    type: string
+
+  # Huawei has pre-existing WAN objects; use set_params provisioning.
+  - name: wan.provisioning_type
+    path: "set_params"
+    type: string
+
+  # PPPoE credentials
+  - name: wan.pppoe_user
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Username"
+    type: string
+  - name: wan.pppoe_pass
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Password"
+    type: string
+
+  # WAN IP address
+  - name: wan.ip_address
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.ExternalIPAddress"
+    type: string
+
+  - name: wan.status
+    path: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANIPConnection.{wan_ip_conn}.ConnectionStatus"
+    type: string

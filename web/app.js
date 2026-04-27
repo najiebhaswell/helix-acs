@@ -163,6 +163,8 @@ function fmtRam(totalKB, freeKB) {
   if (!totalKB) return '';
   const usedKB = totalKB - freeKB;
   const pct = Math.round((usedKB / totalKB) * 100);
+  // Percentage-only mode: backend stores Total=100, Free=(100-pct) when only % is available.
+  if (totalKB === 100) return `${pct}%`;
   return `${Math.round(usedKB / 1024)} MB / ${Math.round(totalKB / 1024)} MB (${pct}%)`;
 }
 
@@ -182,69 +184,83 @@ function tagBadges(tags) {
   return tags.map(t => `<span class="tag-badge">${escHtml(t)}</span>`).join('');
 }
 
+// extractOpticalInfo scans all device parameters generically.
+// It finds any path whose parent context relates to optical/GPON/PON/Xpon,
+// then maps known field-name suffixes to canonical optical keys.
+// No brand-specific paths are hardcoded here — this works for any vendor.
 function extractOpticalInfo(params) {
   if (!params) return null;
-  const optical = {};
 
-  // TR-181 TP-Link paths
-  const tplinkMappings = {
-    'PonType': 'Device.Optical.Interface.1.X_TP_GPON_Config.PonType',
-    'PonMode': 'Device.Optical.Interface.1.X_TP_GPON_Config.PonMode',
-    'XPONStatus': 'Device.Optical.Interface.1.X_TP_GPON_Config.XponStatus',
-    'Status': 'Device.Optical.Interface.1.X_TP_GPON_Config.Status',
-    'Temperature': 'Device.Optical.Interface.1.X_TP_GPON_Config.TransceiverTemperature',
-    'SupplyVoltage': 'Device.Optical.Interface.1.X_TP_GPON_Config.SupplyVottage',
-    'BiasCurrent': 'Device.Optical.Interface.1.X_TP_GPON_Config.BiasCurrent',
-    'TXPower': 'Device.Optical.Interface.1.X_TP_GPON_Config.TXPower',
-    'RXPower': 'Device.Optical.Interface.1.X_TP_GPON_Config.RXPower',
-    'OpticalSignalLevel': 'Device.Optical.Interface.1.X_TP_GPON_Config.OpticalSignalLevel',
-    'TransmitOpticalLevel': 'Device.Optical.Interface.1.X_TP_GPON_Config.TransmitOpticalLevel',
-    'FecDownstream': 'Device.Optical.Interface.1.X_TP_GPON_Config.FecDsEn',
-    'FecUpstream': 'Device.Optical.Interface.1.X_TP_GPON_Config.FecUsEn',
-    'BytesReceived': 'Device.Optical.Interface.1.Stats.BytesReceived',
-    'BytesSent': 'Device.Optical.Interface.1.Stats.BytesSent',
-    'PacketsReceived': 'Device.Optical.Interface.1.Stats.PacketsReceived',
-    'PacketsSent': 'Device.Optical.Interface.1.Stats.PacketsSent',
-    'OMCIPacketsReceived': 'Device.Optical.Interface.1.X_TP_OMCIStats.PacketsReceived',
-    'OMCIPacketsSent': 'Device.Optical.Interface.1.X_TP_OMCIStats.PacketsSent',
+  // Canonical field-name suffix → output key.
+  // Covers all known suffix variants across TR-181 and TR-098 vendors.
+  const signalFields = {
+    'RXPower':                 'RXPower',
+    'TXPower':                 'TXPower',
+    'TransceiverTemperature':  'Temperature',
+    'SupplyVoltage':           'SupplyVoltage',
+    'SupplyVottage':           'SupplyVoltage', // known firmware typo
+    'BiasCurrent':             'BiasCurrent',
+    'OpticalSignalLevel':      'OpticalSignalLevel',
+    'TransmitOpticalLevel':    'TransmitOpticalLevel',
+  };
+  const statusFields  = { 'Status': 'Status', 'XponStatus': 'XPONStatus' };
+  const modeFields    = { 'PonType': 'PonType', 'PonMode': 'PonMode' };
+  const fecFields     = { 'FecDsEn': 'FecDownstream', 'FecUsEn': 'FecUpstream' };
+  const statsFields   = {
+    'BytesReceived':   'BytesReceived',
+    'BytesSent':       'BytesSent',
+    'PacketsReceived': 'PacketsReceived',
+    'PacketsSent':     'PacketsSent',
   };
 
-  // TR-098 CDATA/ZTE paths — values are already in real units (°C, V, mA, dBm)
-  // Temperature priority: XponInterface → X_ALU_OntOpticalParam → TemperatureSensor.1.Value
-  const cdataMappings = {
-    'PonMode': 'InternetGatewayDevice.DeviceInfo.XponInterface.X_CMS_PonMode',
-    'Status': 'InternetGatewayDevice.DeviceInfo.XponInterface.Status',
-    'Temperature': 'InternetGatewayDevice.DeviceInfo.XponInterface.TransceiverTemperature',
-    'SupplyVoltage': 'InternetGatewayDevice.DeviceInfo.XponInterface.SupplyVottage',
-    'BiasCurrent': 'InternetGatewayDevice.DeviceInfo.XponInterface.BiasCurrent',
-    'TXPower': 'InternetGatewayDevice.DeviceInfo.XponInterface.TXPower',
-    'RXPower': 'InternetGatewayDevice.DeviceInfo.XponInterface.RXPower',
-  };
-  // Fallback temperature paths for CDATA (tried in order if primary is missing)
-  const cdataTempFallbacks = [
-    'InternetGatewayDevice.X_ALU_OntOpticalParam.TransceiverTemperature',
-    'InternetGatewayDevice.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Value',
+  // Regex: path segment must contain an optical/PON context keyword.
+  const reOpticalCtx = /optical|gpon|pon|xpon|transceiver/i;
+
+  // Group candidates by parent object path; collect signal fields per group.
+  // A "group" is the full param path minus the last segment (the field name).
+  const groups = {}; // parentPath → { key: value, ... }
+
+  for (const [paramKey, val] of Object.entries(params)) {
+    if (val === undefined || val === null || val === '') continue;
+    const dot = paramKey.lastIndexOf('.');
+    if (dot < 0) continue;
+    const fieldName  = paramKey.substring(dot + 1);
+    const parentPath = paramKey.substring(0, dot);
+    if (!reOpticalCtx.test(parentPath)) continue;
+
+    const allFieldMaps = [signalFields, statusFields, modeFields, fecFields, statsFields];
+    for (const fm of allFieldMaps) {
+      if (fm[fieldName]) {
+        if (!groups[parentPath]) groups[parentPath] = {};
+        groups[parentPath][fm[fieldName]] = val;
+        break;
+      }
+    }
+  }
+
+  if (Object.keys(groups).length === 0) return null;
+
+  // Merge all groups: signal fields win over status/stats. If two groups supply
+  // the same key, prefer the one from a path with Status=Up.
+  const upPaths    = new Set();
+  const merged     = {};
+
+  for (const [path, fields] of Object.entries(groups)) {
+    if (fields['Status'] === 'Up') upPaths.add(path);
+  }
+
+  // Apply: Up-paths first, then the rest (later writes don't overwrite earlier).
+  const orderedPaths = [
+    ...Object.keys(groups).filter(p => upPaths.has(p)),
+    ...Object.keys(groups).filter(p => !upPaths.has(p)),
   ];
-
-  for (const [key, path] of Object.entries(tplinkMappings)) {
-    if (params[path] !== undefined && params[path] !== null && params[path] !== '') {
-      optical[key] = params[path];
-    }
-  }
-  for (const [key, path] of Object.entries(cdataMappings)) {
-    if (params[path] !== undefined && params[path] !== null && params[path] !== '') {
-      optical[key] = params[path];
-    }
-  }
-  // Apply temperature fallbacks if primary path was empty
-  if (!optical['Temperature']) {
-    for (const path of cdataTempFallbacks) {
-      const v = params[path];
-      if (v !== undefined && v !== null && v !== '') { optical['Temperature'] = v; break; }
+  for (const path of orderedPaths) {
+    for (const [k, v] of Object.entries(groups[path])) {
+      if (!(k in merged)) merged[k] = v;
     }
   }
 
-  return optical;
+  return Object.keys(merged).length > 0 ? merged : null;
 }
 
 function escHtml(s) {
@@ -306,6 +322,9 @@ function routeTo(hash) {
   } else if (base === '/devices') {
     setActive('/devices');
     viewDevices();
+  } else if (base === '/default-params') {
+    setActive('/default-params');
+    viewDefaultParams();
   } else if (base === '/health') {
     setActive('/health');
     viewHealth();
@@ -614,6 +633,19 @@ async function deleteDevice(serial) {
   });
 }
 
+async function triggerSummon(serial) {
+  try {
+    const r = await API.post(`/devices/${encodeURIComponent(serial)}/summon`, {});
+    toast(r.status || 'Full summon scheduled — parameters will refresh on next device contact', 'success');
+  } catch (e) {
+    if (e.message && e.message.includes('503')) {
+      toast('Device not connected — wait for next Inform cycle or check connectivity', 'warning');
+    } else {
+      toast(e.message || 'Failed to trigger summon', 'danger');
+    }
+  }
+}
+
 async function saveSnapshot(serial) {
   try {
     const res = await API.post(`/devices/${encodeURIComponent(serial)}/snapshots/last-known-good`, {});
@@ -738,14 +770,26 @@ function renderDeviceHeader(dev) {
             ${field('Serial', dev.serial)}
             ${field('Firmware', dev.sw_version)}
             ${(function(){
-              const isTR069 = w => (w.service_type||'').toUpperCase().split(',').some(s=>s.trim()==='TR069'||s.trim()==='MANAGEMENT');
-              const internetWAN = dev.wans && dev.wans.find(w => w.ip_address && !isTR069(w));
+              const mgmtIP = dev.wan_ip || '';
+              const wans = dev.wans || [];
+              // If any WAN IP matches wan_ip, use IP-match to split management vs internet.
+              // Otherwise fall back to service_type token check (TP-Link etc).
+              const anyIPMatch = mgmtIP && wans.some(w => w.ip_address === mgmtIP);
+              const isManagement = w => anyIPMatch
+                ? w.ip_address === mgmtIP
+                : (w.service_type||'').toUpperCase().split(/[,_]/).some(s=>s.trim()==='TR069'||s.trim()==='MANAGEMENT');
+              const internetWAN = wans.find(w => w.ip_address && !isManagement(w));
               return field('WAN IP', internetWAN ? internetWAN.ip_address : '');
             })()}
             ${(function(){
-              const isTR069 = w => (w.service_type||'').toUpperCase().split(',').some(s=>s.trim()==='TR069'||s.trim()==='MANAGEMENT');
-              const tr069WAN = dev.wans && dev.wans.find(isTR069);
-              return field('WAN TR069', tr069WAN ? tr069WAN.ip_address : dev.wan_ip || '');
+              const mgmtIP = dev.wan_ip || '';
+              const wans = dev.wans || [];
+              const anyIPMatch = mgmtIP && wans.some(w => w.ip_address === mgmtIP);
+              const isManagement = w => anyIPMatch
+                ? w.ip_address === mgmtIP
+                : (w.service_type||'').toUpperCase().split(/[,_]/).some(s=>s.trim()==='TR069'||s.trim()==='MANAGEMENT');
+              const tr069WAN = wans.find(isManagement);
+              return field('WAN TR069', tr069WAN ? tr069WAN.ip_address : mgmtIP);
             })()}
             ${field('Uptime', uptimeStr)}
             ${field('CPU', cpuStr)}
@@ -804,22 +848,29 @@ function renderInfoTab(dev) {
               ${row('RAM (Used/Total)', dev.ram_total ? fmtRam(dev.ram_total, dev.ram_free) : null)}
               ${row('URL ACS', escHtml(dev.acs_url))}
               ${(function() {
-                // WAN TR069 IP: WAN whose service_type contains 'TR069' or 'Management'
-                const isTR069 = w => (w.service_type || '').toUpperCase().split(',').some(s => s.trim() === 'TR069' || s.trim() === 'MANAGEMENT');
-                const tr069WAN = dev.wans && dev.wans.find(isTR069);
-                const tr069IP = tr069WAN ? tr069WAN.ip_address : dev.wan_ip || '';
-                return row('WAN TR069 IP', tr069IP || null);
+                const mgmtIP = dev.wan_ip || '';
+                const wans = dev.wans || [];
+                const anyIPMatch = mgmtIP && wans.some(w => w.ip_address === mgmtIP);
+                const isManagement = w => anyIPMatch
+                  ? w.ip_address === mgmtIP
+                  : (w.service_type || '').toUpperCase().split(/[,_]/).some(s => s.trim() === 'TR069' || s.trim() === 'MANAGEMENT');
+                const tr069WAN = wans.find(isManagement);
+                return row('WAN TR069 IP', tr069WAN ? tr069WAN.ip_address : (mgmtIP || null));
               })()}
               <tr>
                 <td class="text-muted small fw-semibold" style="width:180px">WAN IP</td>
                 <td>${(function() {
-                  // WAN IP: only WANs with Internet service (PPPoE/DHCP, not TR069 management)
-                  const isTR069 = w => (w.service_type || '').toUpperCase().split(',').some(s => s.trim() === 'TR069' || s.trim() === 'MANAGEMENT');
-                  const internetWANs = dev.wans ? dev.wans.filter(w => w.ip_address && !isTR069(w)) : [];
+                  const mgmtIP = dev.wan_ip || '';
+                  const wans = dev.wans || [];
+                  const anyIPMatch = mgmtIP && wans.some(w => w.ip_address === mgmtIP);
+                  const isManagement = w => anyIPMatch
+                    ? w.ip_address === mgmtIP
+                    : (w.service_type || '').toUpperCase().split(/[,_]/).some(s => s.trim() === 'TR069' || s.trim() === 'MANAGEMENT');
+                  const internetWANs = wans.filter(w => w.ip_address && !isManagement(w));
                   if (internetWANs.length > 0) {
                     return internetWANs.map(w => `${escHtml(w.ip_address)} <span class="text-muted">(${escHtml(w.connection_type || 'Unknown')})</span>`).join('<br>');
                   }
-                  return escHtml(dev.wan_ip && !dev.wans?.some(w => w.ip_address === dev.wan_ip && isTR069(w)) ? dev.wan_ip : '');
+                  return '';
                 })()}
                 </td>
               </tr>
@@ -860,6 +911,9 @@ function renderInfoTab(dev) {
             <button class="btn btn-sm btn-outline-success" onclick="saveSnapshot('${escHtml(dev.serial)}')" title="Simpan parameter saat ini sebagai last_known_good snapshot. Snapshot ini digunakan untuk restore otomatis setelah factory reset.">
               <i class="bi bi-floppy me-1"></i>Save Snapshot (last_known_good)
             </button>
+            <button class="btn btn-sm btn-outline-primary" onclick="triggerSummon('${escHtml(dev.serial)}')" title="Trigger GetParameterNames full summon — fetches ALL parameters from device. Required for first-time optical/GPON data discovery.">
+              <i class="bi bi-cloud-download me-1"></i>Summon All Parameters
+            </button>
           </div>
         </div>
       </div>
@@ -891,20 +945,33 @@ function renderInfoTab(dev) {
       const formatVoltage = (val) => {
         if (!val) return '-';
         if (isPreFormatted(val)) return String(val).trim();
-        return (val / 1000).toFixed(3) + ' V';
+        const str = String(val).trim();
+        if (str.includes('.')) return parseFloat(str).toFixed(3) + ' V';
+        return (parseInt(str) / 1000).toFixed(3) + ' V';
       };
       const formatCurrent = (val) => {
         if (!val) return '-';
         if (isPreFormatted(val)) return String(val).trim();
-        return (val * 2 / 1000).toFixed(2) + ' mA';
+        const str = String(val).trim();
+        if (str.includes('.')) return parseFloat(str).toFixed(2) + ' mA';
+        return (parseInt(str) * 2 / 1000).toFixed(2) + ' mA';
       };
       const formatPower = (val) => {
         if (!val) return '-';
         if (isPreFormatted(val)) return String(val).trim();
-        const microWatts = parseInt(val) * 0.1;
+        const str = String(val).trim();
+        // ZTE (and some other vendors) store TX/RX power already in dBm as a float, e.g. "2.87".
+        // Detect by presence of decimal point — pass through directly.
+        if (str.includes('.')) return parseFloat(str).toFixed(2) + ' dBm';
+        // Integer: check if it's already in dBm (Huawei stores TXPower/RXPower as integer dBm).
+        // Plausible optical dBm range is -50..+20; values outside this are raw 0.1-µW units (TP-Link).
+        const n = parseInt(str);
+        if (!isNaN(n) && n >= -50 && n <= 20) return n.toFixed(2) + ' dBm';
+        // TP-Link style raw value in 0.1-µW units → convert to dBm.
+        const microWatts = n * 0.1;
         const milliWatts = microWatts / 1000;
         const dBm = 10 * Math.log10(milliWatts);
-        return isNaN(dBm) ? String(val) : dBm.toFixed(2) + ' dBm';
+        return isNaN(dBm) ? str : dBm.toFixed(2) + ' dBm';
       };
 
       let htmlContent = '';
@@ -1120,21 +1187,6 @@ async function renderNetworkTab(dev, serial) {
 
   document.getElementById('tab-network').innerHTML = `
     <div class="row g-3">
-      <div class="col-12">
-        <div class="card border-0 shadow-sm">
-          <div class="card-header bg-white fw-semibold small">
-            <i class="bi bi-graph-up-arrow me-1 text-info"></i>WAN traffic <span class="text-muted fw-normal">(average rate between counter samples, not real-time)</span>
-          </div>
-          <div class="card-body py-2">
-            <canvas id="wan-traffic-canvas" width="800" height="220" style="width:100%;max-height:220px;height:220px;display:block"></canvas>
-            <div class="d-flex flex-wrap justify-content-between align-items-center small text-muted mt-1 gap-2">
-              <span><span class="text-success">●</span> Download (RX)</span>
-              <span><span class="text-primary">●</span> Upload (TX)</span>
-              <span id="wan-traffic-hint"></span>
-            </div>
-          </div>
-        </div>
-      </div>
       <div class="col-md-6 d-flex flex-column gap-3">
         ${wanCards}
         ${lanCard}
@@ -1146,105 +1198,6 @@ async function renderNetworkTab(dev, serial) {
       </div>
     </div>`;
 
-  loadAndDrawWanTrafficChart(serial || dev.serial);
-}
-
-/**
- * Fetches /devices/:serial/traffic and draws RX/TX average bitrate polylines (bps from Δbytes/Δt).
- */
-async function loadAndDrawWanTrafficChart(serial) {
-  const canvas = document.getElementById('wan-traffic-canvas');
-  const hint = document.getElementById('wan-traffic-hint');
-  if (!canvas || !serial) return;
-  const ctx = canvas.getContext('2d');
-  const rect = canvas.getBoundingClientRect();
-  const cssW = Math.max(320, rect.width || canvas.parentElement?.clientWidth || 800);
-  const cssH = 220;
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.floor(cssW * dpr);
-  canvas.height = Math.floor(cssH * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const W = cssW;
-  const H = cssH;
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#f8f9fa';
-  ctx.fillRect(0, 0, W, H);
-
-  const drawEmpty = (msg) => {
-    ctx.fillStyle = '#6c757d';
-    ctx.font = '13px system-ui,sans-serif';
-    ctx.fillText(msg, 12, H / 2);
-    if (hint) hint.textContent = '';
-  };
-
-  try {
-    const data = await API.get(`/devices/${encodeURIComponent(serial)}/traffic?hours=24`);
-    const pts = data.points || [];
-    if (pts.length === 0) {
-      drawEmpty('Need at least two counter samples to show a rate (wait for the next Inform / summon).');
-      if (hint) hint.textContent = 'Belum ada cukup data.';
-      return;
-    }
-    if (hint) {
-      hint.textContent = `${pts.length} interval · last 24h (Δbytes/Δtime)`;
-    }
-    let maxBps = 1e3;
-    for (const p of pts) {
-      if (p.valid) {
-        maxBps = Math.max(maxBps, p.rx_bps || 0, p.tx_bps || 0);
-      }
-    }
-    maxBps *= 1.08;
-    const padL = 44;
-    const padR = 8;
-    const padT = 14;
-    const padB = 6;
-    const plotW = W - padL - padR;
-    const plotH = H - padT - padB;
-    const plotY = padT;
-    ctx.strokeStyle = '#dee2e6';
-    ctx.lineWidth = 1;
-    for (let g = 0; g <= 4; g++) {
-      const y = plotY + (g / 4) * plotH;
-      ctx.beginPath();
-      ctx.moveTo(padL, y);
-      ctx.lineTo(W - padR, y);
-      ctx.stroke();
-    }
-    const n = pts.length;
-    const toX = (i) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-    const toY = (bps) => plotY + plotH - (Math.min(bps, maxBps) / maxBps) * plotH;
-    const drawSeries = (pick, color) => {
-      ctx.beginPath();
-      let started = false;
-      for (let i = 0; i < n; i++) {
-        const p = pts[i];
-        if (!p.valid) {
-          started = false;
-          continue;
-        }
-        const x = toX(i);
-        const y = toY(pick(p));
-        if (!started) {
-          ctx.moveTo(x, y);
-          started = true;
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    };
-    drawSeries((p) => p.rx_bps, '#198754');
-    drawSeries((p) => p.tx_bps, '#0d6efd');
-    ctx.fillStyle = '#495057';
-    ctx.font = '11px system-ui,sans-serif';
-    ctx.fillText(fmtMbpsFromBps(maxBps), 4, 11);
-  } catch (_) {
-    drawEmpty('Could not load traffic series.');
-    if (hint) hint.textContent = 'Gagal memuat data traffic.';
-  }
 }
 
 // Toggle PPPoE password visibility in WAN card
@@ -1571,6 +1524,208 @@ function openTagsModal(serial, tags) {
     } catch (e) { toast(e.message, 'danger'); }
   };
   S.tagsModal.show();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  View: Default Params
+// ─────────────────────────────────────────────────────────────
+
+async function viewDefaultParams() {
+  document.getElementById('topbar-title').textContent = 'Default Parameters';
+  const el = document.getElementById('view-content');
+  el.innerHTML = `
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h5 class="fw-bold mb-0"><i class="bi bi-sliders me-2 text-primary"></i>Default Parameters</h5>
+    </div>
+    <div class="card shadow-sm mb-4">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-info-circle text-primary"></i>
+        <span class="fw-semibold">About Default Parameters</span>
+      </div>
+      <div class="card-body">
+        <p class="mb-0 text-muted small">
+          Parameters configured here are automatically pushed to a CPE via
+          <strong>SetParameterValues</strong> on its <em>first-ever connection</em> to the ACS
+          or after a <em>factory reset</em> (Bootstrap event).
+          If the device already has the correct value, the parameter is skipped.
+        </p>
+      </div>
+    </div>
+    <div class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-table me-1"></i>Parameter List</span>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" onclick="dpAddVirtualRow()" title="Virtual param maps one name to multiple vendor-specific paths">
+            <i class="bi bi-diagram-3 me-1"></i>Add Virtual
+          </button>
+          <button class="btn btn-sm btn-outline-primary" onclick="dpAddRow()">
+            <i class="bi bi-plus-lg me-1"></i>Add Parameter
+          </button>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div id="dp-loading" class="text-center p-4">
+          <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading…
+        </div>
+        <div id="dp-table-wrap" class="d-none">
+          <table class="table table-hover mb-0" id="dp-table">
+            <thead class="table-light">
+              <tr>
+                <th style="width:42px">Type</th>
+                <th style="width:40%">Parameter Path / Name</th>
+                <th>Value</th>
+                <th style="width:48px"></th>
+              </tr>
+            </thead>
+            <tbody id="dp-tbody"></tbody>
+          </table>
+          <datalist id="dp-path-suggestions">
+            <option value="Device.ManagementServer.Username">
+            <option value="Device.ManagementServer.Password">
+            <option value="Device.ManagementServer.PeriodicInformInterval">
+            <option value="Device.ManagementServer.PeriodicInformEnable">
+            <option value="Device.ManagementServer.ConnectionRequestUsername">
+            <option value="Device.ManagementServer.ConnectionRequestPassword">
+            <option value="InternetGatewayDevice.ManagementServer.Username">
+            <option value="InternetGatewayDevice.ManagementServer.Password">
+            <option value="InternetGatewayDevice.ManagementServer.PeriodicInformInterval">
+            <option value="InternetGatewayDevice.ManagementServer.ConnectionRequestUsername">
+            <option value="InternetGatewayDevice.ManagementServer.ConnectionRequestPassword">
+          </datalist>
+          <div id="dp-empty" class="text-center text-muted p-4 d-none">
+            <i class="bi bi-inbox display-6 d-block mb-2 opacity-50"></i>
+            No default parameters configured.
+          </div>
+        </div>
+      </div>
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <div id="dp-status" class="small text-muted"></div>
+        <button class="btn btn-primary" onclick="dpSave()">
+          <i class="bi bi-floppy me-1"></i>Save Changes
+        </button>
+      </div>
+    </div>`;
+
+  await dpLoad();
+}
+
+async function dpLoad() {
+  try {
+    const data = await API.get('/config/default-params');
+    document.getElementById('dp-loading').classList.add('d-none');
+    document.getElementById('dp-table-wrap').classList.remove('d-none');
+    const tbody = document.getElementById('dp-tbody');
+    tbody.innerHTML = '';
+
+    const entries = Object.entries(data);
+    if (entries.length === 0) {
+      document.getElementById('dp-empty').classList.remove('d-none');
+    } else {
+      document.getElementById('dp-empty').classList.add('d-none');
+      entries.sort((a, b) => a[0].localeCompare(b[0])).forEach(([k, v]) => dpAppendRow(k, v));
+    }
+  } catch (e) {
+    document.getElementById('dp-loading').innerHTML =
+      `<div class="text-danger p-3"><i class="bi bi-exclamation-triangle me-1"></i>${e.message}</div>`;
+  }
+}
+
+function dpAppendRow(path = '', value = '') {
+  // Detect virtual param stored as _vp.* with JSON spec value
+  if (path.startsWith('_vp.')) {
+    let spec = {value: '', candidates: []};
+    try { spec = JSON.parse(value); } catch (_) {}
+    dpAppendVirtualRow(path.slice(4), spec.value || '', (spec.candidates || []).join('\n'));
+    return;
+  }
+  const tbody = document.getElementById('dp-tbody');
+  document.getElementById('dp-empty').classList.add('d-none');
+  const tr = document.createElement('tr');
+  tr.dataset.type = 'standard';
+  tr.innerHTML = `
+    <td><span class="badge bg-secondary bg-opacity-25 text-secondary border" style="font-size:.65rem">STD</span></td>
+    <td><input type="text" class="form-control form-control-sm dp-path" value="${escHtml(path)}"
+         placeholder="Device.ManagementServer.Username" list="dp-path-suggestions"></td>
+    <td><input type="text" class="form-control form-control-sm dp-value" value="${escHtml(value)}"
+         placeholder="value"></td>
+    <td><button class="btn btn-sm btn-outline-danger" onclick="dpRemoveRow(this)">
+         <i class="bi bi-trash3"></i></button></td>`;
+  tbody.appendChild(tr);
+}
+
+function dpAppendVirtualRow(name = '', value = '', candidates = '') {
+  const tbody = document.getElementById('dp-tbody');
+  document.getElementById('dp-empty').classList.add('d-none');
+  const tr = document.createElement('tr');
+  tr.dataset.type = 'virtual';
+  tr.innerHTML = `
+    <td><span class="badge bg-primary bg-opacity-15 text-primary border" style="font-size:.65rem">VP</span></td>
+    <td>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text text-muted" style="font-size:.7rem">_vp.</span>
+        <input type="text" class="form-control form-control-sm dp-vp-name" value="${escHtml(name)}" placeholder="web_admin_password">
+      </div>
+      <textarea class="form-control form-control-sm dp-vp-candidates mt-1" rows="3"
+        placeholder="One candidate path per line:\nInternetGatewayDevice.UserInterface.X_ZTE-COM_WebUserInfo.AdminPassword\nInternetGatewayDevice.User.1.Password"
+        style="font-size:.75rem;font-family:monospace">${escHtml(candidates)}</textarea>
+    </td>
+    <td><input type="text" class="form-control form-control-sm dp-value" value="${escHtml(value)}" placeholder="value to set"></td>
+    <td><button class="btn btn-sm btn-outline-danger" onclick="dpRemoveRow(this)">
+         <i class="bi bi-trash3"></i></button></td>`;
+  tbody.appendChild(tr);
+}
+
+function dpAddRow() {
+  dpAppendRow('', '');
+  const rows = document.querySelectorAll('#dp-tbody tr');
+  if (rows.length) rows[rows.length - 1].querySelector('.dp-path').focus();
+}
+
+function dpAddVirtualRow() {
+  dpAppendVirtualRow('', '', '');
+  const rows = document.querySelectorAll('#dp-tbody tr');
+  if (rows.length) rows[rows.length - 1].querySelector('.dp-vp-name').focus();
+}
+
+function dpRemoveRow(btn) {
+  btn.closest('tr').remove();
+  if (document.querySelectorAll('#dp-tbody tr').length === 0) {
+    document.getElementById('dp-empty').classList.remove('d-none');
+  }
+}
+
+async function dpSave() {
+  const params = {};
+  let hasError = false;
+  document.querySelectorAll('#dp-tbody tr').forEach(tr => {
+    if (tr.dataset.type === 'virtual') {
+      const name = tr.querySelector('.dp-vp-name').value.trim();
+      const value = tr.querySelector('.dp-value').value.trim();
+      const rawCandidates = tr.querySelector('.dp-vp-candidates').value;
+      const candidates = rawCandidates.split('\n').map(s => s.trim()).filter(Boolean);
+      if (!name) { hasError = true; tr.querySelector('.dp-vp-name').classList.add('is-invalid'); return; }
+      tr.querySelector('.dp-vp-name').classList.remove('is-invalid');
+      params['_vp.' + name] = JSON.stringify({value, candidates});
+    } else {
+      const path  = tr.querySelector('.dp-path').value.trim();
+      const value = tr.querySelector('.dp-value').value.trim();
+      if (!path) { hasError = true; tr.querySelector('.dp-path').classList.add('is-invalid'); return; }
+      tr.querySelector('.dp-path').classList.remove('is-invalid');
+      params[path] = value;
+    }
+  });
+  if (hasError) { toast('Fix highlighted rows before saving.', 'danger'); return; }
+
+  const statusEl = document.getElementById('dp-status');
+  statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+  try {
+    await API.put('/config/default-params', params);
+    toast('Default parameters saved.', 'success');
+    statusEl.textContent = `Saved ${Object.keys(params).length} parameter(s).`;
+  } catch (e) {
+    toast('Save failed: ' + e.message, 'danger');
+    statusEl.textContent = '';
+  }
 }
 
 // ─────────────────────────────────────────────────────────────

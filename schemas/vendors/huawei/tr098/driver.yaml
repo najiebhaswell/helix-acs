@@ -1,0 +1,30 @@
+id: huawei_tr098
+vendor: huawei
+model: tr098
+description: >
+  Huawei GPON ONU TR-098 baseline driver (HG8145V5 and similar).
+  CPU: InternetGatewayDevice.DeviceInfo.ProcessStatus.CPUUsage
+  RAM: InternetGatewayDevice.DeviceInfo.MemoryStatus.{Free,Total}
+  Optical: InternetGatewayDevice.WANDevice.1.X_GponInterfaceConfig.*
+  WAN service list: X_HW_SERVICELIST (uppercase, values: INTERNET / TR069)
+
+features:
+  nat: true
+  ipv6: false
+  gpon: true
+  band_steering: false
+
+discovery:
+  # Huawei stores CPU/RAM under standard TR-098 DeviceInfo paths.
+  # No custom system_cpu_path needed — extracted generically.
+
+  # Huawei GPON optical parameters are under X_GponInterfaceConfig.
+  # Also fetch X_HW_PonInterface for redundancy.
+  extra_summon_paths:
+    - "InternetGatewayDevice.WANDevice.1.X_GponInterfaceConfig."
+    - "InternetGatewayDevice.WANDevice.1.X_HW_PonInterface."
+
+  # Huawei uses X_HW_SERVICELIST (uppercase) to identify WAN service type.
+  # Values: "INTERNET", "TR069", "VOIP".
+  # Note: TR-098 WAN extraction detects ServiceList by case-insensitive suffix
+  # match — no wan_service_type_path needed here.

@@ -170,6 +170,9 @@ type InfoUpdate struct {
 	ACSURL        *string
 	IPAddress     *string
 	WANIP         *string
+	ModelName     *string
+	SWVersion     *string
+	HWVersion     *string
 
 	WANs           []WANInfo
 	LAN            *LANInfo

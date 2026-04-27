@@ -444,6 +444,11 @@ func extractWANInfos(params map[string]string, mapper datamodel.Mapper, driver *
 			if pppMatch := regexp.MustCompile(`Device\.PPP\.Interface\.(\d+)`).FindStringSubmatch(lower); pppMatch != nil {
 				pppIdx := pppMatch[1]
 				wan.PPPoEUsername = params[fmt.Sprintf("Device.PPP.Interface.%s.Username", pppIdx)]
+				// PPPoE sessions often expose peer gateway in IPCP.RemoteIPAddress
+				// while IPv4Forwarding gateway entries are absent.
+				if wan.Gateway == "" || wan.Gateway == "0.0.0.0" {
+					wan.Gateway = strings.TrimSpace(params[fmt.Sprintf("Device.PPP.Interface.%s.IPCP.RemoteIPAddress", pppIdx)])
+				}
 
 				dnsStr := params[fmt.Sprintf("Device.PPP.Interface.%s.IPCP.DNSServers", pppIdx)]
 				if dnsStr != "" {
@@ -502,6 +507,12 @@ type tr098WANEntry struct {
 	LinkStatus string
 	Service    string
 	Username   string
+	SubnetMask string
+	Gateway    string
+	DNSServers string
+	MACAddress string
+	MTU        int
+	Uptime     int
 }
 
 var (
@@ -529,8 +540,25 @@ func extractWANInfosTR098(params map[string]string, seen map[string]bool, macAdd
 				e.LinkStatus = v
 			case "ExternalIPAddress":
 				e.IPAddress = v
-			case "X_CT-COM_ServiceList":
-				e.Service = v
+			case "SubnetMask":
+				e.SubnetMask = v
+			case "DefaultGateway":
+				e.Gateway = v
+			case "DNSServers":
+				e.DNSServers = v
+			case "MACAddress":
+				if v != "" {
+					e.MACAddress = v
+				}
+			case "MaxMTUSize":
+				e.MTU, _ = strconv.Atoi(v)
+			case "Uptime":
+				e.Uptime, _ = strconv.Atoi(v)
+			default:
+				if strings.EqualFold(field, "ServiceList") || strings.EqualFold(field, "SERVICELIST") ||
+					strings.HasSuffix(strings.ToLower(field), "servicelist") {
+					e.Service = v
+				}
 			}
 		}
 		if m := reTR098WANPPPField.FindStringSubmatch(k); m != nil {
@@ -550,10 +578,26 @@ func extractWANInfosTR098(params map[string]string, seen map[string]bool, macAdd
 				e.LinkStatus = v
 			case "ExternalIPAddress":
 				e.IPAddress = v
-			case "X_CT-COM_ServiceList":
-				e.Service = v
+			case "SubnetMask":
+				e.SubnetMask = v
+			case "DefaultGateway":
+				e.Gateway = v
+			case "DNSServers":
+				e.DNSServers = v
+			case "MACAddress":
+				if v != "" {
+					e.MACAddress = v
+				}
+			case "MaxMTUSize":
+				e.MTU, _ = strconv.Atoi(v)
+			case "Uptime":
+				e.Uptime, _ = strconv.Atoi(v)
 			case "Username":
 				e.Username = v
+			default:
+				if strings.HasSuffix(strings.ToLower(field), "servicelist") {
+					e.Service = v
+				}
 			}
 		}
 	}
@@ -577,12 +621,30 @@ func extractWANInfosTR098(params map[string]string, seen map[string]bool, macAdd
 		if conn == "" {
 			conn = "IP_Routed"
 		}
+		mac := e.MACAddress
+		if mac == "" {
+			mac = macAddress
+		}
+		dns1, dns2 := "", ""
+		if dnsClean := cleanDNSServers(e.DNSServers); dnsClean != "" {
+			parts := strings.SplitN(dnsClean, ",", 2)
+			dns1 = strings.TrimSpace(parts[0])
+			if len(parts) > 1 {
+				dns2 = strings.TrimSpace(parts[1])
+			}
+		}
 		wans = append(wans, device.WANInfo{
 			ConnectionType: conn,
 			ServiceType:    e.Service,
 			IPAddress:      e.IPAddress,
+			SubnetMask:     e.SubnetMask,
+			Gateway:        e.Gateway,
+			DNS1:           dns1,
+			DNS2:           dns2,
+			MTU:            e.MTU,
+			UptimeSeconds:  int64(e.Uptime),
 			LinkStatus:     e.LinkStatus,
-			MACAddress:     macAddress,
+			MACAddress:     mac,
 			PPPoEUsername:  e.Username,
 		})
 		seen[e.IPAddress] = true

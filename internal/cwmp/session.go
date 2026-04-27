@@ -105,6 +105,7 @@ type Session struct {
 	//   phase 4 → receive response → rebuild mapper, do NOT write to DB
 	summonPhase       int
 	summonSchemaName  string
+	summonMode        string            // "ui_refresh" or "task_discovery"
 	summonAllNames    []string          // full summon: leaf names from GetParameterNames
 	summonBatchIdx    int               // full summon: current batch index
 	summonAllParams   map[string]string // full summon: accumulated params
@@ -113,6 +114,10 @@ type Session struct {
 	// lastSetParams holds the parameters sent in the most recent SetParameterValues
 	// dispatch so that handleSetParamValuesResponse can sync them to PostgreSQL.
 	lastSetParams map[string]string
+
+	// isBootstrap is true when the Inform that started this session carried
+	// the "0 BOOTSTRAP" event (factory reset or first-ever boot).
+	isBootstrap bool
 
 	// pendingWANCredentials holds PPPoE credentials from a WAN task to be
 	// persisted to PostgreSQL once the task completes successfully.
@@ -131,8 +136,10 @@ func (s *Session) setState(st SessionState) {
 
 // SessionManager manages active CWMP sessions, keyed by session ID.
 type SessionManager struct {
-	sessions sync.Map
-	mu       sync.RWMutex
+	sessions       sync.Map
+	serialSessions sync.Map // serial -> *Session
+	rpcIDSessions  sync.Map // cwmp:ID (ACS request id) -> *Session
+	mu             sync.RWMutex
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -152,6 +159,49 @@ func (sm *SessionManager) GetOrCreate(sessionID string) *Session {
 // Delete removes the Session for the given sessionID.
 func (sm *SessionManager) Delete(sessionID string) { sm.sessions.Delete(sessionID) }
 
+// BindSerial indexes a session by device serial for reconnect continuity.
+func (sm *SessionManager) BindSerial(serial string, s *Session) {
+	if serial == "" || s == nil {
+		return
+	}
+	sm.serialSessions.Store(serial, s)
+}
+
+// GetBySerial returns the last seen session for a device serial.
+func (sm *SessionManager) GetBySerial(serial string) *Session {
+	if serial == "" {
+		return nil
+	}
+	if v, ok := sm.serialSessions.Load(serial); ok {
+		if s, ok := v.(*Session); ok {
+			return s
+		}
+	}
+	return nil
+}
+
+// BindRPCID indexes an outbound ACS RPC ID to its owning session so that
+// subsequent CPE responses can be matched even when CPE rotates HTTP cookies.
+func (sm *SessionManager) BindRPCID(id string, s *Session) {
+	if id == "" || s == nil {
+		return
+	}
+	sm.rpcIDSessions.Store(id, s)
+}
+
+// TakeByRPCID returns and removes a session binding for a cwmp:ID.
+func (sm *SessionManager) TakeByRPCID(id string) *Session {
+	if id == "" {
+		return nil
+	}
+	v, ok := sm.rpcIDSessions.LoadAndDelete(id)
+	if !ok {
+		return nil
+	}
+	s, _ := v.(*Session)
+	return s
+}
+
 // Cleanup removes sessions older than 30 minutes.
 func (sm *SessionManager) Cleanup() {
 	cutoff := time.Now().UTC().Add(-30 * time.Minute)
@@ -159,26 +209,91 @@ func (sm *SessionManager) Cleanup() {
 		s := value.(*Session)
 		if s.CreatedAt.Before(cutoff) {
 			sm.sessions.Delete(key)
+			sm.serialSessions.Range(func(serialKey, sessionVal any) bool {
+				if sessionVal == s {
+					sm.serialSessions.Delete(serialKey)
+				}
+				return true
+			})
+			sm.rpcIDSessions.Range(func(idKey, sessionVal any) bool {
+				if sessionVal == s {
+					sm.rpcIDSessions.Delete(idKey)
+				}
+				return true
+			})
 		}
 		return true
 	})
 }
 
+// adoptInFlightBySerial moves WAN/task in-flight state from a prior session of
+// the same device serial into the current session when the CPE rotates session IDs.
+func (h *Handler) adoptInFlightBySerial(serial string, current *Session) bool {
+	prev := h.sessionMgr.GetBySerial(serial)
+	if prev == nil || prev == current {
+		return false
+	}
+
+	prev.mu.Lock()
+	prevTask := prev.currentTask
+	prevWAN := prev.wanProvision
+	prevFollow := prev.addObjFollowUp
+	prevSetParams := make(map[string]string, len(prev.lastSetParams))
+	for k, v := range prev.lastSetParams {
+		prevSetParams[k] = v
+	}
+	prevCreds := make(map[string]string, len(prev.pendingWANCredentials))
+	for k, v := range prev.pendingWANCredentials {
+		prevCreds[k] = v
+	}
+	prev.mu.Unlock()
+
+	if prevTask == nil && prevWAN == nil && prevFollow == nil {
+		return false
+	}
+
+	current.mu.Lock()
+	if current.currentTask == nil {
+		current.currentTask = prevTask
+		current.wanProvision = prevWAN
+		current.addObjFollowUp = prevFollow
+		if len(prevSetParams) > 0 {
+			current.lastSetParams = prevSetParams
+		}
+		if len(prevCreds) > 0 {
+			current.pendingWANCredentials = prevCreds
+		}
+	}
+	current.mu.Unlock()
+
+	// Clear moved state from previous session to avoid double-processing.
+	prev.mu.Lock()
+	prev.currentTask = nil
+	prev.wanProvision = nil
+	prev.addObjFollowUp = nil
+	prev.lastSetParams = nil
+	prev.pendingWANCredentials = nil
+	prev.mu.Unlock()
+
+	return true
+}
+
 // Handler implements http.Handler and manages CWMP sessions and message handling.
 type Handler struct {
-	deviceSvc      device.Service
-	taskQueue      task.Queue
-	parameterRepo  parameter.Repository
-	sessionMgr     *SessionManager
-	log            logger.Logger
-	acsUsername    string
-	acsPassword    string
-	acsURL         string
-	informInterval time.Duration
-	schemaRegistry *schema.Registry
-	schemaResolver *schema.Resolver
-	driverRegistry *schema.DeviceDriverRegistry
-	lastSummonTime sync.Map // serial → time.Time
+	deviceSvc         device.Service
+	taskQueue         task.Queue
+	parameterRepo     parameter.Repository
+	sessionMgr        *SessionManager
+	log               logger.Logger
+	acsUsername       string
+	acsPassword       string
+	acsURL            string
+	informInterval    time.Duration
+	schemaRegistry    *schema.Registry
+	schemaResolver    *schema.Resolver
+	driverRegistry    *schema.DeviceDriverRegistry
+	lastSummonTime    sync.Map // serial → time.Time
+	pendingFullSummon sync.Map // serial → bool: trigger full GPN on next Inform
 }
 
 // NewHandler creates a new CWMP Handler with the given dependencies and configuration.
@@ -274,6 +389,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// CPEs that rotate cookies/session IDs between requests still echo the
+	// cwmp:ID of the ACS RPC they are replying to. Prefer this binding for
+	// non-Inform messages to keep multi-step provisioning state consistent.
+	if env.Body.Inform == nil {
+		if reqID := requestID(env); reqID != "" {
+			if mapped := h.sessionMgr.TakeByRPCID(reqID); mapped != nil {
+				session = mapped
+			}
+		}
+	}
+
 	switch {
 	case env.Body.Inform != nil:
 		h.handleInform(ctx, w, r, env, session)
@@ -285,7 +411,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		writeXML(w, respXML)
+		h.writeSessionXML(w, session, respXML)
 
 	case env.Body.TransferComplete != nil:
 		respXML, ferr := h.handleTransferComplete(ctx, env)
@@ -294,7 +420,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		writeXML(w, respXML)
+		h.writeSessionXML(w, session, respXML)
 
 	// CPE responses to ACS-initiated RPC requests
 	case env.Body.SetParameterValuesResponse != nil:
@@ -357,6 +483,21 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	session.mu.Lock()
 	session.DeviceSerial = upsertReq.Serial
 	session.mu.Unlock()
+	if h.adoptInFlightBySerial(upsertReq.Serial, session) {
+		h.log.
+			WithField("session", session.ID).
+			WithField("serial", upsertReq.Serial).
+			Info("CWMP: adopted in-flight session state by serial")
+	}
+	h.sessionMgr.BindSerial(upsertReq.Serial, session)
+
+	// Track bootstrap event for global default param injection.
+	session.mu.Lock()
+	session.isBootstrap = hasBootstrapEvent(env.Body.Inform)
+	session.mu.Unlock()
+
+	// Resolve the schema name before upsert so it is persisted to MongoDB.
+	upsertReq.Schema = h.schemaResolver.Resolve(upsertReq.Manufacturer, upsertReq.ProductClass, upsertReq.DataModel)
 
 	h.log.
 		WithField("session", session.ID).
@@ -373,6 +514,73 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 
 	h.log.WithField("serial", dev.Serial).
 		WithField("id", dev.ID.Hex()).Debug("CWMP: Device upserted")
+
+	// If model_name, cpu_usage, or WAN service_type are missing, try to backfill
+	// from the parameter store (Redis-cached). Covers devices like Huawei whose
+	// targeted GPV (partial-path) fails so finishSummon never runs.
+	wansNeedService := false
+	for _, w := range dev.WANs {
+		if w.ServiceType == "" {
+			wansNeedService = true
+			break
+		}
+	}
+	needBackfill := dev.ModelName == "" || dev.CPUUsage == 0 || wansNeedService
+	if needBackfill {
+		go func() {
+			bfCtx, bfCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer bfCancel()
+			storedParams, bfErr := h.parameterRepo.GetAllParameters(bfCtx, upsertReq.Serial)
+			if bfErr != nil || len(storedParams) == 0 {
+				return
+			}
+			upd := device.InfoUpdate{}
+			if dev.ModelName == "" {
+				mn := storedParams["InternetGatewayDevice.DeviceInfo.ModelName"]
+				if mn == "" {
+					mn = storedParams["Device.DeviceInfo.ModelName"]
+				}
+				if mn != "" {
+					upd.ModelName = &mn
+				}
+			}
+			if dev.CPUUsage == 0 {
+				if cpu := extractCPUUsage(storedParams, nil); cpu != nil {
+					upd.CPUUsage = cpu
+				}
+			}
+			if wansNeedService {
+				hasServiceList := false
+				for k := range storedParams {
+					if strings.Contains(k, "SERVICELIST") || strings.Contains(strings.ToLower(k), "servicelist") {
+						hasServiceList = true
+						break
+					}
+				}
+				bfMapper := datamodel.Mapper(schema.NewSchemaMapper(h.schemaRegistry, upsertReq.Schema, datamodel.InstanceMap{}))
+				wans := extractWANInfos(storedParams, bfMapper, nil)
+				h.log.WithField("serial", upsertReq.Serial).
+					WithField("has_service_list", hasServiceList).
+					WithField("wans_extracted", len(wans)).
+					WithField("wans_with_svc", func() int {
+						c := 0
+						for _, w := range wans {
+							if w.ServiceType != "" {
+								c++
+							}
+						}
+						return c
+					}()).
+					Info("CWMP: backfill WAN service_type")
+				if len(wans) > 0 {
+					upd.WANs = wans
+				}
+			}
+			if upd.ModelName != nil || upd.CPUUsage != nil || upd.WANs != nil {
+				_ = h.deviceSvc.UpdateInfo(bfCtx, upsertReq.Serial, upd)
+			}
+		}()
+	}
 
 	// Record device parameters in PostgreSQL repository (non-blocking)
 	if len(upsertReq.Parameters) > 0 {
@@ -407,23 +615,14 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	discoveryHints := discoveryHintsFromDriver(driver)
 	instanceMap := datamodel.DiscoverInstancesWithHints(upsertReq.Parameters, discoveryHints)
 
-	// Resolve the schema name for this device (e.g. "tr181", "vendor/huawei/tr181").
-	schemaName := h.schemaResolver.Resolve(upsertReq.Manufacturer, upsertReq.ProductClass, upsertReq.DataModel)
-	upsertReq.Schema = schemaName
+	schemaName := upsertReq.Schema
 
 	h.log.
 		WithField("serial", upsertReq.Serial).
 		WithField("schema", schemaName).
 		Debug("CWMP: resolved device schema")
 
-	// Build a schema-driven mapper; fall back to the standard mapper when
-	// the registry is empty or the schema is not found.
-	var mapper datamodel.Mapper
-	if sm := schema.NewSchemaMapper(h.schemaRegistry, schemaName, instanceMap); sm != nil {
-		mapper = sm
-	} else {
-		mapper = datamodel.ApplyInstanceMap(datamodel.NewMapper(modelType), instanceMap)
-	}
+	mapper := datamodel.Mapper(schema.NewSchemaMapper(h.schemaRegistry, schemaName, instanceMap))
 
 	// Detect factory reset synchronously BEFORE DequeuePending so the restore task
 	// is included in the current session's pending queue.
@@ -435,10 +634,21 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 		h.log.WithError(err).WithField("serial", upsertReq.Serial).Error("CWMP: Dequeue pending tasks failed")
 	}
 
-	// Trigger full parameter summon to keep device data (WAN, WiFi, LAN)
-	// up-to-date. Throttle to at most once every 2 minutes per device to avoid
-	// overwhelming devices with very short periodic inform intervals (e.g.
-	// CDATA/ZTE at 10s).
+	// If a full summon was explicitly requested via the API, perform it now and
+	// skip the targeted summon entirely.
+	if _, pending := h.pendingFullSummon.LoadAndDelete(upsertReq.Serial); pending {
+		session.mu.Lock()
+		session.summonPhase = 1
+		session.summonSchemaName = schemaName
+		session.mu.Unlock()
+		h.log.WithField("serial", upsertReq.Serial).Info("CWMP: executing pending full summon (API-triggered)")
+		h.dispatchNextOrClose(ctx, w, session)
+		return
+	}
+
+	// Trigger a targeted UI refresh summon (instead of full summon) so we only
+	// fetch subtrees used by the dashboard/detail views. This is throttled to at
+	// most once every 2 minutes per device to avoid overwhelming devices.
 	shouldSummon := true
 	if lastSummon, ok := h.lastSummonTime.Load(upsertReq.Serial); ok {
 		if time.Since(lastSummon.(time.Time)) < 2*time.Minute {
@@ -446,14 +656,19 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 		}
 	}
 	if shouldSummon {
-		// Full summon: refresh all device parameters (runs at most once per 2 minutes).
-		session.mu.Lock()
-		session.summonPhase = 1
-		session.summonSchemaName = schemaName
-		session.mu.Unlock()
-		h.lastSummonTime.Store(upsertReq.Serial, time.Now())
-		h.log.WithField("serial", upsertReq.Serial).
-			Info("CWMP: scheduling full parameter summon")
+		paths := uiSummonPaths(schemaName, driver)
+		if len(paths) > 0 {
+			session.mu.Lock()
+			session.summonPhase = 3
+			session.summonMode = "ui_refresh"
+			session.summonSchemaName = schemaName
+			session.summonTargetPaths = paths
+			session.mu.Unlock()
+			h.lastSummonTime.Store(upsertReq.Serial, time.Now())
+			h.log.WithField("serial", upsertReq.Serial).
+				WithField("paths", paths).
+				Info("CWMP: scheduling targeted UI summon")
+		}
 	} else {
 		// Within throttle window: if a WiFi or WAN task is pending, do a targeted
 		// summon that fetches only the relevant subtree (one GPV round-trip) so
@@ -462,6 +677,7 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 		if len(targetedPaths) > 0 {
 			session.mu.Lock()
 			session.summonPhase = 3
+			session.summonMode = "task_discovery"
 			session.summonSchemaName = schemaName
 			session.summonTargetPaths = targetedPaths
 			session.mu.Unlock()
@@ -507,16 +723,11 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	session.State = StateProcessing
 	session.mu.Unlock()
 
-	// WAN traffic graph: sample when Inform carries byte counter parameters (~periodic inform).
-	if h.parameterRepo != nil {
-		serial := upsertReq.Serial
-		pcopy := upsertReq.Parameters
-		go func() {
-			tctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			h.maybeRecordWANTrafficFromInformParams(tctx, serial, pcopy, mapper)
-		}()
-	}
+	// Inject global default params on bootstrap or first-ever provision using
+	// the Inform parameters as the current-value baseline. ManagementServer.*
+	// paths are always present in Inform messages, making this reliable for all
+	// device types (TR-181 and TR-098) regardless of whether a summon fires.
+	h.injectGlobalDefaultParams(ctx, session, upsertReq.Serial, upsertReq.Parameters)
 
 	respXML, err := BuildInformResponse(id)
 	if err != nil {
@@ -524,7 +735,7 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	writeXML(w, respXML)
+	h.writeSessionXML(w, session, respXML)
 }
 
 // handleTransferComplete processes the TransferComplete message, marking the related task done or failed.
@@ -597,7 +808,7 @@ func (h *Handler) handleSetParamValuesResponse(ctx context.Context, w http.Respo
 		}
 		if nextXML != nil {
 			// More steps to go — keep currentTask set and send next request.
-			writeXML(w, nextXML)
+			h.writeSessionXML(w, session, nextXML)
 			return
 		}
 		// All steps done — clear provision state and mark task complete.
@@ -699,10 +910,9 @@ func (h *Handler) sendGetParameterNamesSummon(w http.ResponseWriter, session *Se
 		}
 	}
 
-	// Fall back to mapper type check if schema didn't determine path
-	if rootPath == "Device." && mapper != nil {
-		switch mapper.(type) {
-		case *datamodel.TR098Mapper:
+	// Fall back to mapper model type if schema didn't determine path
+	if rootPath == "Device." {
+		if sm, ok := mapper.(*schema.SchemaMapper); ok && sm.ModelType() == datamodel.TR098 {
 			rootPath = "InternetGatewayDevice."
 		}
 	}
@@ -722,7 +932,7 @@ func (h *Handler) sendGetParameterNamesSummon(w http.ResponseWriter, session *Se
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	writeXML(w, env)
+	h.writeSessionXML(w, session, env)
 }
 
 // sendTargetedSummon sends a single GetParameterValues for specific object
@@ -732,11 +942,13 @@ func (h *Handler) sendGetParameterNamesSummon(w http.ResponseWriter, session *Se
 func (h *Handler) sendTargetedSummon(ctx context.Context, w http.ResponseWriter, session *Session) {
 	session.mu.Lock()
 	paths := session.summonTargetPaths
+	mode := session.summonMode
 	serial := session.DeviceSerial
 	session.summonPhase = 4 // waiting targeted GetParameterValuesResponse
 	session.mu.Unlock()
 
 	h.log.WithField("serial", serial).
+		WithField("mode", mode).
 		WithField("paths", paths).
 		Info("CWMP: sending targeted GetParameterValues for instance discovery")
 
@@ -750,7 +962,7 @@ func (h *Handler) sendTargetedSummon(ctx context.Context, w http.ResponseWriter,
 		h.dispatchNextOrClose(ctx, w, session)
 		return
 	}
-	writeXML(w, env)
+	h.writeSessionXML(w, session, env)
 }
 
 // handleTargetedSummonResponse processes the GetParameterValuesResponse for a
@@ -760,8 +972,10 @@ func (h *Handler) handleTargetedSummonResponse(ctx context.Context, w http.Respo
 	session.mu.Lock()
 	serial := session.DeviceSerial
 	drv := session.driver
+	mode := session.summonMode
 	schemaName := session.summonSchemaName
 	session.summonPhase = 0
+	session.summonMode = ""
 	session.summonTargetPaths = nil
 	session.mu.Unlock()
 
@@ -776,18 +990,97 @@ func (h *Handler) handleTargetedSummonResponse(ctx context.Context, w http.Respo
 		WithField("vlan_term", instanceMap.WANVLANTermIdx).
 		Info("CWMP: targeted summon DiscoverInstances result")
 
-	modelType := datamodel.DetectFromRootObject(firstRootObject(params))
-	var newMapper datamodel.Mapper
-	if sm := schema.NewSchemaMapper(h.schemaRegistry, schemaName, instanceMap); sm != nil {
-		newMapper = sm
-	} else {
-		newMapper = datamodel.ApplyInstanceMap(datamodel.NewMapper(modelType), instanceMap)
-	}
+	newMapper := datamodel.Mapper(schema.NewSchemaMapper(h.schemaRegistry, schemaName, instanceMap))
 
 	session.mu.Lock()
 	session.mapper = newMapper
 	session.instanceMap = instanceMap
 	session.mu.Unlock()
+
+	if mode == "ui_refresh" {
+		if err := h.deviceSvc.UpdateParameters(ctx, serial, params); err != nil {
+			h.log.WithError(err).WithField("serial", serial).Warn("CWMP: save targeted UI params to MongoDB failed")
+		}
+		{
+			pgCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			if err := h.parameterRepo.UpdateParameters(pgCtx, serial, params); err != nil {
+				h.log.WithError(err).WithField("serial", serial).Warn("CWMP: save targeted UI params to PostgreSQL failed")
+			}
+		}
+
+		// Keep dashboard/device detail sections fresh from the targeted refresh set.
+		wifi24 := extractWiFiInfo(0, params, newMapper)
+		wifi5 := extractWiFiInfo(1, params, newMapper)
+		bandSteeringStatus := extractBandSteeringStatus(params, newMapper)
+		wifi24.BandSteeringEnabled = bandSteeringStatus
+		wifi5.BandSteeringEnabled = bandSteeringStatus
+		lanInfo := extractLANInfo(params, newMapper)
+		wansInfo := extractWANInfos(params, newMapper, drv)
+		hosts := parseConnectedHosts(params, newMapper, drv)
+		stats, _ := parseCPEStats(params, newMapper)
+
+		sort.SliceStable(wansInfo, func(i, j int) bool {
+			iPPPoE := wansInfo[i].ConnectionType == "PPPoE"
+			jPPPoE := wansInfo[j].ConnectionType == "PPPoE"
+			if iPPPoE != jPPPoE {
+				return iPPPoE
+			}
+			return false
+		})
+
+		var bestWanIP string
+		for _, w := range wansInfo {
+			if w.IPAddress != "" {
+				bestWanIP = w.IPAddress
+				break
+			}
+		}
+
+		acsURL := params["Device.ManagementServer.URL"]
+		if acsURL == "" {
+			acsURL = params["InternetGatewayDevice.ManagementServer.URL"]
+		}
+		cpuUsage := extractCPUUsage(params, drv)
+		patchRAMFromPct(drv, params, stats)
+		devInfoUI := newMapper.ExtractDeviceInfo(params)
+
+		infoUpdate := device.InfoUpdate{
+			WANs:          wansInfo,
+			UptimeSeconds: &stats.UptimeSeconds,
+			RAMTotal:      &stats.RAMTotalKB,
+			RAMFree:       &stats.RAMFreeKB,
+			CPUUsage:      cpuUsage,
+			ACSURL:        &acsURL,
+			ModelName:     &devInfoUI.ModelName,
+			SWVersion:     &devInfoUI.SWVersion,
+			HWVersion:     &devInfoUI.HWVersion,
+		}
+		if lanInfo.IPAddress != "" {
+			infoUpdate.IPAddress = &lanInfo.IPAddress
+		}
+		if bestWanIP != "" {
+			infoUpdate.WANIP = &bestWanIP
+		}
+		if wifi24.SSID != "" || wifi24.Enabled || wifi24.Channel > 0 {
+			infoUpdate.WiFi24 = &wifi24
+		}
+		if wifi5.SSID != "" || wifi5.Enabled || wifi5.Channel > 0 {
+			infoUpdate.WiFi5 = &wifi5
+		}
+		if lanInfo.IPAddress != "" || lanInfo.DHCPEnabled {
+			infoUpdate.LAN = &lanInfo
+		}
+		infoUpdate.ConnectedHosts = hosts
+		if err := h.deviceSvc.UpdateInfo(ctx, serial, infoUpdate); err != nil {
+			h.log.WithError(err).WithField("serial", serial).Warn("CWMP: persist UI info from targeted summon failed")
+		}
+
+		h.injectDefaultParamTask(session, serial, drv, params)
+
+		// Inject global default params on bootstrap or first-ever provision.
+		h.injectGlobalDefaultParams(ctx, session, serial, params)
+	}
 
 	h.dispatchNextOrClose(ctx, w, session)
 }
@@ -895,7 +1188,7 @@ func (h *Handler) sendNextSummonBatch(ctx context.Context, w http.ResponseWriter
 		h.dispatchNextOrClose(ctx, w, session)
 		return
 	}
-	writeXML(w, env)
+	h.writeSessionXML(w, session, env)
 }
 
 // finishSummon saves all accumulated parameters to MongoDB and rebuilds the mapper.
@@ -939,13 +1232,7 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 		WithField("ppp_iface", instanceMap.PPPIfaceIdx).
 		WithField("free_gpon", instanceMap.FreeGPONLinkIdx).
 		Info("CWMP: summon DiscoverInstances result")
-	modelType := datamodel.DetectFromRootObject(firstRootObject(params))
-	var newMapper datamodel.Mapper
-	if sm := schema.NewSchemaMapper(h.schemaRegistry, schemaName, instanceMap); sm != nil {
-		newMapper = sm
-	} else {
-		newMapper = datamodel.ApplyInstanceMap(datamodel.NewMapper(modelType), instanceMap)
-	}
+	newMapper := datamodel.Mapper(schema.NewSchemaMapper(h.schemaRegistry, schemaName, instanceMap))
 	session.mu.Lock()
 	session.mapper = newMapper
 	session.instanceMap = instanceMap
@@ -1008,20 +1295,11 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 	if acsUrl == "" {
 		acsUrl = params["InternetGatewayDevice.ManagementServer.URL"]
 	}
-	var cpuUsage *int64
-	// TR-181: Device.DeviceInfo.ProcessStatus.CPUUsage
-	// TR-098 CDATA/ZTE: InternetGatewayDevice.DeviceInfo.X_CMS_CPUUsage
-	for _, cpuPath := range []string{
-		"Device.DeviceInfo.ProcessStatus.CPUUsage",
-		"InternetGatewayDevice.DeviceInfo.X_CMS_CPUUsage",
-	} {
-		if cpuStr := params[cpuPath]; cpuStr != "" {
-			if c, err := strconv.ParseInt(cpuStr, 10, 64); err == nil {
-				cpuUsage = &c
-				break
-			}
-		}
-	}
+	cpuUsage := extractCPUUsage(params, drv)
+	patchRAMFromPct(drv, params, stats)
+
+	// Extract model/version info from full param set (fills fields missing from Inform).
+	devInfo := newMapper.ExtractDeviceInfo(params)
 
 	// Persist all collected info to device
 	infoUpdate := device.InfoUpdate{
@@ -1031,6 +1309,9 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 		RAMFree:       &stats.RAMFreeKB,
 		CPUUsage:      cpuUsage,
 		ACSURL:        &acsUrl,
+		ModelName:     &devInfo.ModelName,
+		SWVersion:     &devInfo.SWVersion,
+		HWVersion:     &devInfo.HWVersion,
 	}
 	if lanInfo.IPAddress != "" {
 		infoUpdate.IPAddress = &lanInfo.IPAddress
@@ -1054,18 +1335,134 @@ func (h *Handler) finishSummon(ctx context.Context, w http.ResponseWriter, sessi
 		h.log.WithField("serial", serial).Info("CWMP: persist WAN/WiFi/LAN info success")
 	}
 
-	// WAN traffic graph: sample after full summon (complete counter snapshot).
-	{
-		tctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		h.recordWANTrafficFromSummonedParams(tctx, serial, params, newMapper)
-		cancel()
-	}
-
 	// Enforce driver default_params: push any param whose current value differs
 	// from the required default. Runs once per full-summon cycle (≈ every 2 min).
 	h.injectDefaultParamTask(session, serial, drv, params)
 
+	// Inject global default params on bootstrap or first-ever provision.
+	h.injectGlobalDefaultParams(ctx, session, serial, params)
+
 	h.dispatchNextOrClose(ctx, w, session)
+}
+
+// virtualParamSpec is the JSON shape stored as the value of a _vp.* global default entry.
+type virtualParamSpec struct {
+	Value      string   `json:"value"`
+	Candidates []string `json:"candidates"`
+}
+
+// expandVirtualParams resolves any _vp.* virtual-parameter entries in raw into
+// concrete path→value pairs. For each virtual param, only candidate paths that
+// are present in currentParams (i.e. the device actually has that parameter) are
+// included. Regular (non-_vp) entries are passed through unchanged.
+func expandVirtualParams(raw map[string]string, currentParams map[string]string) map[string]string {
+	out := make(map[string]string, len(raw))
+	for key, val := range raw {
+		if !strings.HasPrefix(key, "_vp.") {
+			out[key] = val
+			continue
+		}
+		var spec virtualParamSpec
+		if err := json.Unmarshal([]byte(val), &spec); err != nil || spec.Value == "" || len(spec.Candidates) == 0 {
+			continue // malformed virtual param — skip silently
+		}
+		for _, candidate := range spec.Candidates {
+			if _, exists := currentParams[candidate]; exists {
+				out[candidate] = spec.Value
+			}
+		}
+	}
+	return out
+}
+
+// injectGlobalDefaultParams pushes global default parameters (stored under the
+// "__system__" pseudo-serial in PostgreSQL) to the CPE when:
+//   - The current Inform carries "0 BOOTSTRAP" (factory reset / first boot), OR
+//   - The device has never been provisioned (_helix.provisioned flag not set).
+//
+// After applying (or confirming all values already match), the device is marked
+// provisioned so subsequent Informs are not re-provisioned.
+func (h *Handler) injectGlobalDefaultParams(ctx context.Context, session *Session, serial string, currentParams map[string]string) {
+	if h.parameterRepo == nil || serial == "" {
+		return
+	}
+
+	// Load global defaults; bail early when none are configured.
+	globalDefaults, err := h.parameterRepo.GetAllParameters(ctx, "__system__")
+	if err != nil || len(globalDefaults) == 0 {
+		return
+	}
+
+	// Determine whether we should apply.
+	session.mu.Lock()
+	isBootstrap := session.isBootstrap
+	session.mu.Unlock()
+
+	if !isBootstrap {
+		provisioned, _ := h.parameterRepo.GetParameter(ctx, serial, "_helix.provisioned")
+		if provisioned == "true" {
+			return
+		}
+	}
+
+	// Mark device as provisioned so later Informs skip this check.
+	markCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = h.parameterRepo.UpdateParameters(markCtx, serial, map[string]string{"_helix.provisioned": "true"})
+
+	// Detect device data model from current params to filter mismatched paths.
+	// TR-098 devices use InternetGatewayDevice.* root; TR-181 use Device.*.
+	isIGD := false
+	for k := range currentParams {
+		if strings.HasPrefix(k, "InternetGatewayDevice.") {
+			isIGD = true
+			break
+		}
+	}
+
+	// Expand virtual params (_vp.*) into concrete paths that exist on this device.
+	expanded := expandVirtualParams(globalDefaults, currentParams)
+
+	// Build diff: only push params that differ from the device's current value,
+	// and skip paths whose root doesn't match the device's data model.
+	toSet := make(map[string]string, len(expanded))
+	for path, want := range expanded {
+		if strings.HasPrefix(path, "_") {
+			continue // internal keys (_helix.*, _vp.* residuals) — never push to CPE
+		}
+		if isIGD && strings.HasPrefix(path, "Device.") {
+			continue
+		}
+		if !isIGD && strings.HasPrefix(path, "InternetGatewayDevice.") {
+			continue
+		}
+		if strings.TrimSpace(currentParams[path]) != strings.TrimSpace(want) {
+			toSet[path] = want
+		}
+	}
+	if len(toSet) == 0 {
+		h.log.WithField("serial", serial).Debug("CWMP: global default params already match CPE; skipping")
+		return
+	}
+
+	payload, err := json.Marshal(task.SetParamsPayload{Parameters: toSet})
+	if err != nil {
+		h.log.WithError(err).WithField("serial", serial).Warn("CWMP: marshal global default params failed")
+		return
+	}
+	synth := &task.Task{
+		ID:      "global_defaults_" + serial,
+		Serial:  serial,
+		Type:    task.TypeSetParams,
+		Payload: json.RawMessage(payload),
+		Status:  task.StatusPending,
+	}
+	h.log.WithField("serial", serial).
+		WithField("params", toSet).
+		Info("CWMP: injecting global default params via SetParameterValues")
+	session.mu.Lock()
+	session.pendingTasks = append([]*task.Task{synth}, session.pendingTasks...)
+	session.mu.Unlock()
 }
 
 // injectDefaultParamTask prepends a synthetic SetParameterValues task for any
@@ -1115,39 +1512,6 @@ func (h *Handler) injectDefaultParamTask(session *Session, serial string, drv *s
 	session.mu.Lock()
 	session.pendingTasks = append([]*task.Task{synth}, session.pendingTasks...)
 	session.mu.Unlock()
-}
-
-// recordWANTrafficFromSummonedParams stores cumulative WAN octet counters for bitrate graphs.
-func (h *Handler) recordWANTrafficFromSummonedParams(ctx context.Context, serial string, params map[string]string, mapper datamodel.Mapper) {
-	if h.parameterRepo == nil || serial == "" || mapper == nil || len(params) == 0 {
-		return
-	}
-	_, wanSt := parseCPEStats(params, mapper)
-	if err := h.parameterRepo.RecordWANTrafficSample(ctx, serial, time.Now().UTC(), wanSt.BytesSent, wanSt.BytesReceived); err != nil {
-		h.log.WithError(err).WithField("serial", serial).Debug("CWMP: RecordWANTrafficSample failed")
-	}
-}
-
-// maybeRecordWANTrafficFromInformParams records a sample only if Inform included counter paths
-// (sparse Informs often omit them — then we rely on the full summon path).
-func (h *Handler) maybeRecordWANTrafficFromInformParams(ctx context.Context, serial string, params map[string]string, mapper datamodel.Mapper) {
-	if h.parameterRepo == nil || serial == "" || mapper == nil || len(params) == 0 {
-		return
-	}
-	sentPath := mapper.WANBytesSentPath()
-	recvPath := mapper.WANBytesReceivedPath()
-	sentKeyPresent := sentPath != ""
-	if sentKeyPresent {
-		_, sentKeyPresent = params[sentPath]
-	}
-	recvKeyPresent := recvPath != ""
-	if recvKeyPresent {
-		_, recvKeyPresent = params[recvPath]
-	}
-	if !sentKeyPresent && !recvKeyPresent {
-		return
-	}
-	h.recordWANTrafficFromSummonedParams(ctx, serial, params, mapper)
 }
 
 // handleGetParamValuesResponse routes the parsed parameter map to the correct
@@ -1300,7 +1664,7 @@ func (h *Handler) handleAddObjectResponse(ctx context.Context, w http.ResponseWr
 			return
 		}
 		if nextXML != nil {
-			writeXML(w, nextXML)
+			h.writeSessionXML(w, session, nextXML)
 			return
 		}
 		// All steps complete.
@@ -1323,7 +1687,7 @@ func (h *Handler) handleAddObjectResponse(ctx context.Context, w http.ResponseWr
 		h.handleTaskResponse(ctx, w, session, nil, err.Error())
 		return
 	}
-	writeXML(w, taskXML)
+	h.writeSessionXML(w, session, taskXML)
 }
 
 // handleDeleteObjectResponse handles DeleteObjectResponse.
@@ -1347,7 +1711,7 @@ func (h *Handler) handleDeleteObjectResponse(ctx context.Context, w http.Respons
 			return
 		}
 		if nextXML != nil {
-			writeXML(w, nextXML)
+			h.writeSessionXML(w, session, nextXML)
 			return
 		}
 		// All steps complete.
@@ -1434,7 +1798,7 @@ func (h *Handler) dispatchTask(ctx context.Context, w http.ResponseWriter, sessi
 		WithField("type", string(t.Type)).
 		Info("CWMP: dispatching task to CPE")
 
-	writeXML(w, taskXML)
+	h.writeSessionXML(w, session, taskXML)
 }
 
 // executeTask converts a Task into CWMP XML bytes.
@@ -1467,6 +1831,22 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 		session.mu.Lock()
 		im := session.instanceMap
 		session.mu.Unlock()
+		wanDevIdx := im.WANDeviceIdx
+		if wanDevIdx == 0 {
+			wanDevIdx = 1
+		}
+		wanConnIdx := im.WANConnDevIdx
+		if wanConnIdx == 0 {
+			wanConnIdx = 1
+		}
+		wanIPConnIdx := im.WANIPConnIdx
+		if wanIPConnIdx == 0 {
+			wanIPConnIdx = 1
+		}
+		wanPPPConnIdx := im.WANPPPConnIdx
+		if wanPPPConnIdx == 0 {
+			wanPPPConnIdx = 1
+		}
 
 		connType := strings.TrimSpace(strings.ToLower(p.ConnectionType))
 		isPPPoE := connType == "pppoe"
@@ -1498,10 +1878,14 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 				// Use YAML-driven provisioning flow from device driver.
 				var err error
 				wp, err = newWANProvisionFromDriver(t, drv, "wan_pppoe_new", map[string]string{
-					"vlan_id":  strconv.Itoa(p.VLAN),
-					"username": p.Username,
-					"password": p.Password,
-					"gpon_idx": strconv.Itoa(im.FreeGPONLinkIdx),
+					"vlan_id":      strconv.Itoa(p.VLAN),
+					"username":     p.Username,
+					"password":     p.Password,
+					"gpon_idx":     strconv.Itoa(im.FreeGPONLinkIdx),
+					"wan_dev":      strconv.Itoa(wanDevIdx),
+					"wan_conn":     strconv.Itoa(wanConnIdx),
+					"wan_ip_conn":  strconv.Itoa(wanIPConnIdx),
+					"wan_ppp_conn": strconv.Itoa(wanPPPConnIdx),
 				})
 				if err != nil {
 					return nil, fmt.Errorf("create driver provision flow: %w", err)
@@ -1531,7 +1915,7 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 				if err != nil {
 					return nil, err
 				}
-				writeXML(w, xmlBytes)
+				h.writeSessionXML(w, session, xmlBytes)
 				return nil, nil // response already written
 			}
 
@@ -1582,6 +1966,10 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 					"ppp_iface_idx": strconv.Itoa(im.PPPIfaceIdx),
 					"username":      p.Username,
 					"password":      p.Password,
+					"wan_dev":       strconv.Itoa(wanDevIdx),
+					"wan_conn":      strconv.Itoa(wanConnIdx),
+					"wan_ip_conn":   strconv.Itoa(wanIPConnIdx),
+					"wan_ppp_conn":  strconv.Itoa(wanPPPConnIdx),
 				}
 
 				if vlanChanging {
@@ -1619,7 +2007,7 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 				if err != nil {
 					return nil, err
 				}
-				writeXML(w, xmlBytes)
+				h.writeSessionXML(w, session, xmlBytes)
 				return nil, nil
 			}
 
@@ -1792,7 +2180,7 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 				return BuildSetParameterValues(t.ID, params)
 			}
 			session.mu.Unlock()
-			writeXML(w, xml)
+			h.writeSessionXML(w, session, xml)
 			return nil, nil // signal: already wrote response
 
 		case task.PortForwardingRemove:
@@ -2070,6 +2458,31 @@ func writeXML(w http.ResponseWriter, data []byte) {
 	_, _ = w.Write(data)
 }
 
+func (h *Handler) writeSessionXML(w http.ResponseWriter, session *Session, data []byte) {
+	h.bindOutboundRPCID(data, session)
+	writeXML(w, data)
+}
+
+func requestID(env *Envelope) string {
+	if env != nil && env.Header.ID != nil {
+		return strings.TrimSpace(env.Header.ID.Value)
+	}
+	return ""
+}
+
+func (h *Handler) bindOutboundRPCID(xmlBytes []byte, session *Session) {
+	if h == nil || h.sessionMgr == nil || session == nil || len(xmlBytes) == 0 {
+		return
+	}
+	env, err := ParseEnvelope(xmlBytes)
+	if err != nil {
+		return
+	}
+	if id := requestID(env); id != "" {
+		h.sessionMgr.BindRPCID(id, session)
+	}
+}
+
 func headerID(env *Envelope) string {
 	if env != nil && env.Header.ID != nil {
 		return env.Header.ID.Value
@@ -2082,10 +2495,10 @@ func headerID(env *Envelope) string {
 // targetedSummonPaths returns the GPV object paths needed for a targeted summon
 // and the task type that triggered it. Returns nil, "" if no targeted summon is needed.
 //
-//   WiFi  task → Device.WiFi.                           (TR-181)
-//              → InternetGatewayDevice.LANDevice.        (TR-098)
-//   WAN   task → Device.IP.Interface. + Device.PPP.Interface. + vlan/link subtrees  (TR-181)
-//              → InternetGatewayDevice.WANDevice.        (TR-098)
+//	WiFi  task → Device.WiFi.                           (TR-181)
+//	           → InternetGatewayDevice.LANDevice.        (TR-098)
+//	WAN   task → Device.IP.Interface. + Device.PPP.Interface. + vlan/link subtrees  (TR-181)
+//	           → InternetGatewayDevice.WANDevice.        (TR-098)
 func targetedSummonPaths(schemaName string, pending []*task.Task) ([]string, string) {
 	isTR098 := strings.Contains(strings.ToLower(schemaName), "tr098")
 
@@ -2109,6 +2522,40 @@ func targetedSummonPaths(schemaName string, pending []*task.Task) ([]string, str
 		}
 	}
 	return nil, ""
+}
+
+// uiSummonPaths returns object paths needed to refresh fields shown in the web UI
+// (Information/Network/WiFi/LAN/traffic-related counters), without triggering
+// full GetParameterNames + many GPV batches.
+// Driver extra_summon_paths are appended when a driver is provided.
+func uiSummonPaths(schemaName string, drv *schema.DeviceDriver) []string {
+	isTR098 := strings.Contains(strings.ToLower(schemaName), "tr098")
+	var paths []string
+	if isTR098 {
+		paths = []string{
+			"InternetGatewayDevice.DeviceInfo.",
+			"InternetGatewayDevice.WANDevice.",
+			"InternetGatewayDevice.LANDevice.",
+			"InternetGatewayDevice.ManagementServer.",
+		}
+	} else {
+		paths = []string{
+			"Device.DeviceInfo.",
+			"Device.IP.Interface.",
+			"Device.PPP.Interface.",
+			"Device.WiFi.",
+			"Device.WiFi.AccessPoint.",
+			"Device.Optical.Interface.",
+			"Device.Ethernet.VLANTermination.",
+			"Device.Ethernet.Link.",
+			"Device.ManagementServer.",
+			"Device.Hosts.",
+		}
+	}
+	if drv != nil {
+		paths = append(paths, drv.Discovery.ExtraSummonPaths...)
+	}
+	return paths
 }
 
 // because some CDATA/ZTE ONTs report both namespaces in a single session.
@@ -2281,6 +2728,56 @@ func parseInt64(s string) (int64, error) {
 	return v, err
 }
 
+// extractCPUUsage reads CPU usage percentage from device parameters.
+// It checks the driver-configured path first, then falls back to the standard
+// TR-181 path. The value may be a plain integer ("42") or a multi-core string
+// like "1%;2%" — the first numeric token is used.
+func extractCPUUsage(params map[string]string, drv *schema.DeviceDriver) *int64 {
+	paths := []string{
+		"Device.DeviceInfo.ProcessStatus.CPUUsage",
+		"InternetGatewayDevice.DeviceInfo.ProcessStatus.CPUUsage",
+	}
+	if drv != nil && drv.Discovery.SystemCPUPath != "" {
+		paths = append([]string{drv.Discovery.SystemCPUPath}, paths...)
+	}
+	for _, p := range paths {
+		raw := strings.TrimSpace(params[p])
+		if raw == "" {
+			continue
+		}
+		// Handle "core1%;core2%;…" — take first token, strip "%".
+		token := strings.SplitN(raw, ";", 2)[0]
+		token = strings.TrimSuffix(strings.TrimSpace(token), "%")
+		if c, err := strconv.ParseInt(token, 10, 64); err == nil {
+			return &c
+		}
+	}
+	return nil
+}
+
+// patchRAMFromPct populates stats.RAMTotalKB/RAMFreeKB from a percentage path
+// (e.g. "56%") when the driver provides SystemMemPctPath and standard KB paths
+// returned zero. We store Total=100, Free=(100-pct) so callers can display "%".
+func patchRAMFromPct(drv *schema.DeviceDriver, params map[string]string, stats *task.CPEStatsResult) {
+	if drv == nil || drv.Discovery.SystemMemPctPath == "" || stats == nil {
+		return
+	}
+	if stats.RAMTotalKB != 0 {
+		return // standard paths already populated
+	}
+	raw := strings.TrimSpace(params[drv.Discovery.SystemMemPctPath])
+	if raw == "" {
+		return
+	}
+	raw = strings.TrimSuffix(raw, "%")
+	pct, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || pct < 0 || pct > 100 {
+		return
+	}
+	stats.RAMTotalKB = 100
+	stats.RAMFreeKB = 100 - pct
+}
+
 // detectAndHandleReset checks for factory reset via TR-069 "0 BOOTSTRAP" event
 // or ProvisioningCode reset, and queues a parameter restore task synchronously
 // so it is picked up by DequeuePending in the same CWMP session.
@@ -2438,7 +2935,14 @@ func (h *Handler) restoreWiFiConfig(ctx context.Context, serial string, snapshot
 		discoveryHints = discoveryHintsFromDriver(drv)
 	}
 	snapshotInstanceMap := datamodel.DiscoverInstancesWithHints(snapshot, discoveryHints)
-	snapshotMapper := datamodel.ApplyInstanceMap(datamodel.NewMapper(modelType), snapshotInstanceMap)
+	// Use SchemaMapper.Clone so instance indices from snapshot are applied to the
+	// same YAML parameter table as the live session mapper.
+	var snapshotMapper datamodel.Mapper
+	if sm, ok := mapper.(*schema.SchemaMapper); ok {
+		snapshotMapper = sm.Clone(snapshotInstanceMap)
+	} else {
+		snapshotMapper = datamodel.ApplyInstanceMap(mapper, snapshotInstanceMap)
+	}
 
 	h.log.WithField("serial", serial).
 		WithField("ssid_idx_24", snapshotInstanceMap.WiFiSSIDIndices).
@@ -2602,4 +3106,23 @@ func filterCriticalParameters(params map[string]string) map[string]string {
 	}
 
 	return critical
+}
+
+// TriggerFullSummon schedules a full GetParameterNames+GetParameterValues summon
+// for the given serial. It works across session boundaries: if the device is
+// currently connected the active session is marked immediately; otherwise the
+// flag persists until the device's next Inform cycle.
+// Always returns true (the request is accepted even if device is currently offline).
+func (h *Handler) TriggerFullSummon(serial string) bool {
+	h.pendingFullSummon.Store(serial, true)
+	// Also mark the live session immediately if one exists.
+	if session := h.sessionMgr.GetBySerial(serial); session != nil {
+		session.mu.Lock()
+		if session.State == StateNew || session.State == StateInform || session.State == StateProcessing {
+			session.summonPhase = 1
+		}
+		session.mu.Unlock()
+	}
+	h.log.WithField("serial", serial).Info("CWMP: full summon scheduled via API")
+	return true
 }

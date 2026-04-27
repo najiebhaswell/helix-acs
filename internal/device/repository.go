@@ -62,19 +62,27 @@ func (r *mongoRepository) Upsert(ctx context.Context, req *UpsertRequest) (*Devi
 		"serial":        req.Serial,
 		"oui":           req.OUI,
 		"manufacturer":  req.Manufacturer,
-		"model_name":    req.ModelName,
 		"product_class": req.ProductClass,
 		"data_model":    req.DataModel,
 		"schema":        req.Schema,
 		"ip_address":    req.IPAddress,
 		"wan_ip":        req.WANIP,
-		"sw_version":    req.SWVersion,
-		"hw_version":    req.HWVersion,
 		"bl_version":    req.BLVersion,
 		"parameters":    req.Parameters,
 		"online":        true,
 		"last_inform":   now,
 		"updated_at":    now,
+	}
+	// Only overwrite these fields when the Inform provides non-empty values;
+	// otherwise summon-based values (UpdateInfo) would be erased on every Inform.
+	if req.ModelName != "" {
+		setFields["model_name"] = req.ModelName
+	}
+	if req.SWVersion != "" {
+		setFields["sw_version"] = req.SWVersion
+	}
+	if req.HWVersion != "" {
+		setFields["hw_version"] = req.HWVersion
 	}
 
 	// Only overwrite system fields when the CPE reports them.
@@ -138,6 +146,15 @@ func (r *mongoRepository) UpdateInfo(ctx context.Context, serial string, upd Inf
 	}
 	if upd.WANIP != nil {
 		setFields["wan_ip"] = *upd.WANIP
+	}
+	if upd.ModelName != nil && *upd.ModelName != "" {
+		setFields["model_name"] = *upd.ModelName
+	}
+	if upd.SWVersion != nil && *upd.SWVersion != "" {
+		setFields["sw_version"] = *upd.SWVersion
+	}
+	if upd.HWVersion != nil && *upd.HWVersion != "" {
+		setFields["hw_version"] = *upd.HWVersion
 	}
 	if upd.WANs != nil {
 		setFields["wans"] = upd.WANs
