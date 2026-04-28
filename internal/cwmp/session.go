@@ -365,12 +365,39 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		session.mu.Lock()
+		wp := session.wanProvision
+		t := session.currentTask
 		var next *task.Task
-		if len(session.pendingTasks) > 0 {
+
+		if wp != nil {
+			// We have an adopted mid-flight WAN provision. Do not pop a new task.
+		} else if t != nil {
+			// We have an adopted simple task. Re-dispatch it.
+			next = t
+		} else if len(session.pendingTasks) > 0 {
 			next = session.pendingTasks[0]
 			session.pendingTasks = session.pendingTasks[1:]
 		}
 		session.mu.Unlock()
+
+		// If a WAN provision is mid-flight, resume by resending the current step's XML.
+		// (This handles the case where the CPE dropped the connection before sending the response).
+		if wp != nil {
+			h.log.WithField("task_id", wp.t.ID).
+				WithField("step", wp.stepIndex()).
+				Info("CWMP: resuming in-flight WAN provision")
+			xmlBytes, err := wp.buildCurrentXML()
+			if err != nil {
+				h.log.WithError(err).Error("CWMP: resume WAN provision failed")
+				session.mu.Lock()
+				session.wanProvision = nil
+				session.mu.Unlock()
+				h.handleTaskResponse(ctx, w, session, nil, err.Error())
+				return
+			}
+			h.writeSessionXML(w, session, xmlBytes)
+			return
+		}
 
 		if next != nil {
 			h.dispatchTask(ctx, w, session, next)

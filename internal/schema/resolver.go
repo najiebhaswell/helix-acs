@@ -63,10 +63,22 @@ func normaliseVendor(manufacturer string) string {
 		return ""
 	}
 
-	// Well-known vendor prefixes → canonical slug.
-	for prefix, slug := range knownVendors {
+	// Sort prefixes by length descending so "zteg" matches before "zte".
+	var prefixes []string
+	for p := range knownVendors {
+		prefixes = append(prefixes, p)
+	}
+	for i := 0; i < len(prefixes); i++ {
+		for j := i + 1; j < len(prefixes); j++ {
+			if len(prefixes[i]) < len(prefixes[j]) {
+				prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
+			}
+		}
+	}
+
+	for _, prefix := range prefixes {
 		if strings.HasPrefix(s, prefix) {
-			return slug
+			return knownVendors[prefix]
 		}
 	}
 
