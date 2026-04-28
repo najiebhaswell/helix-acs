@@ -1,0 +1,15 @@
+id: wan_pppoe_update
+vendor: cdata
+model: tr098
+description: >
+  C-DATA TR-098 PPPoE credential update for an existing WANPPPConnection.
+  Keeps WAN service enabled and updates both standard and X_CMS password fields.
+  Input vars: wan_dev, wan_conn, wan_ppp_conn, username, password.
+
+steps:
+  - kind: set
+    params:
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Username": "{username}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Password": "{password}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_CMS_Password": "{password}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Enable": "1"
