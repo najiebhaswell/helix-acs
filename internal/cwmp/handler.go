@@ -36,6 +36,7 @@ func (s *Server) Router() http.Handler {
 	cwmpHandler := s.digestAuth.Middleware(http.HandlerFunc(s.handler.ServeHTTP))
 	cwmpHandler = limitBody(cwmpHandler, 16<<20) // 16 MB
 
+	mux.Handle("/", cwmpHandler)
 	mux.Handle("/acs", cwmpHandler)
 	mux.Handle("/acs/", cwmpHandler)
 
