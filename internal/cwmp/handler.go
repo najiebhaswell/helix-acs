@@ -93,3 +93,8 @@ func limitBody(next http.Handler, maxBytes int64) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// TriggerFullSummon delegates to the underlying handler to schedule a full parameter refresh.
+func (s *Server) TriggerFullSummon(serial string) bool {
+	return s.handler.TriggerFullSummon(serial)
+}

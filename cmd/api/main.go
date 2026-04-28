@@ -140,6 +140,7 @@ func run(ctx context.Context, cfg config.ConfigProvider, appLogger l.Logger) err
 		storageDB,
 		cacheDB,
 		paramRepo,
+		cwmpSrv,
 		appLogger,
 		routerCfg,
 	)

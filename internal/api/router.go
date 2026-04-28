@@ -63,6 +63,7 @@ func NewRouter(
 	mongoClient *mongo.Client,
 	redisClient *redis.Client,
 	paramRepo parameter.Repository,
+	cwmpTrigger handler.SummonTriggerer,
 	log logger.Logger,
 	cfg Config,
 ) http.Handler {
@@ -73,6 +74,8 @@ func NewRouter(
 	taskHandler := handler.NewTaskHandler(taskQueue, deviceSvc, cfg.MaxAttempts)
 	healthHandler := handler.NewHealthHandler(mongoClient, redisClient)
 	snapshotHandler := handler.NewSnapshotHandler(deviceSvc, paramRepo)
+	configHandler := handler.NewConfigHandler(paramRepo)
+	summonHandler := handler.NewSummonHandler(cwmpTrigger)
 
 	// Root router global middleware applied to every route.
 	r := mux.NewRouter()
@@ -99,8 +102,12 @@ func NewRouter(
 	api.HandleFunc("/devices/{serial}", deviceHandler.Update).Methods(http.MethodPut)
 	api.HandleFunc("/devices/{serial}", deviceHandler.Delete).Methods(http.MethodDelete)
 	api.HandleFunc("/devices/{serial}/parameters", deviceHandler.GetParameters).Methods(http.MethodGet)
-	api.HandleFunc("/devices/{serial}/traffic", deviceHandler.GetTraffic).Methods(http.MethodGet)
+	api.HandleFunc("/devices/{serial}/summon", summonHandler.TriggerFullSummon).Methods(http.MethodPost)
 	api.HandleFunc("/devices/{serial}/provision", deviceHandler.GetProvisionInfo).Methods(http.MethodGet)
+
+	// Config / Virtual Parameters API
+	api.HandleFunc("/config/default-params", configHandler.GetDefaultParams).Methods(http.MethodGet)
+	api.HandleFunc("/config/default-params", configHandler.UpdateDefaultParams).Methods(http.MethodPut)
 
 	// Snapshot routes
 	api.HandleFunc("/devices/{serial}/snapshots/last-known-good", snapshotHandler.SaveLastKnownGood).Methods(http.MethodPost)
