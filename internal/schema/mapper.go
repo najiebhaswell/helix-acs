@@ -307,3 +307,19 @@ func (m *SchemaMapper) WANProvisioningType() string {
 	}
 	return v
 }
+
+// ModelType returns the data-model type (TR-181 or TR-098) for this mapper.
+func (m *SchemaMapper) ModelType() datamodel.ModelType {
+	return m.modelType
+}
+
+// Clone returns a copy of this SchemaMapper with the given InstanceMap substituted.
+// This allows per-WAN-interface path resolution without mutating the original.
+func (m *SchemaMapper) Clone(im datamodel.InstanceMap) *SchemaMapper {
+	return &SchemaMapper{
+		params:      m.params,
+		instanceMap: im,
+		modelType:   m.modelType,
+	}
+}
+

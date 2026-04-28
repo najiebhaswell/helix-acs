@@ -75,6 +75,21 @@ type DiscoveryYAML struct {
 
 	// WiFi SSID→band when SSID.LowerLayers is missing (per-model driver YAML).
 	WiFiSSIDBandWithoutLowerLayers *WiFiSSIDBandWithoutLowerLayersYAML `yaml:"wifi_ssid_band_without_lower_layers,omitempty"`
+
+	// ExtraSummonPaths lists additional TR-069 partial paths to include in
+	// GetParameterNames/GetParameterValues summons beyond the standard tree.
+	// Useful for vendor-specific subtrees (e.g. GPON/optical parameters on ZTE).
+	ExtraSummonPaths []string `yaml:"extra_summon_paths,omitempty"`
+
+	// SystemCPUPath is a vendor-specific parameter path that holds the CPU
+	// usage as a string (e.g. "1%;1%" on ZTE). When set, it overrides the
+	// standard DeviceInfo.ProcessStatus.CPUUsage parameter.
+	SystemCPUPath string `yaml:"system_cpu_path,omitempty"`
+
+	// SystemMemPctPath is a vendor-specific parameter path that holds memory
+	// usage as a percentage string (e.g. "56%" on ZTE). When set, the mapper
+	// will use this instead of standard RAM KB counters to compute usage.
+	SystemMemPctPath string `yaml:"system_mem_pct_path,omitempty"`
 }
 
 // WiFiSSIDBandWithoutLowerLayersYAML configures TR-181 SSID instance index → band
