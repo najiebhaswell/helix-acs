@@ -26,6 +26,13 @@ type DiscoveryHints struct {
 	WANServiceTypePath string
 	GPONEnablePath     string
 
+	// WANTR098VLANPathSuffix is the parameter name suffix (e.g. ".X_CT-COM_VLANIDMark")
+	// derived from the driver's wan_vlan_path. The TR-098 WAN discovery loop uses
+	// strings.HasSuffix to find the current VLAN ID on any WANPPPConnection instance
+	// without needing to know the exact instance numbers in advance.
+	// Empty means TR-098 VLAN discovery is disabled (device not configured for it).
+	WANTR098VLANPathSuffix string
+
 	// WiFiSSIDBandWithoutLowerLayers selects SSID index → band when TR-181
 	// SSID.LowerLayers is absent (from driver YAML). Nil = legacy TP-Link heuristic.
 	WiFiSSIDBandWithoutLowerLayers *WiFiSSIDBandWithoutLowerLayersHints
@@ -87,7 +94,7 @@ func DiscoverInstancesWithHints(params map[string]string, hints *DiscoveryHints)
 	if isTR181Params(params) {
 		discoverTR181(params, &im, hints)
 	} else {
-		discoverTR098(params, &im)
+		discoverTR098(params, &im, hints)
 	}
 	return im
 }
@@ -749,13 +756,29 @@ var (
 	reWLANStd     = regexp.MustCompile(`^InternetGatewayDevice\.LANDevice\.\d+\.WLANConfiguration\.(\d+)\.Standard$`)
 )
 
-func discoverTR098(params map[string]string, im *InstanceMap) {
-	discoverTR098WAN(params, im)
+func discoverTR098(params map[string]string, im *InstanceMap, hints *DiscoveryHints) {
+	discoverTR098WAN(params, im, hints)
 	discoverTR098LAN(params, im)
 	discoverTR098WLAN(params, im)
 }
 
-func discoverTR098WAN(params map[string]string, im *InstanceMap) {
+// tr098PPPCandidate represents a discovered WANPPPConnection for scoring.
+type tr098PPPCandidate struct {
+	wanDev  int
+	wanConn int
+	wanPPP  int
+	hasIP   bool // ExternalIPAddress is non-empty
+	pubIP   bool // ExternalIPAddress is a public IP
+}
+
+func discoverTR098WAN(params map[string]string, im *InstanceMap, hints *DiscoveryHints) {
+	vlanSuffix := ""
+	if hints != nil && hints.WANTR098VLANPathSuffix != "" {
+		vlanSuffix = hints.WANTR098VLANPathSuffix
+	}
+
+	// --- Pass 1: collect all WANIPConnection and WANPPPConnection candidates ---
+	// Track WANIPConnection (first-seen wins, same as before).
 	for name := range params {
 		if m := reWANIPConn.FindStringSubmatch(name); m != nil {
 			wanDev, _ := strconv.Atoi(m[1])
@@ -766,22 +789,85 @@ func discoverTR098WAN(params map[string]string, im *InstanceMap) {
 				im.WANConnDevIdx = wanConn
 				im.WANIPConnIdx = wanIP
 			}
+			break // WANIPConnection indices discovered; stop early
 		}
-		if m := reWANPPPConn.FindStringSubmatch(name); m != nil {
-			wanDev, _ := strconv.Atoi(m[1])
-			wanConn, _ := strconv.Atoi(m[2])
-			wanPPP, _ := strconv.Atoi(m[3])
-			if im.WANDeviceIdx == 0 {
-				im.WANDeviceIdx = wanDev
-				im.WANConnDevIdx = wanConn
+	}
+
+	// Collect all PPP candidates keyed by (wanDev, wanConn).
+	type connKey struct{ dev, conn int }
+	candidates := map[connKey]*tr098PPPCandidate{}
+	for name, val := range params {
+		m := reWANPPPConn.FindStringSubmatch(name)
+		if m == nil {
+			continue
+		}
+		wanDev, _ := strconv.Atoi(m[1])
+		wanConn, _ := strconv.Atoi(m[2])
+		wanPPP, _ := strconv.Atoi(m[3])
+		key := connKey{wanDev, wanConn}
+		if _, ok := candidates[key]; !ok {
+			candidates[key] = &tr098PPPCandidate{
+				wanDev: wanDev, wanConn: wanConn, wanPPP: wanPPP,
 			}
-			if im.WANPPPConnIdx == 0 {
-				im.WANPPPConnIdx = wanPPP
+		}
+		// Detect external IP to score active connections higher.
+		if strings.HasSuffix(name, ".ExternalIPAddress") && val != "" {
+			c := candidates[key]
+			c.hasIP = true
+			c.pubIP = isPublicIP(val)
+		}
+	}
+
+	// --- Pass 2: pick the best candidate ---
+	// Priority: public IP > any IP > lowest WANConnectionDevice index.
+	var best *tr098PPPCandidate
+	for _, c := range candidates {
+		if best == nil {
+			best = c
+			continue
+		}
+		// Prefer public IP.
+		if c.pubIP && !best.pubIP {
+			best = c
+			continue
+		}
+		if !c.pubIP && best.pubIP {
+			continue
+		}
+		// Prefer any IP over no IP.
+		if c.hasIP && !best.hasIP {
+			best = c
+			continue
+		}
+		if !c.hasIP && best.hasIP {
+			continue
+		}
+		// Tie-break: prefer lowest WANConnectionDevice index for determinism.
+		if c.wanConn < best.wanConn {
+			best = c
+		}
+	}
+
+	if best != nil {
+		if im.WANDeviceIdx == 0 {
+			im.WANDeviceIdx = best.wanDev
+		}
+		im.WANConnDevIdx = best.wanConn
+		im.WANPPPConnIdx = best.wanPPP
+
+		// Extract VLAN from the selected connection if the driver declared a path suffix.
+		if vlanSuffix != "" {
+			prefix := fmt.Sprintf("InternetGatewayDevice.WANDevice.%d.WANConnectionDevice.%d.WANPPPConnection.%d",
+				best.wanDev, best.wanConn, best.wanPPP)
+			vlanKey := prefix + vlanSuffix
+			if val, ok := params[vlanKey]; ok && val != "" && val != "0" {
+				if vlanID, err := strconv.Atoi(val); err == nil {
+					im.WANCurrentVLAN = vlanID
+				}
 			}
 		}
 	}
 }
-
 func discoverTR098LAN(params map[string]string, im *InstanceMap) {
 	for name := range params {
 		m := reLANDevice.FindStringSubmatch(name)

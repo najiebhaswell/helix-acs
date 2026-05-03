@@ -1859,6 +1859,15 @@ const TASK_FORMS = {
             <label class="form-label">PPPoE Password</label>
             <input class="form-control" id="tf-wan-pass" type="password">
           </div>
+          <div class="col-12 mt-2">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="tf-ipv6-en">
+              <label class="form-check-label" for="tf-ipv6-en">
+                <i class="bi bi-globe2 me-1"></i>Enable IPv6 (Dual-Stack)
+              </label>
+              <div class="form-text">When enabled, the WAN connection uses IPv4 + IPv6 dual-stack mode.</div>
+            </div>
+          </div>
         </div>
       </div>
       <div id="tf-static-fields" style="display:none">
@@ -2169,6 +2178,7 @@ async function submitTask() {
         if (wanType === 'pppoe') {
           payload.username = document.getElementById('tf-wan-user').value;
           payload.password = document.getElementById('tf-wan-pass').value;
+          payload.ipv6_enabled = document.getElementById('tf-ipv6-en').checked;
         } else if (wanType === 'static') {
           payload.ip_address  = document.getElementById('tf-wan-ip').value;
           payload.subnet_mask = document.getElementById('tf-wan-mask').value;

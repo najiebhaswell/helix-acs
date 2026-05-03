@@ -234,11 +234,17 @@ func (e *Executor) BuildGetParams(ctx context.Context, t *Task, mapper datamodel
 		return names, nil
 
 	case TypeConnectedDevices:
-		// Fetch Hosts sub-tree and WiFi AccessPoints for RSSI (if supported by mapper).
-		// TR-181 has Device.WiFi.AccessPoint; TR-098 uses vendor-specific WiFi paths.
+		// Fetch Hosts sub-tree and WiFi associated devices for RSSI.
+		// TR-181: Device.WiFi.AccessPoint.{i}.AssociatedDevice.{i}.SignalStrength
+		// TR-098: InternetGatewayDevice.LANDevice.1.WLANConfiguration.{i}.AssociatedDevice.{i}.{RSSI|SignalStrength}
 		paths := []string{mapper.HostsBasePath()}
 		if mapper.SupportsWiFiAccessPoint() {
+			// TR-181: fetch AccessPoint subtree for RSSI via AssociatedDevice ref.
 			paths = append(paths, "Device.WiFi.AccessPoint.")
+		} else {
+			// TR-098: fetch all WLANConfiguration AssociatedDevice subtrees
+			// to cross-reference host MACs with RSSI values.
+			paths = append(paths, "InternetGatewayDevice.LANDevice.1.WLANConfiguration.")
 		}
 		return paths, nil
 

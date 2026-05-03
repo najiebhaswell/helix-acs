@@ -7,8 +7,8 @@ description: >
   X_CT-COM_VLANIDMark and X_CT-COM_VLANMode vendor extensions — there is no
   separate WANVLANTermination object as in TR-181.
   This flow is a single atomic SetParameterValues that updates credentials,
-  VLAN mode (tagged=2), and VLAN ID in one RPC.
-  Input vars: wan_dev, wan_conn, wan_ppp_conn, username, password, vlan_id.
+  VLAN mode (tagged=2), VLAN ID, and IP mode (IPv4/IPv6) in one RPC.
+  Input vars: wan_dev, wan_conn, wan_ppp_conn, username, password, vlan_id, wan_ip_mode.
 
 steps:
   - kind: set
@@ -18,4 +18,5 @@ steps:
       "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_CMS_Password": "{password}"
       "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_CT-COM_VLANMode": "2"
       "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_CT-COM_VLANIDMark": "{vlan_id}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_CT-COM_IPMode": "{wan_ip_mode}"
       "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Enable": "1"

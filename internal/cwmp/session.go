@@ -63,12 +63,25 @@ func discoveryHintsFromDriver(drv *schema.DeviceDriver) *datamodel.DiscoveryHint
 	if drv == nil {
 		return nil
 	}
+
+	// Derive the TR-098 VLAN path suffix from wan_vlan_path by taking the
+	// last ".ParameterName" segment. This lets the engine match any instance
+	// of the parameter without knowing the concrete instance numbers up front.
+	// e.g. "...WANPPPConnection.1.X_CT-COM_VLANIDMark" → ".X_CT-COM_VLANIDMark"
+	vlanSuffix := ""
+	if p := drv.Discovery.WANVLANPath; p != "" {
+		if idx := strings.LastIndex(p, "."); idx >= 0 {
+			vlanSuffix = p[idx:] // includes the leading dot
+		}
+	}
+
 	return &datamodel.DiscoveryHints{
 		WANTypePath:                    drv.Discovery.WANTypePath,
 		WANTypeValuesWAN:               drv.Discovery.WANTypeValues.WAN,
 		WANTypeValuesLAN:               drv.Discovery.WANTypeValues.LAN,
 		WANServiceTypePath:             drv.Discovery.WANServiceTypePath,
 		GPONEnablePath:                 drv.Discovery.GPONEnablePath,
+		WANTR098VLANPathSuffix:         vlanSuffix,
 		WiFiSSIDBandWithoutLowerLayers: wifiSSIDBandHintsFromYAML(drv.Discovery.WiFiSSIDBandWithoutLowerLayers),
 	}
 }
@@ -1015,6 +1028,10 @@ func (h *Handler) handleTargetedSummonResponse(ctx context.Context, w http.Respo
 		WithField("ppp_iface", instanceMap.PPPIfaceIdx).
 		WithField("wan_iface", instanceMap.WANIPIfaceIdx).
 		WithField("vlan_term", instanceMap.WANVLANTermIdx).
+		WithField("wan_dev", instanceMap.WANDeviceIdx).
+		WithField("wan_conn_dev", instanceMap.WANConnDevIdx).
+		WithField("wan_ppp_conn", instanceMap.WANPPPConnIdx).
+		WithField("wan_current_vlan", instanceMap.WANCurrentVLAN).
 		Info("CWMP: targeted summon DiscoverInstances result")
 
 	newMapper := datamodel.Mapper(schema.NewSchemaMapper(h.schemaRegistry, schemaName, instanceMap))
@@ -1883,7 +1900,14 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 			isPPPoE = p.Username != "" || p.Password != "" || p.VLAN > 0
 		}
 
-		if isPPPoE && (im.WANIPIfaceIdx == 0 || im.PPPIfaceIdx == 0) {
+		// isTR098PPPoEProvisioned returns true when the device is TR-098 and
+		// already has a WANPPPConnection object (C-DATA/ZTE pre-provisioned WANs).
+		isTR098PPPoEProvisioned := im.WANPPPConnIdx > 0
+		// isTR181PPPoEProvisioned returns true when the device is TR-181 and
+		// already has both a WAN IP interface and a PPP interface.
+		isTR181PPPoEProvisioned := im.WANIPIfaceIdx > 0 && im.PPPIfaceIdx > 0
+
+		if isPPPoE && !isTR098PPPoEProvisioned && !isTR181PPPoEProvisioned {
 			// Missing WAN/PPP runtime interface: device needs full PPPoE provisioning.
 			// This commonly happens after WAN is deleted from the ONT web UI: WAN IP
 			// objects may still exist, but PPP interface is gone. In that case we must
@@ -1904,16 +1928,21 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 			if drv != nil && drv.GetProvisionFlow("wan_pppoe_new") != nil {
 				// Use YAML-driven provisioning flow from device driver.
 				var err error
-				wp, err = newWANProvisionFromDriver(t, drv, "wan_pppoe_new", map[string]string{
-					"vlan_id":      strconv.Itoa(p.VLAN),
-					"username":     p.Username,
-					"password":     p.Password,
-					"gpon_idx":     strconv.Itoa(im.FreeGPONLinkIdx),
-					"wan_dev":      strconv.Itoa(wanDevIdx),
-					"wan_conn":     strconv.Itoa(wanConnIdx),
-					"wan_ip_conn":  strconv.Itoa(wanIPConnIdx),
-					"wan_ppp_conn": strconv.Itoa(wanPPPConnIdx),
-				})
+				newVars := map[string]string{
+					"vlan_id":       strconv.Itoa(p.VLAN),
+					"username":      p.Username,
+					"password":      p.Password,
+					"gpon_idx":      strconv.Itoa(im.FreeGPONLinkIdx),
+					"wan_dev":       strconv.Itoa(wanDevIdx),
+					"wan_conn":      strconv.Itoa(wanConnIdx),
+					"wan_ip_conn":   strconv.Itoa(wanIPConnIdx),
+					"wan_ppp_conn":  strconv.Itoa(wanPPPConnIdx),
+					"ipv6_enabled":  wanIPv6EnabledStr(p),
+				}
+				if v := resolveWANIPMode(p, drv); v != "" {
+					newVars["wan_ip_mode"] = v
+				}
+				wp, err = newWANProvisionFromDriver(t, drv, "wan_pppoe_new", newVars)
 				if err != nil {
 					return nil, fmt.Errorf("create driver provision flow: %w", err)
 				}
@@ -1961,7 +1990,7 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 			return h.buildSetParamsXML(session, t.ID, genParams)
 		}
 
-		if isPPPoE && im.PPPIfaceIdx > 0 {
+		if isPPPoE && (isTR181PPPoEProvisioned || isTR098PPPoEProvisioned) {
 			// PPPoE already provisioned: update credentials and/or VLAN
 
 			// Determine update mode based on whether VLAN is changing
@@ -1997,10 +2026,17 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 					"wan_conn":      strconv.Itoa(wanConnIdx),
 					"wan_ip_conn":   strconv.Itoa(wanIPConnIdx),
 					"wan_ppp_conn":  strconv.Itoa(wanPPPConnIdx),
+					"ipv6_enabled":  wanIPv6EnabledStr(p),
+				}
+				if v := resolveWANIPMode(p, drv); v != "" {
+					inputVars["wan_ip_mode"] = v
 				}
 
 				if vlanChanging {
-					if im.WANIPIfaceIdx == 0 || im.PPPIfaceIdx == 0 || im.WANVLANTermIdx == 0 {
+					// For TR-181, VLAN change requires a VLANTermination index.
+					// For TR-098 (C-DATA), VLAN is embedded in WANPPPConnection via
+					// X_CT-COM_VLANIDMark — no separate WANVLANTermination exists.
+					if isTR181PPPoEProvisioned && (im.WANIPIfaceIdx == 0 || im.PPPIfaceIdx == 0 || im.WANVLANTermIdx == 0) {
 						return nil, fmt.Errorf("WAN PPPoE VLAN change requires instance map (ip=%d ppp=%d vlan=%d)",
 							im.WANIPIfaceIdx, im.PPPIfaceIdx, im.WANVLANTermIdx)
 					}

@@ -1,0 +1,18 @@
+id: wan_pppoe_update_vlan
+vendor: huawei
+model: tr098
+description: >
+  Huawei TR-098 PPPoE VLAN + credential update on an existing WANPPPConnection.
+  For Huawei TR-098, VLAN is stored as X_HW_VLAN on WANPPPConnection.
+  Atomic single-step SetParameterValues updates credentials, VLAN, and IPv6 in one RPC.
+  Input vars: wan_dev, wan_conn, wan_ppp_conn, username, password, vlan_id, ipv6_enabled.
+
+steps:
+  - kind: set
+    params:
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Username": "{username}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Password": "{password}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_HW_VLAN": "{vlan_id}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_HW_IPv4Enable": "1"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_HW_IPv6Enable": "{ipv6_enabled}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Enable": "1"

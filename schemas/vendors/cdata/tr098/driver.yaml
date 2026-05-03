@@ -18,6 +18,7 @@ config:
   provisioning_code: "helix.rPPP"
   wan_service_list: "INTERNET"
   wan_ip_mode: "1"
+  wan_ip_mode_v6: "3"
 
 security_modes:
   "WPA2-PSK": "WPA2-PSK"
@@ -33,9 +34,15 @@ wifi:
 
 discovery:
   system_cpu_path: "InternetGatewayDevice.DeviceInfo.X_CMS_CPUUsage"
+  # wan_vlan_path tells the engine which parameter on WANPPPConnection holds
+  # the current VLAN tag for this device family. Only the last path segment
+  # (.X_CT-COM_VLANIDMark) is used as a suffix matcher — instance numbers
+  # in the path are ignored, so any WANPPPConnection instance will match.
+  wan_vlan_path: "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_CT-COM_VLANIDMark"
 
 provisions:
   wan_pppoe_new: "provision_wan_pppoe_new.yaml"
   wan_pppoe_update: "provision_wan_pppoe_update.yaml"
   wan_pppoe_update_vlan: "provision_wan_pppoe_update_vlan.yaml"
+  wifi_update: "../../common/provision_wifi.yaml"
 

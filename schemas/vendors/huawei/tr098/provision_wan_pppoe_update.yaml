@@ -1,0 +1,16 @@
+id: wan_pppoe_update
+vendor: huawei
+model: tr098
+description: >
+  Huawei TR-098 PPPoE credential update for an existing WANPPPConnection.
+  Updates username, password and optionally enables IPv6.
+  Input vars: wan_dev, wan_conn, wan_ppp_conn, username, password, ipv6_enabled.
+
+steps:
+  - kind: set
+    params:
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Username": "{username}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Password": "{password}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_HW_IPv4Enable": "1"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_HW_IPv6Enable": "{ipv6_enabled}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Enable": "1"

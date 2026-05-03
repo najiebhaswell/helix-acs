@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/raykavin/helix-acs/internal/datamodel"
+	"github.com/raykavin/helix-acs/internal/schema"
 	"github.com/raykavin/helix-acs/internal/task"
 )
 
@@ -97,6 +98,38 @@ func buildWANCredentialMap(p task.WANPayload) map[string]string {
 		creds["_helix.provision.connection_type"] = connType
 	}
 	return creds
+}
+
+// wanIPv6EnabledStr returns "1" when IPv6 is explicitly enabled, "0" otherwise.
+// Used as a template variable in provision YAML flows.
+func wanIPv6EnabledStr(p task.WANPayload) string {
+	if p.IPv6Enabled != nil && *p.IPv6Enabled {
+		return "1"
+	}
+	return "0"
+}
+
+// resolveWANIPMode returns the vendor-specific IP-mode string based on the
+// IPv6 toggle and the driver config. Each driver defines:
+//
+//	wan_ip_mode    — value for IPv4-only (the default, used when toggle is off)
+//	wan_ip_mode_v6 — value for dual-stack (used when toggle is on)
+//
+// When IPv6 is off, returns "" so the driver config default (wan_ip_mode) is
+// used via the normal config→inputVar merge in NewProvisionExecutor.
+// When IPv6 is on, returns the driver's wan_ip_mode_v6 value so it overrides
+// the default.
+func resolveWANIPMode(p task.WANPayload, drv *schema.DeviceDriver) string {
+	if p.IPv6Enabled == nil || !*p.IPv6Enabled {
+		return "" // let driver config default (wan_ip_mode) be used
+	}
+	if drv != nil && drv.Config != nil {
+		if v, ok := drv.Config["wan_ip_mode_v6"]; ok {
+			return v
+		}
+	}
+	// Fallback for drivers that don't define wan_ip_mode_v6
+	return ""
 }
 
 // persistWANCredentials saves PPPoE/WAN provisioning credentials into the

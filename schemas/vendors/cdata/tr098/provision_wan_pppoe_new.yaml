@@ -2,18 +2,24 @@ id: wan_pppoe_new
 vendor: cdata
 model: tr098
 description: >
-  C-DATA TR-098 PPPoE provisioning with WANConnectionDevice AddObject first.
-  All parameters — including VLAN and Enable — are sent in a single atomic
-  SetParameterValues AFTER the AddObject, so the PPPoE session never starts
-  without a VLAN tag (which causes ERROR_UNKNOWN on CDATA hardware).
-  ConnectionType is intentionally omitted; CDATA firmware auto-assigns it
-  based on the WANPPPConnection object type (PPPoE).
-  Input vars: wan_dev, wan_conn, wan_ppp_conn, vlan_id, username, password.
+  C-DATA TR-098 full PPPoE provisioning via AddObject flow.
+  Step 1: AddObject on WANConnectionDevice to get a new connection device slot.
+  Step 2: AddObject on WANPPPConnection inside the new WANConnectionDevice.
+  Step 3: Atomic SetParameterValues — all parameters (VLAN, credentials, Enable)
+  are sent in a single RPC so the PPPoE session never starts without a VLAN tag.
+  ConnectionType is intentionally omitted; C-DATA firmware auto-assigns PPPoE
+  based on the WANPPPConnection object type.
+  Input vars: wan_dev, username, password, vlan_id.
+  wan_ip_mode and wan_service_list come from driver config (defaults applied).
 
 steps:
   - kind: add_object
     object: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice."
     as: wan_conn
+
+  - kind: add_object
+    object: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection."
+    as: wan_ppp_conn
 
   - kind: set
     params:

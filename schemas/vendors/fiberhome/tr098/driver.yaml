@@ -1,0 +1,46 @@
+id: fiberhome_tr098
+vendor: fiberhome
+model: tr098
+description: >
+  FiberHome GPON ONU TR-098 baseline driver (HG6145D2 and similar).
+  Built from live full-summon parameters from FiberHome HG6145D2 ONT.
+  WAN: WANConnectionDevice.1 is TR069 management (WANIPConnection),
+  WANConnectionDevice.2 is Internet PPPoE (WANPPPConnection).
+  VLAN: standard TR-098 VLANID + VLANEnable on WANPPPConnection.
+  IPv6: X_FH_IPMode (1=IPv4 only, 3=IPv4+IPv6 dual-stack).
+  CPU: InternetGatewayDevice.DeviceInfo.ProcessStatus.CPUUsage (standard).
+  Memory: InternetGatewayDevice.DeviceInfo.MemoryStatus.{Free,Total} (standard).
+
+features:
+  nat: true
+  ipv6: true
+  gpon: true
+  band_steering: false
+
+config:
+  default_mtu: "1492"
+  wan_service_list: "INTERNET"
+  wan_ip_mode: "1"
+  wan_ip_mode_v6: "3"
+
+security_modes:
+  "WPA2-PSK": "WPA2-PSK"
+  "WPA-WPA2-PSK": "WPA-WPA2-PSK"
+  "WPA3-SAE": "WPA3-SAE"
+  "None": "None"
+
+wifi:
+  sync_bands_on_steering: false
+
+discovery:
+  # FiberHome GPON optical parameters
+  extra_summon_paths:
+    - "InternetGatewayDevice.WANDevice.1.X_FH_WANGponLinkConfig."
+
+  # VLAN is stored as standard VLANID on WANPPPConnection (not vendor-prefixed).
+  wan_vlan_path: "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.VLANID"
+
+provisions:
+  wan_pppoe_update: "provision_wan_pppoe_update.yaml"
+  wan_pppoe_update_vlan: "provision_wan_pppoe_update_vlan.yaml"
+  wifi_update: "../../common/provision_wifi.yaml"

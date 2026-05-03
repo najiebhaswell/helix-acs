@@ -14,6 +14,19 @@ features:
   gpon: true
   band_steering: false
 
+config:
+  default_mtu: "1492"
+  wan_service_list: "INTERNET"
+
+security_modes:
+  "WPA2-PSK":     "11i"
+  "WPA-WPA2-PSK": "WPAand11i"
+  "WPA3-SAE":     "11i"
+  "None":         "Basic"
+
+wifi:
+  sync_bands_on_steering: false
+
 discovery:
   # Huawei stores CPU/RAM under standard TR-098 DeviceInfo paths.
   # No custom system_cpu_path needed — extracted generically.
@@ -28,3 +41,11 @@ discovery:
   # Values: "INTERNET", "TR069", "VOIP".
   # Note: TR-098 WAN extraction detects ServiceList by case-insensitive suffix
   # match — no wan_service_type_path needed here.
+
+  # VLAN is stored as X_HW_VLAN on each WANPPPConnection.
+  wan_vlan_path: "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_HW_VLAN"
+
+provisions:
+  wan_pppoe_update: "provision_wan_pppoe_update.yaml"
+  wan_pppoe_update_vlan: "provision_wan_pppoe_update_vlan.yaml"
+  wifi_update: "../../common/provision_wifi.yaml"

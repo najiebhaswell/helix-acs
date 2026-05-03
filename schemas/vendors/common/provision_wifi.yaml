@@ -1,0 +1,22 @@
+id: wifi_update
+vendor: generic
+model: tr098
+description: >
+  Generic TR-098 WiFi update flow.
+  All parameter paths are injected as input vars from Go (mapper + driver),
+  so this flow is brand-agnostic. The mapper resolves vendor-specific paths
+  (e.g. X_CMS_*, X_ZTE-COM_*, X_FH_*) to the correct WLANConfiguration
+  indices before passing them to this template.
+
+steps:
+  - kind: set
+    params:
+      "{band_steering_path}": "{band_steering_enabled}"
+      "{ssid_path}": "{ssid}"
+      "{security_path}": "{security_mode}"
+      "{password_path}": "{password}"
+      "{enabled_path}": "{enabled}"
+      "{channel_path}": "{channel}"
+      "{sync_ssid_path}": "{sync_ssid}"
+      "{sync_security_path}": "{sync_security_mode}"
+      "{sync_password_path}": "{sync_password}"

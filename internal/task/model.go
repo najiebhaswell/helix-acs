@@ -98,6 +98,7 @@ type WANPayload struct {
 	DNS2           string `json:"dns2,omitempty"`
 	VLAN           int    `json:"vlan,omitempty"`
 	MTU            int    `json:"mtu,omitempty"`
+	IPv6Enabled    *bool  `json:"ipv6_enabled,omitempty"`
 }
 
 type LANPayload struct {

@@ -6,14 +6,14 @@ description: >
   Uses two SetParameterValues RPCs (disable-then-update, then re-enable).
 
   Step 1 disables the IP interface and updates VLAN/credentials atomically.
-  Step 2 re-enables the PPP and IP interfaces.
+  Step 2 re-enables the PPP and IP interfaces with optional IPv6.
 
   Empty-value params (e.g. username / password not provided) are automatically
   omitted by the executor so the device retains its existing credentials.
 
   Input variables:
     ip_iface_idx, ppp_iface_idx, vlan_term_idx, vlan_id,
-    username (optional), password (optional)
+    username (optional), password (optional), ipv6_enabled
 
   Variables from driver config:
     ppp_auth_protocol
@@ -30,8 +30,9 @@ steps:
       "Device.PPP.Interface.{ppp_iface_idx}.Username": "{username}"
       "Device.PPP.Interface.{ppp_iface_idx}.Password": "{password}"
 
-  # Step 2: Re-enable the stack.
+  # Step 2: Re-enable the stack with IPv6 setting.
   - kind: set
     params:
       "Device.PPP.Interface.{ppp_iface_idx}.Enable": "1"
+      "Device.IP.Interface.{ip_iface_idx}.IPv6Enable": "{ipv6_enabled}"
       "Device.IP.Interface.{ip_iface_idx}.Enable": "1"

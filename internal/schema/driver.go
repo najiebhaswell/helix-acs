@@ -69,6 +69,16 @@ type DiscoveryYAML struct {
 	WANUptimePath      string `yaml:"wan_uptime_path,omitempty"`       // e.g. "Device.IP.Interface.{i}.X_TP_Uptime"
 	WANServiceTypePath string `yaml:"wan_service_type_path,omitempty"` // e.g. "Device.IP.Interface.{i}.X_TP_ServiceType"
 
+	// WANVLANPath is a TR-098 vendor-specific parameter path (on WANPPPConnection
+	// or WANIPConnection) that holds the current VLAN ID as an integer.
+	// Used by the engine to detect VLAN changes without a separate VLANTermination
+	// object (which only exists in TR-181). Example:
+	//   C-DATA: "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_CT-COM_VLANIDMark"
+	//   Huawei: "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_HW_VLANID"
+	// Use the literal instance path with a trailing parameter name — the engine
+	// matches by suffix so any WANPPPConnection instance will match.
+	WANVLANPath string `yaml:"wan_vlan_path,omitempty"`
+
 	// Connected host type detection
 	HostConnTypePath   string            `yaml:"host_conn_type_path,omitempty"`   // e.g. "Hosts.Host.{i}.X_TP_LanConnType"
 	HostConnTypeValues map[string]string `yaml:"host_conn_type_values,omitempty"` // "wifi" → "1", "lan" → "0"

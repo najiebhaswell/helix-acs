@@ -731,6 +731,11 @@ func parseConnectedHosts(params map[string]string, mapper datamodel.Mapper, driv
 		}
 	}
 
+	// Build MAC→RSSI lookup from TR-098 WLANConfiguration.*.AssociatedDevice.* entries.
+	// This enables RSSI for ZTE, C-DATA, FiberHome which store RSSI on the WLAN subtree.
+	// Key = normalised lowercase MAC, Value = RSSI int.
+	wlanRSSI := buildWLANAssociatedDeviceRSSI(params)
+
 	hostMap := make(map[int]*device.ConnectedHost)
 	for k, v := range params {
 		if !strings.HasPrefix(k, base) {
@@ -764,11 +769,22 @@ func parseConnectedHosts(params map[string]string, mapper datamodel.Mapper, driv
 			h.Active = strings.EqualFold(v, "true") || v == "1"
 		case "LeaseTimeRemaining":
 			h.LeaseTime, _ = strconv.Atoi(v)
+		case "Layer2Interface":
+			// TR-098: e.g. "InternetGatewayDevice.LANDevice.1.WLANConfiguration.5"
+			// Detect WiFi band from WLAN index.
+			if strings.Contains(v, "WLANConfiguration") {
+				h.Interface = wlanBandFromLayer2(v)
+			}
 		case "X_TP_LanConnType":
 			if v == "1" {
 				h.Interface = "Wi-Fi"
 			} else if v == "0" {
 				h.Interface = "LAN"
+			}
+		case "X_HW_RSSI":
+			// Huawei: RSSI directly on Host object.
+			if r, err := strconv.Atoi(v); err == nil && r != 0 {
+				h.RSSI = &r
 			}
 		case "AssociatedDevice":
 			if v != "" {
@@ -807,11 +823,101 @@ func parseConnectedHosts(params map[string]string, mapper datamodel.Mapper, driv
 
 	hosts := make([]device.ConnectedHost, 0, len(hostMap))
 	for _, h := range hostMap {
-		if h.MACAddress != "" {
-			hosts = append(hosts, *h)
+		if h.MACAddress == "" {
+			continue
 		}
+		// Cross-reference RSSI from WLANConfiguration AssociatedDevice if not already set.
+		if h.RSSI == nil {
+			mac := strings.ToLower(h.MACAddress)
+			if rssi, ok := wlanRSSI[mac]; ok {
+				h.RSSI = &rssi
+			}
+		}
+		hosts = append(hosts, *h)
 	}
 	return hosts
+}
+
+// buildWLANAssociatedDeviceRSSI builds a MAC→RSSI map from TR-098
+// WLANConfiguration.*.AssociatedDevice.* entries in the params.
+//
+// It matches fields like:
+//   - ...AssociatedDevice.{i}.AssociatedDeviceMACAddress → MAC
+//   - ...AssociatedDevice.{i}.RSSI or SignalStrength or AssociatedDeviceRssi → RSSI
+//
+// Returns a map keyed by normalised lowercase MAC.
+func buildWLANAssociatedDeviceRSSI(params map[string]string) map[string]int {
+	const wlanPrefix = "InternetGatewayDevice.LANDevice.1.WLANConfiguration."
+
+	// Collect per-(wlanIdx, assocIdx) → {mac, rssi}
+	type assocEntry struct {
+		mac  string
+		rssi int
+		ok   bool
+	}
+	entries := make(map[string]*assocEntry) // key = "wlanIdx.assocIdx"
+
+	for k, v := range params {
+		if !strings.HasPrefix(k, wlanPrefix) {
+			continue
+		}
+		rest := k[len(wlanPrefix):]
+		// rest = "5.AssociatedDevice.1.RSSI"
+		if !strings.Contains(rest, "AssociatedDevice.") {
+			continue
+		}
+		parts := strings.SplitN(rest, ".", 4)
+		if len(parts) < 4 {
+			continue
+		}
+		// parts[0]="5", parts[1]="AssociatedDevice", parts[2]="1", parts[3]="RSSI"
+		entryKey := parts[0] + "." + parts[2]
+		field := parts[3]
+		if entries[entryKey] == nil {
+			entries[entryKey] = &assocEntry{}
+		}
+		e := entries[entryKey]
+		switch field {
+		case "AssociatedDeviceMACAddress", "MACAddress", "X_ZTE-COM_MACAddress":
+			e.mac = strings.ToLower(v)
+		case "RSSI", "SignalStrength", "AssociatedDeviceRssi",
+			"X_ZTE-COM_Rssi", "X_ZTE-COM_SignalStrength",
+			"X_CMS_SignalStrength":
+			if r, err := strconv.Atoi(v); err == nil {
+				e.rssi = r
+				e.ok = true
+			}
+		}
+	}
+
+	result := make(map[string]int)
+	for _, e := range entries {
+		if e.mac != "" && e.ok {
+			result[e.mac] = e.rssi
+		}
+	}
+	return result
+}
+
+// wlanBandFromLayer2 extracts WiFi band info from a TR-098 Layer2Interface path.
+// e.g. "InternetGatewayDevice.LANDevice.1.WLANConfiguration.5" → "Wi-Fi 5GHz"
+// Convention: indices 1-4 = 2.4GHz, indices 5-8 = 5GHz (common across ZTE/Huawei/FiberHome/C-DATA).
+func wlanBandFromLayer2(layer2 string) string {
+	idx := strings.LastIndex(layer2, ".")
+	if idx < 0 {
+		return "Wi-Fi"
+	}
+	n, err := strconv.Atoi(layer2[idx+1:])
+	if err != nil {
+		return "Wi-Fi"
+	}
+	if n >= 1 && n <= 4 {
+		return "Wi-Fi 2.4GHz"
+	}
+	if n >= 5 && n <= 8 {
+		return "Wi-Fi 5GHz"
+	}
+	return "Wi-Fi"
 }
 
 func buildIndexedPathRegex(pathTemplate string) *regexp.Regexp {

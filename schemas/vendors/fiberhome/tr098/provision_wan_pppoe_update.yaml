@@ -1,10 +1,9 @@
 id: wan_pppoe_update
-vendor: cdata
+vendor: fiberhome
 model: tr098
 description: >
-  C-DATA TR-098 PPPoE credential update for an existing WANPPPConnection.
-  Keeps WAN service enabled and updates both standard and X_CMS password fields.
-  Optionally enables IPv6 dual-stack via X_CT-COM_IPMode.
+  FiberHome TR-098 PPPoE credential update for an existing WANPPPConnection.
+  Updates username, password and IP mode (IPv4 or dual-stack).
   Input vars: wan_dev, wan_conn, wan_ppp_conn, username, password, wan_ip_mode.
 
 steps:
@@ -12,6 +11,5 @@ steps:
     params:
       "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Username": "{username}"
       "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Password": "{password}"
-      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_CMS_Password": "{password}"
-      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_CT-COM_IPMode": "{wan_ip_mode}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_FH_IPMode": "{wan_ip_mode}"
       "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Enable": "1"

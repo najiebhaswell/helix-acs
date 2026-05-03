@@ -10,7 +10,7 @@ description: >
 
   Input variables:
     ip_iface_idx, ppp_iface_idx,
-    username (optional), password (optional)
+    username (optional), password (optional), ipv6_enabled
 
   Variables from driver config:
     ppp_auth_protocol
@@ -23,4 +23,5 @@ steps:
       "Device.PPP.Interface.{ppp_iface_idx}.Password": "{password}"
       "Device.PPP.Interface.{ppp_iface_idx}.AuthenticationProtocol": "{ppp_auth_protocol}"
       "Device.PPP.Interface.{ppp_iface_idx}.Enable": "1"
+      "Device.IP.Interface.{ip_iface_idx}.IPv6Enable": "{ipv6_enabled}"
       "Device.IP.Interface.{ip_iface_idx}.Enable": "1"
