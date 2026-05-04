@@ -1,0 +1,1528 @@
+InternetGatewayDevice.DeviceInfo.AccessType	
+InternetGatewayDevice.DeviceInfo.AdditionalHardwareVersion	
+InternetGatewayDevice.DeviceInfo.AdditionalSoftwareVersion	RP00001
+InternetGatewayDevice.DeviceInfo.Description	Home Gateway
+InternetGatewayDevice.DeviceInfo.DeviceLog	Jan  1 04:00:42 (none) daemon.err udevd[443]: delete_path: rmdir(/dev/.udev/failed) failed: Read-only file system
+Jan  1 04:00:42 (none) daemon.err udevd[443]: delete_path: rmdir(/dev/.udev/queue) failed: Read-only file system
+Jan  1 00:01:07 (none) user.crit tr069: Agent: start download
+Jan  1 00:01:07 (none) user.crit tr069: Agent: file type is 1 Firmware Upgrade Image
+Jan  1 00:01:12 (none) user.crit tr069: Agent: download failed
+Jan  1 00:05:00 (none) daemon.err udevd[446]: delete_path: rmdir(/dev/.udev/failed) failed: Read-only file system
+Jan  1 00:05:00 (none) daemon.err udevd[446]: delete_path: rmdir(/dev/.udev/failed) failed: Read-only file system
+Jan  1 00:05:00 (none) daemon.err udevd[446]: delete_path: rmdir(/dev/.udev/queue) failed: Read-only file system
+Jan  1 00:02:29 (none) user.err ajax: 43.245.184.5:admin login succeed from web!
+Jan  1 00:07:43 (none) daemon.err pppd[9930]: Unable to complete PPPoE Discovery
+Jan  1 00:09:53 (none) user.crit tr069: Agent: start download
+Jan  1 00:09:53 (none) user.crit tr069: Agent: file type is 1 Firmware Upgrade Image
+Jan  1 00:09:58 (none) user.crit tr069: Agent: download failed
+Jan  1 00:10:52 (none) daemon.err pppd[10748]: Unable to complete PPPoE Discovery
+Jan  1 00:12:58 (none) daemon.err pppd[13928]: Unable to complete PPPoE Discovery
+Jan  1 00:18:37 (none) user.err ajax: 43.245.184.5:admin login succeed from web!
+Jan  1 00:19:46 (none) daemon.err pppd[15953]: Unable to complete PPPoE Discovery
+
+InternetGatewayDevice.DeviceInfo.DeviceType	HG6145D2
+InternetGatewayDevice.DeviceInfo.EnabledOptions	
+InternetGatewayDevice.DeviceInfo.FHVerion	
+InternetGatewayDevice.DeviceInfo.FirstUseDate	0001-01-01T00:00:00Z
+InternetGatewayDevice.DeviceInfo.HardwareVersion	WKE2.094.443A03
+InternetGatewayDevice.DeviceInfo.Manufacturer	FiberHome
+InternetGatewayDevice.DeviceInfo.ManufacturerOUI	000AC2
+InternetGatewayDevice.DeviceInfo.MemoryStatus.Free	378192
+InternetGatewayDevice.DeviceInfo.MemoryStatus.Total	524288
+InternetGatewayDevice.DeviceInfo.ModelName	HG6145D2
+InternetGatewayDevice.DeviceInfo.ModemFirmwareVersion	FW.R01.01.Build17
+InternetGatewayDevice.DeviceInfo.ProcessStatus.CPUUsage	6
+InternetGatewayDevice.DeviceInfo.ProductClass	HG6145D2
+InternetGatewayDevice.DeviceInfo.ProvisioningCode	01
+InternetGatewayDevice.DeviceInfo.SerialNumber	FHTTC1E9C3D5
+InternetGatewayDevice.DeviceInfo.SoftwareVersion	RP4592
+InternetGatewayDevice.DeviceInfo.SpecVersion	1.0
+InternetGatewayDevice.DeviceInfo.UpTime	10834
+InternetGatewayDevice.DeviceInfo.VendorConfigFile.1.Date	2025-08-12T20:18:17Z
+InternetGatewayDevice.DeviceInfo.VendorConfigFile.1.Discription	
+InternetGatewayDevice.DeviceInfo.VendorConfigFile.1.Name	
+InternetGatewayDevice.DeviceInfo.VendorConfigFile.1.Version	
+InternetGatewayDevice.DeviceInfo.VendorConfigFileNumberOfEntries	1
+InternetGatewayDevice.DeviceInfo.X_FH_Account.X_FH_WebUserInfo.Enable	1
+InternetGatewayDevice.DeviceInfo.X_FH_Account.X_FH_WebUserInfo.WanPassword	
+InternetGatewayDevice.DeviceInfo.X_FH_Account.X_FH_WebUserInfo.WebPassword	fiberstream.net.id
+InternetGatewayDevice.DeviceInfo.X_FH_Account.X_FH_WebUserInfo.WebSuperPassword	S1liw4n9i508
+InternetGatewayDevice.DeviceInfo.X_FH_Account.X_FH_WebUserInfo.WebSuperUsername	admin
+InternetGatewayDevice.DeviceInfo.X_FH_Account.X_FH_WebUserInfo.WebUsername	fiberstream
+InternetGatewayDevice.DeviceSummary	InternetGatewayDevice:1.1[](Baseline:1,EthernetLAN:1,USBLAN:1,WiFiLAN:2,WANDevice:1,Time:1,IPPing:1,GatewayInfo:1,Services:1)
+InternetGatewayDevice.DownloadDiagnostics.BOMTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.DownloadDiagnostics.DSCP	0
+InternetGatewayDevice.DownloadDiagnostics.DiagnosticsState	None
+InternetGatewayDevice.DownloadDiagnostics.DownloadURL	
+InternetGatewayDevice.DownloadDiagnostics.EOMTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.DownloadDiagnostics.EthernetPriority	0
+InternetGatewayDevice.DownloadDiagnostics.Interface	
+InternetGatewayDevice.DownloadDiagnostics.ROMTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.DownloadDiagnostics.TCPOpenRequestTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.DownloadDiagnostics.TCPOpenResponseTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.DownloadDiagnostics.TestBytesReceived	0
+InternetGatewayDevice.DownloadDiagnostics.TotalBytesReceived	0
+InternetGatewayDevice.IPPingDiagnostics.AverageResponseTime	0
+InternetGatewayDevice.IPPingDiagnostics.DSCP	0
+InternetGatewayDevice.IPPingDiagnostics.DataBlockSize	56
+InternetGatewayDevice.IPPingDiagnostics.DiagnosticsState	
+InternetGatewayDevice.IPPingDiagnostics.FailureCount	0
+InternetGatewayDevice.IPPingDiagnostics.Host	
+InternetGatewayDevice.IPPingDiagnostics.IPVersion	0
+InternetGatewayDevice.IPPingDiagnostics.Interface	
+InternetGatewayDevice.IPPingDiagnostics.MaximumResponseTime	0
+InternetGatewayDevice.IPPingDiagnostics.MinimumResponseTime	0
+InternetGatewayDevice.IPPingDiagnostics.NumberOfRepetitions	4
+InternetGatewayDevice.IPPingDiagnostics.SuccessCount	0
+InternetGatewayDevice.IPPingDiagnostics.Timeout	10000
+InternetGatewayDevice.LANDevice.1.HostCustomiseNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.AckTime	6845
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.Active	1
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.AddressSource	DHCP
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.DeviceType	Computer
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.HostName	Xiaomi-14
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.IPAddress	192.168.1.5
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.InterfaceType	802.11
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.Layer2Interface	InternetGatewayDevice.LANDevice.1.WLANConfiguration.5
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.LeaseTimeRemaining	86009
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.MACAddress	A2:EE:83:D5:1A:20
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.X_FH_Stats.BytesReceived	0
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.X_FH_Stats.BytesSent	0
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.X_FH_Stats.X_FH_PacketsReceived	0
+InternetGatewayDevice.LANDevice.1.Hosts.Host.1.X_FH_Stats.X_FH_PacketsSent	0
+InternetGatewayDevice.LANDevice.1.Hosts.HostNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.Hosts.X_FH_LearnNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.DuplexMode	Auto
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Enable	1
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.MACAddress	
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.MACAddressControlEnabled	1
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.MaxBitRate	Auto
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Name	eth0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.BroadcastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.BroadcastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.BytesReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.BytesSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.ErrorsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.MulticastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.MulticastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.PacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.PacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.UnicastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.UnicastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.Status	NoLink
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.X_FH_LinkSpeed	1000M
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.X_FH_MacLimitNumber	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.DuplexMode	Auto
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Enable	1
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.MACAddress	
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.MACAddressControlEnabled	1
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.MaxBitRate	Auto
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Name	eth1
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.BroadcastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.BroadcastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.BytesReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.BytesSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.ErrorsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.MulticastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.MulticastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.PacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.PacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.UnicastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.UnicastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.Status	NoLink
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.X_FH_LinkSpeed	1000M
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.X_FH_MacLimitNumber	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.DuplexMode	Auto
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Enable	1
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.MACAddress	
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.MACAddressControlEnabled	1
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.MaxBitRate	Auto
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Name	eth2
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.BroadcastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.BroadcastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.BytesReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.BytesSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.ErrorsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.MulticastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.MulticastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.PacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.PacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.UnicastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.UnicastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.Status	NoLink
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.X_FH_LinkSpeed	1000M
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.X_FH_MacLimitNumber	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.DuplexMode	Auto
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Enable	1
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.MACAddress	
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.MACAddressControlEnabled	1
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.MaxBitRate	Auto
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Name	eth3
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.BroadcastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.BroadcastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.BytesReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.BytesSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.ErrorsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.MulticastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.MulticastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.PacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.PacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.UnicastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.UnicastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.Status	NoLink
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.X_FH_LinkSpeed	1000M
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.X_FH_MacLimitNumber	0
+InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceNumberOfEntries	4
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.AllowedMACAddresses	
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.AssociatedConnection	
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.DHCPLeaseTime	86400
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.DHCPRelay	0
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.DHCPServerConfigurable	1
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.DHCPServerEnable	1
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.DNSServers	192.168.1.1
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.DomainName	www.fiberhome.com.cn
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.1.Enable	1
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.1.IPInterfaceAddressingType	DHCP
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.1.IPInterfaceIPAddress	192.168.1.1
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.1.IPInterfaceSubnetMask	255.255.255.0
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.2.Enable	0
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.2.IPInterfaceIPAddress	192.168.2.1
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.2.IPInterfaceSubnetMask	255.255.255.0
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterfaceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPRouters	192.168.1.1
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.MACAddress	88:65:9F:F9:11:98
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.MaxAddress	192.168.1.254
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.MinAddress	192.168.1.2
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.PassthroughLease	0
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.PassthroughMACAddress	
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.ReservedAddresses	192.168.1.33
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.SubnetMask	255.255.255.0
+InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.UseAllocatedWAN	
+InternetGatewayDevice.LANDevice.1.LANUSBInterfaceNumberOfEntries	1
+InternetGatewayDevice.LANDevice.1.LANWLANConfigurationNumberOfEntries	8
+InternetGatewayDevice.LANDevice.1.WLANConfigNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.AuthenticationServiceMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.AutoChannelEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.AutoRateFallBackEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.BSSID	88:66:9f:f9:11:98
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.BasicAuthenticationMode	OpenSystem
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.BasicDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.BasicEncryptionModes	None
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.BeaconAdvertisementEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.BeaconType	Basic
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Channel	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.ChannelsInUse	6
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.ConfigActive	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.DeviceOperationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.DiagnosticsState	None
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.DistanceFromRoot	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Enable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.IEEE11iAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.IEEE11iEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.InsecureOOBAccessEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase	wlannqhjxc
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.LocationDescription	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.MACAddressControlEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.MaxBitRate	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Name	wl0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.NeighborNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.OperationalDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PeerBSSID	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PossibleChannels	1-13
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PossibleDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase	wlannqhjxc
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey	wlannqhjxc
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.RadioEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.RegulatoryDomain	ID
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.RekeyingInterval	1800
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID	fh_f91198
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSIDAdvertisementEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Standard	bgn
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.BroadcastPacketsReceived	102
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.BroadcastPacketsSent	135
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.ErrorsSent	3909
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.MulticastPacketsReceived	152
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.MulticastPacketsSent	107
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.UnicastPacketsReceived	1543
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.UnicastPacketsSent	868
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Status	Up
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesReceived	93907
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesSent	769931
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalIntegrityFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalPSKFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalPacketsReceived	957
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalPacketsSent	1110
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TransmitPower	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TransmitPowerSupported	20,40,60,80,100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WEPEncryptionLevel	40-bit
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WEPKey.1.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WEPKey.2.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WEPKey.3.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WEPKey.4.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WEPKeyIndex	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WLAN_AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WMMEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WMMSupported	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPAAuthenticationMode	NONE
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPAEncryptionModes	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.ConfigMethodsEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.ConfigMethodsSupported	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.ConfigurationState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.DeviceName	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.DevicePassword	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.LastConfigurationError	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.RegistrarEstablished	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.RegistrarNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.SetupLock	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.SetupLockedState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.UUID	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.WPS.Version	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_AssociateNum	32
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_BandSteeringEnable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_Beaconperiod	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_ChannelWidth	2
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_MACAccessMode	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_RSSIThreshold_2G	-40
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_RSSIThreshold_5G	-70
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_Radius.Key	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_Radius.Port	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_Radius.ServiceIp	0.0.0.0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_Radius.ServiceIpLenth	4
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_Radius.ServiceIpPrefixLen	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_FH_Radius.ServiceIpType	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.AuthenticationServiceMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.AutoChannelEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.AutoRateFallBackEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.BSSID	88:66:9f:f9:11:99
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.BasicAuthenticationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.BasicDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.BasicEncryptionModes	None
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.BeaconAdvertisementEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.BeaconType	11i
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Channel	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.ChannelsInUse	6
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.ConfigActive	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.DeviceOperationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.DistanceFromRoot	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.IEEE11iAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.IEEE11iEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.InsecureOOBAccessEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.LocationDescription	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.MACAddressControlEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.MaxBitRate	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Name	wl0.1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.OperationalDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.PeerBSSID	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.PossibleChannels	1-13
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.PossibleDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.PreSharedKey.1.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.PreSharedKey.1.PreSharedKey	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.RadioEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.RegulatoryDomain	US
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.RekeyingInterval	1800
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSID	fh_ssid2
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSIDAdvertisementEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Standard	bgn
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.BroadcastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.BroadcastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.ErrorsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.MulticastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.MulticastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.UnicastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.UnicastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Status	Disabled
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalAssociations	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalBytesReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalBytesSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalIntegrityFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalPSKFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TransmitPower	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TransmitPowerSupported	20,40,60,80,100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WEPEncryptionLevel	40-bit
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WEPKey.1.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WEPKey.2.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WEPKey.3.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WEPKey.4.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WEPKeyIndex	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WLAN_AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WMMEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WMMSupported	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPAAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPAEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.ConfigMethodsEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.ConfigMethodsSupported	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.ConfigurationState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.DeviceName	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.DevicePassword	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.LastConfigurationError	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.RegistrarEstablished	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.RegistrarNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.SetupLock	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.SetupLockedState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.UUID	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.WPS.Version	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.X_FH_AssociateNum	32
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.X_FH_Beaconperiod	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.X_FH_ChannelWidth	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.X_FH_MACAccessMode	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.X_FH_Radius.Key	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.X_FH_Radius.Port	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.X_FH_Radius.ServiceIp	0.0.0.0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.X_FH_Radius.ServiceIpLenth	4
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.X_FH_Radius.ServiceIpPrefixLen	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.X_FH_Radius.ServiceIpType	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.AuthenticationServiceMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.AutoChannelEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.AutoRateFallBackEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.BSSID	88:66:9f:f9:11:9a
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.BasicAuthenticationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.BasicDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.BasicEncryptionModes	None
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.BeaconAdvertisementEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.BeaconType	11i
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Channel	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.ChannelsInUse	6
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.ConfigActive	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.DeviceOperationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.DistanceFromRoot	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.IEEE11iAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.IEEE11iEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.InsecureOOBAccessEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.LocationDescription	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.MACAddressControlEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.MaxBitRate	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Name	wl0.2
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.OperationalDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.PeerBSSID	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.PossibleChannels	1-13
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.PossibleDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.PreSharedKey.1.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.PreSharedKey.1.PreSharedKey	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.RadioEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.RegulatoryDomain	US
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.RekeyingInterval	1800
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.SSID	fh_ssid3
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.SSIDAdvertisementEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Standard	bgn
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.BroadcastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.BroadcastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.ErrorsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.MulticastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.MulticastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.UnicastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.UnicastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Status	Disabled
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.TotalAssociations	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.TotalBytesReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.TotalBytesSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.TotalIntegrityFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.TotalPSKFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.TotalPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.TotalPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.TransmitPower	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.TransmitPowerSupported	20,40,60,80,100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WEPEncryptionLevel	40-bit
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WEPKey.1.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WEPKey.2.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WEPKey.3.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WEPKey.4.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WEPKeyIndex	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WLAN_AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WMMEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WMMSupported	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPAAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPAEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.ConfigMethodsEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.ConfigMethodsSupported	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.ConfigurationState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.DeviceName	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.DevicePassword	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.LastConfigurationError	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.RegistrarEstablished	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.RegistrarNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.SetupLock	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.SetupLockedState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.UUID	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.WPS.Version	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.X_FH_AssociateNum	32
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.X_FH_Beaconperiod	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.X_FH_ChannelWidth	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.X_FH_MACAccessMode	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.X_FH_Radius.Key	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.X_FH_Radius.Port	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.X_FH_Radius.ServiceIp	0.0.0.0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.X_FH_Radius.ServiceIpLenth	4
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.X_FH_Radius.ServiceIpPrefixLen	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.X_FH_Radius.ServiceIpType	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.AuthenticationServiceMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.AutoChannelEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.AutoRateFallBackEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.BSSID	88:66:9f:f9:11:9b
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.BasicAuthenticationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.BasicDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.BasicEncryptionModes	None
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.BeaconAdvertisementEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.BeaconType	11i
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Channel	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.ChannelsInUse	6
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.ConfigActive	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.DeviceOperationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.DistanceFromRoot	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.IEEE11iAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.IEEE11iEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.InsecureOOBAccessEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.LocationDescription	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.MACAddressControlEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.MaxBitRate	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Name	wl0.3
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.OperationalDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.PeerBSSID	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.PossibleChannels	1-13
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.PossibleDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.PreSharedKey.1.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.PreSharedKey.1.PreSharedKey	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.RadioEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.RegulatoryDomain	US
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.RekeyingInterval	1800
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.SSID	fh_ssid4
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.SSIDAdvertisementEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Standard	bgn
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.BroadcastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.BroadcastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.ErrorsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.MulticastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.MulticastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.UnicastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.UnicastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Status	Disabled
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.TotalAssociations	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.TotalBytesReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.TotalBytesSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.TotalIntegrityFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.TotalPSKFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.TotalPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.TotalPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.TransmitPower	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.TransmitPowerSupported	20,40,60,80,100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WEPEncryptionLevel	40-bit
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WEPKey.1.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WEPKey.2.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WEPKey.3.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WEPKey.4.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WEPKeyIndex	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WLAN_AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WMMEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WMMSupported	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPAAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPAEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.ConfigMethodsEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.ConfigMethodsSupported	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.ConfigurationState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.DeviceName	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.DevicePassword	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.LastConfigurationError	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.RegistrarEstablished	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.RegistrarNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.SetupLock	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.SetupLockedState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.UUID	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.WPS.Version	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_FH_AssociateNum	32
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_FH_Beaconperiod	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_FH_ChannelWidth	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_FH_MACAccessMode	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_FH_Radius.Key	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_FH_Radius.Port	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_FH_Radius.ServiceIp	0.0.0.0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_FH_Radius.ServiceIpLenth	4
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_FH_Radius.ServiceIpPrefixLen	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.X_FH_Radius.ServiceIpType	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.AuthenticationServiceMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.AutoChannelEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.AutoRateFallBackEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.BSSID	88:66:9f:f9:11:9c
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.BasicAuthenticationMode	OpenSystem
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.BasicDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.BasicEncryptionModes	None
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.BeaconAdvertisementEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.BeaconType	Basic
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Channel	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.ChannelsInUse	149
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.ConfigActive	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.DeviceOperationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.DiagnosticsState	None
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.DistanceFromRoot	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Enable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.IEEE11iAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.IEEE11iEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.InsecureOOBAccessEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.KeyPassphrase	wlannqhjxc
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.LocationDescription	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.MACAddressControlEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.MaxBitRate	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Name	wl1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.NeighborNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.OperationalDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PeerBSSID	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PossibleChannels	36,40,44,48,52,56,60,64,149,153,157,161
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PossibleDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.1.KeyPassphrase	wlannqhjxc
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.1.PreSharedKey	wlannqhjxc
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.RadioEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.RegulatoryDomain	ID
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.RekeyingInterval	1800
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID	fh_f91198_5G
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSIDAdvertisementEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Standard	a,n,ac
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.BroadcastPacketsReceived	16
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.BroadcastPacketsSent	16
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.ErrorsSent	174
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.MulticastPacketsReceived	16
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.MulticastPacketsSent	34
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.UnicastPacketsReceived	302
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.UnicastPacketsSent	50
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Status	Up
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.TotalAssociations	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.TotalBytesReceived	14261
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.TotalBytesSent	11876
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.TotalIntegrityFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.TotalPSKFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.TotalPacketsReceived	128
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.TotalPacketsSent	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.TransmitPower	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.TransmitPowerSupported	20,40,60,80,100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WEPEncryptionLevel	40-bit
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WEPKey.1.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WEPKey.2.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WEPKey.3.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WEPKey.4.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WEPKeyIndex	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WLAN_AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WMMEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WMMSupported	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPAAuthenticationMode	NONE
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPAEncryptionModes	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.ConfigMethodsEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.ConfigMethodsSupported	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.ConfigurationState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.DeviceName	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.DevicePassword	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.LastConfigurationError	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.RegistrarEstablished	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.RegistrarNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.SetupLock	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.SetupLockedState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.UUID	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.WPS.Version	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_FH_AssociateNum	32
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_FH_Beaconperiod	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_FH_ChannelWidth	3
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_FH_MACAccessMode	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_FH_Radius.Key	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_FH_Radius.Port	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_FH_Radius.ServiceIp	0.0.0.0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_FH_Radius.ServiceIpLenth	4
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_FH_Radius.ServiceIpPrefixLen	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_FH_Radius.ServiceIpType	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.AuthenticationServiceMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.AutoChannelEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.AutoRateFallBackEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.BSSID	88:66:9f:f9:11:9d
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.BasicAuthenticationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.BasicDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.BasicEncryptionModes	None
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.BeaconAdvertisementEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.BeaconType	11i
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Channel	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.ChannelsInUse	149
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.ConfigActive	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.DeviceOperationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.DistanceFromRoot	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.IEEE11iAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.IEEE11iEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.InsecureOOBAccessEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.LocationDescription	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.MACAddressControlEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.MaxBitRate	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Name	wl1.1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.OperationalDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.PeerBSSID	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.PossibleChannels	36,40,44,48,52,56,60,64,149,153,157,161
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.PossibleDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.PreSharedKey.1.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.PreSharedKey.1.PreSharedKey	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.RadioEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.RegulatoryDomain	US
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.RekeyingInterval	1800
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.SSID	fh_5G_ssid2
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.SSIDAdvertisementEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Standard	a,n,ac
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.BroadcastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.BroadcastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.ErrorsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.MulticastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.MulticastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.UnicastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.UnicastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Status	Disabled
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.TotalAssociations	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.TotalBytesReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.TotalBytesSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.TotalIntegrityFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.TotalPSKFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.TotalPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.TotalPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.TransmitPower	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.TransmitPowerSupported	20,40,60,80,100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WEPEncryptionLevel	40-bit
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WEPKey.1.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WEPKey.2.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WEPKey.3.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WEPKey.4.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WEPKeyIndex	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WLAN_AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WMMEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WMMSupported	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPAAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPAEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.ConfigMethodsEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.ConfigMethodsSupported	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.ConfigurationState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.DeviceName	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.DevicePassword	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.LastConfigurationError	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.RegistrarEstablished	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.RegistrarNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.SetupLock	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.SetupLockedState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.UUID	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.WPS.Version	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.X_FH_AssociateNum	32
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.X_FH_Beaconperiod	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.X_FH_ChannelWidth	3
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.X_FH_MACAccessMode	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.X_FH_Radius.Key	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.X_FH_Radius.Port	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.X_FH_Radius.ServiceIp	0.0.0.0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.X_FH_Radius.ServiceIpLenth	4
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.X_FH_Radius.ServiceIpPrefixLen	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.X_FH_Radius.ServiceIpType	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.AuthenticationServiceMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.AutoChannelEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.AutoRateFallBackEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.BSSID	88:66:9f:f9:11:9e
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.BasicAuthenticationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.BasicDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.BasicEncryptionModes	None
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.BeaconAdvertisementEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.BeaconType	11i
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Channel	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.ChannelsInUse	149
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.ConfigActive	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.DeviceOperationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.DistanceFromRoot	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.IEEE11iAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.IEEE11iEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.InsecureOOBAccessEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.LocationDescription	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.MACAddressControlEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.MaxBitRate	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Name	wl1.2
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.OperationalDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.PeerBSSID	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.PossibleChannels	36,40,44,48,52,56,60,64,149,153,157,161
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.PossibleDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.PreSharedKey.1.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.PreSharedKey.1.PreSharedKey	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.RadioEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.RegulatoryDomain	US
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.RekeyingInterval	1800
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.SSID	fh_5G_ssid3
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.SSIDAdvertisementEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Standard	a,n,ac
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.BroadcastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.BroadcastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.ErrorsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.MulticastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.MulticastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.UnicastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.UnicastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Status	Disabled
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.TotalAssociations	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.TotalBytesReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.TotalBytesSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.TotalIntegrityFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.TotalPSKFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.TotalPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.TotalPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.TransmitPower	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.TransmitPowerSupported	20,40,60,80,100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WEPEncryptionLevel	40-bit
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WEPKey.1.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WEPKey.2.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WEPKey.3.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WEPKey.4.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WEPKeyIndex	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WLAN_AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WMMEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WMMSupported	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPAAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPAEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.ConfigMethodsEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.ConfigMethodsSupported	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.ConfigurationState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.DeviceName	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.DevicePassword	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.LastConfigurationError	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.RegistrarEstablished	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.RegistrarNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.SetupLock	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.SetupLockedState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.UUID	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.WPS.Version	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.X_FH_AssociateNum	32
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.X_FH_Beaconperiod	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.X_FH_ChannelWidth	3
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.X_FH_MACAccessMode	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.X_FH_Radius.Key	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.X_FH_Radius.Port	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.X_FH_Radius.ServiceIp	0.0.0.0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.X_FH_Radius.ServiceIpLenth	4
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.X_FH_Radius.ServiceIpPrefixLen	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.X_FH_Radius.ServiceIpType	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.AuthenticationServiceMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.AutoChannelEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.AutoRateFallBackEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.BSSID	88:66:9f:f9:11:9f
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.BasicAuthenticationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.BasicDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.BasicEncryptionModes	None
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.BeaconAdvertisementEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.BeaconType	11i
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Channel	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.ChannelsInUse	149
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.ConfigActive	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.DeviceOperationMode	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.DistanceFromRoot	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.IEEE11iAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.IEEE11iEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.InsecureOOBAccessEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.LocationDescription	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.MACAddressControlEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.MaxBitRate	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Name	wl1.3
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.OperationalDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.PeerBSSID	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.PossibleChannels	36,40,44,48,52,56,60,64,149,153,157,161
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.PossibleDataTransmitRates	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.PreSharedKey.1.KeyPassphrase	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.PreSharedKey.1.PreSharedKey	12345678
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.RadioEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.RegulatoryDomain	US
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.RekeyingInterval	1800
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.SSID	fh_5G_ssid4
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.SSIDAdvertisementEnabled	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Standard	a,n,ac
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.BroadcastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.BroadcastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.DiscardPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.DiscardPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.ErrorsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.ErrorsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.MulticastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.MulticastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.UnicastPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.UnicastPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Stats.UnknownProtoPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Status	Disabled
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.TotalAssociations	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.TotalBytesReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.TotalBytesSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.TotalIntegrityFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.TotalPSKFailures	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.TotalPacketsReceived	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.TotalPacketsSent	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.TransmitPower	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.TransmitPowerSupported	20,40,60,80,100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WEPEncryptionLevel	40-bit
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WEPKey.1.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WEPKey.2.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WEPKey.3.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WEPKey.4.WEPKey	12345
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WEPKeyIndex	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WLAN_AssociatedDeviceNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WMMEnable	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WMMSupported	1
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPAAuthenticationMode	PSKAuthentication
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPAEncryptionModes	AESEncryption
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.ConfigMethodsEnabled	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.ConfigMethodsSupported	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.ConfigurationState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.DeviceName	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.DevicePassword	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.Enable	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.LastConfigurationError	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.RegistrarEstablished	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.RegistrarNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.SetupLock	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.SetupLockedState	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.UUID	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.WPS.Version	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.X_FH_AssociateNum	32
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.X_FH_Beaconperiod	100
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.X_FH_ChannelWidth	3
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.X_FH_MACAccessMode	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.X_FH_Radius.Key	
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.X_FH_Radius.Port	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.X_FH_Radius.ServiceIp	0.0.0.0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.X_FH_Radius.ServiceIpLenth	4
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.X_FH_Radius.ServiceIpPrefixLen	0
+InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.X_FH_Radius.ServiceIpType	1
+InternetGatewayDevice.LANDevice.1.WLANForGuestNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.WLANSwitchTimerNumberOfEntries	0
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.EnableUserId	0
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.LANIDIndex	0
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.LINE_ID_Mode	custom
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.PPPEnableUserId	0
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.PPPLANIDndex	0
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.PPPPortIsolation	1
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.PPPSSIDIndex	0
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.PPPSTAIsolation	1
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.PortIsolation	1
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.SSIDIndex	0
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.STAIsolation	1
+InternetGatewayDevice.LANDevice.1.X_FH_WLANShare.1.UserId	
+InternetGatewayDevice.LANDeviceNumberOfEntries	1
+InternetGatewayDevice.Layer3Forwarding.DefaultConnectionService	
+InternetGatewayDevice.Layer3Forwarding.ForwardNumberOfEntries	0
+InternetGatewayDevice.ManagementServer.CertificateEnable	0
+InternetGatewayDevice.ManagementServer.ConnectionRequestAuth	0
+InternetGatewayDevice.ManagementServer.ConnectionRequestPassword	gmedia123
+InternetGatewayDevice.ManagementServer.ConnectionRequestURL	http://10.201.79.58:7547/0
+InternetGatewayDevice.ManagementServer.ConnectionRequestUsername	gmedia
+InternetGatewayDevice.ManagementServer.DefaultActiveNotificationThrottle	1
+InternetGatewayDevice.ManagementServer.DownloadProgressURL	
+InternetGatewayDevice.ManagementServer.EnableCWMP	1
+InternetGatewayDevice.ManagementServer.KickURL	
+InternetGatewayDevice.ManagementServer.ParameterKey	
+InternetGatewayDevice.ManagementServer.Password	gmedia123
+InternetGatewayDevice.ManagementServer.PeriodicInformEnable	1
+InternetGatewayDevice.ManagementServer.PeriodicInformInterval	600
+InternetGatewayDevice.ManagementServer.PeriodicInformTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.ManagementServer.URL	http://acs.gmedia-ops.id:7547
+InternetGatewayDevice.ManagementServer.UpgradesManaged	0
+InternetGatewayDevice.ManagementServer.Username	gmedia
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.ButtonMap	0
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.1.BitRate	64000
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.1.Codec	G.711MuLaw
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.1.EntryID	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.1.PacketizationPeriod	10, 20, 30
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.1.SilenceSuppression	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.2.BitRate	64000
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.2.Codec	G.711ALaw
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.2.EntryID	2
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.2.PacketizationPeriod	10, 20, 30
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.2.SilenceSuppression	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.3.BitRate	8000
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.3.Codec	G.729
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.3.EntryID	3
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.3.PacketizationPeriod	20, 40
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.3.SilenceSuppression	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.4.BitRate	5300
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.4.Codec	G723.l
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.4.EntryID	4
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.4.PacketizationPeriod	30, 60
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.4.SilenceSuppression	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.5.BitRate	6300
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.5.Codec	G723.h
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.5.EntryID	5
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.5.PacketizationPeriod	30, 60
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.5.SilenceSuppression	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.6.BitRate	64000
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.6.Codec	G.722
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.6.EntryID	6
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.6.PacketizationPeriod	20
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Codecs.6.SilenceSuppression	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.DigitMap	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.FaxPassThrough	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.FaxT38	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.MaxLineCount	2
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.MaxProfileCount	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.MaxSessionCount	4
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.MaxSessionsPerLine	2
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.ModemPassThrough	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.NumberingPlan	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.RTCP	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.Regions	TH,AE
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.RingGeneration	0
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.SIP.EventSubscription	1
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.SIP.Extensions	REFER,INFO
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.SIP.ResponseMap	0
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.SIP.Role	UserAgent
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.SIP.Transports	UDP
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.SIP.URISchemes	tel
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.SignalingProtocols	SIP
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.ToneGeneration	0
+InternetGatewayDevice.Services.VoiceService.1.Capabilities.VoicePortTests	1
+InternetGatewayDevice.Services.VoiceService.1.PhyInterface.1.Enable	0
+InternetGatewayDevice.Services.VoiceService.1.PhyInterface.1.InterfaceID	1
+InternetGatewayDevice.Services.VoiceService.1.PhyInterface.1.PhyPort	0
+InternetGatewayDevice.Services.VoiceService.1.PhyInterface.1.Tests.PhoneConnectivity	0
+InternetGatewayDevice.Services.VoiceService.1.PhyInterface.1.Tests.TestSelector	
+InternetGatewayDevice.Services.VoiceService.1.PhyInterface.1.Tests.TestState	
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.DTMFMethod	InBand
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.DTMFMethodG711	inband
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.DigitMap	[0-9ABCD].|[EF][0-9ABCDEF].
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.DigitMapEnable	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Enable	Enable
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.FaxPassThrough	Auto
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.FaxT38.Enable	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallState	INACTIVE
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.CallForwardOnBusyEnable	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.CallForwardOnBusyNumber	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.CallForwardOnNoAnswerEnable	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.CallForwardOnNoAnswerNumber	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.CallForwardUnconditionalEnable	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.CallForwardUnconditionalNumber	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.CallTransferEnable	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.CallWaitingEnable	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.CallerIDEnable	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.DoNotDisturbEnable	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.X_FH_HotlineEnable	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.X_FH_HotlineNumber	
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.CallingFeatures.X_FH_HotlineTimer	5
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.1.BitRate	8000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.1.Codec	G.711MuLaw
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.1.Enable	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.1.EntryID	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.1.PacketizationPeriod	20
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.1.Priority	2
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.1.SilenceSuppression	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.2.BitRate	8000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.2.Codec	G.711ALaw
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.2.Enable	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.2.EntryID	2
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.2.PacketizationPeriod	20
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.2.Priority	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.2.SilenceSuppression	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.3.BitRate	8000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.3.Codec	G.729
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.3.Enable	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.3.EntryID	3
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.3.PacketizationPeriod	20
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.3.Priority	3
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.3.SilenceSuppression	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.4.BitRate	8000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.4.Codec	G726-32
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.4.Enable	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.4.EntryID	4
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.4.PacketizationPeriod	20
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.4.Priority	6
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.4.SilenceSuppression	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.5.BitRate	8000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.5.Codec	G723
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.5.Enable	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.5.EntryID	5
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.5.PacketizationPeriod	30
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.5.Priority	5
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.5.SilenceSuppression	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.6.BitRate	8000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.6.Codec	G.722
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.6.Enable	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.6.EntryID	6
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.6.PacketizationPeriod	20
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.6.Priority	4
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Codec.List.6.SilenceSuppression	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.DirectoryNumber	
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Enable	Enabled
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.SIP.AuthEnable	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.SIP.AuthPassword	
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.SIP.AuthUserName	
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.SIP.URI	
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.BytesReceived	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.BytesSent	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.CallsDropped	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.IncomingCallsAnswered	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.IncomingCallsConnected	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.IncomingCallsFailed	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.IncomingCallsReceived	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.OutgoingCallsAnswered	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.OutgoingCallsAttempted	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.OutgoingCallsConnected	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.OutgoingCallsFailed	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.PacketsLost	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.PacketsReceived	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.PacketsSent	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.ResetStatistics	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Stats.TotalCallTime	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.Status	Error
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.VoiceProcessing.EchoCancellationEnable	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.VoiceProcessing.EchoCancellationInUse	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.VoiceProcessing.EchoCancellationTail	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.VoiceProcessing.ReceiveGain	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.VoiceProcessing.TransmitGain	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.VoiceProcessingMore.CNGEnable	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.X_FH_COM_CallingFeaturesMore.RegStatus	Offline
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.X_FH_IMS.conference-uri	
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.X_FH_IMS.cw-service	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.X_FH_IMS.dial-tone-pattern	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.X_FH_IMS.hold-service	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.X_FH_IMS.hotline-uri	
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.X_FH_IMS.mcid-service	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.X_FH_IMS.no-dialing-behaviour	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1.X_FH_IMS.three-party-service	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.MaxSessions	1800
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Name	
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.NumberOfLines	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.NumberingPlan.InterDigitTimerStd	5
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.NumberingPlan.MaximumNumberOfDigits	30
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.NumberingPlan.MinimumNumberOfDigits	2
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.RTP.DSCPMark	46
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.RTP.LocalPortMax	65535
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.RTP.LocalPortMin	5004
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.RTP.Redundancy.PayloadType	96
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.RTP.TelephoneEventPayloadType	97
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.RTP.VLANIDMark	-1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Reset	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.DSCPMark	46
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.OutboundProxy	0.0.0.0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.OutboundProxyPort	5060
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.ProxyServer	0.0.0.0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.ProxyServerPort	5060
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.ProxyServerTransport	UDP
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.RegisterExpires	3600
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.RegisterRetryInterval	30
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.RegistrarServer	0.0.0.0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.RegistrarServerPort	5060
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.RegistrarServerTransport	UDP
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.RegistrationPeriod	3600
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.T1	500
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.T2	4000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.T4	4000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerA	500
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerB	32000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerC	180000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerD	32000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerE	500
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerF	32000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerG	500
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerH	32000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerI	4000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerJ	32000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.TimerK	4000
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.UserAgentDomain	
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.UserAgentPort	5060
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.UserAgentTransport	UDP
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.VLANIDMark	-1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_802-1pMark	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_HeartbeatCount	3
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_HeartbeatCycle	30
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_HeartbeatSwitch	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_SessionUpdateTimer	1800
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_Standby-OutboundProxy	0.0.0.0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_Standby-OutboundProxyPort	5060
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_Standby-ProxyServer	0.0.0.0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_Standby-ProxyServerPort	5060
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_Standby-ProxyServerTransport	UDP
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_Standby-RegistrarServer	0.0.0.0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_Standby-RegistrarServerPort	5060
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SIP.X_FH_Standby-RegistrarServerTransport	UDP
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.SignalingProtocol	SIP
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_BusyToneTimer	40
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_CIDHeadfield	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_CallIdMode	FSK
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_DigitMapMatchMode	unambiguous notify
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_FaxCtrlMode	2
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_HangingReminderToneTimer	60
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_InterDigitTimerLong	16
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_InterDigitTimerShort	4
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_NoAnswerTimer	60
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_ServerType	1
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_SnowslideTimer	30
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_StartDigitTimer	16
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.X_FH_TransfercodeEnable	0
+InternetGatewayDevice.Services.VoiceService.1.VoiceProfileNumberOfEntries	1
+InternetGatewayDevice.Services.VoiceServiceNumberOfEntries	1
+InternetGatewayDevice.Services.X_FH_IPTV.GlobalVlan	-1
+InternetGatewayDevice.Time.CurrentLocalTime	1970-01-01T00:51:30
+InternetGatewayDevice.Time.DaylightSavingsEnd	0001-01-01T00:00:00Z
+InternetGatewayDevice.Time.DaylightSavingsStart	0001-01-01T00:00:00Z
+InternetGatewayDevice.Time.DaylightSavingsUsed	0
+InternetGatewayDevice.Time.Enable	0
+InternetGatewayDevice.Time.LocalTimeZone	+08:00
+InternetGatewayDevice.Time.LocalTimeZoneName	Beijing,Chongqing,HongKong,Urumqi
+InternetGatewayDevice.Time.NTPServer1	time.windows.com
+InternetGatewayDevice.Time.NTPServer2	time.nist.gov
+InternetGatewayDevice.Time.NTPServer3	
+InternetGatewayDevice.Time.NTPServer4	
+InternetGatewayDevice.Time.NTPServer5	
+InternetGatewayDevice.Time.Status	Disabled
+InternetGatewayDevice.Time.X_FH_NTPServerType	0
+InternetGatewayDevice.Time.X_FH_WanName	
+InternetGatewayDevice.Time.X_NTPInterval	86400
+InternetGatewayDevice.TraceRouteDiagnostics.DSCP	0
+InternetGatewayDevice.TraceRouteDiagnostics.DataBlockSize	38
+InternetGatewayDevice.TraceRouteDiagnostics.DiagnosticsState	
+InternetGatewayDevice.TraceRouteDiagnostics.Host	
+InternetGatewayDevice.TraceRouteDiagnostics.IPVersion	0
+InternetGatewayDevice.TraceRouteDiagnostics.Interface	
+InternetGatewayDevice.TraceRouteDiagnostics.MaxHopCount	30
+InternetGatewayDevice.TraceRouteDiagnostics.Mode	
+InternetGatewayDevice.TraceRouteDiagnostics.NumberOfTries	3
+InternetGatewayDevice.TraceRouteDiagnostics.ResponseTime	0
+InternetGatewayDevice.TraceRouteDiagnostics.RouteHopsNumberOfEntries	0
+InternetGatewayDevice.TraceRouteDiagnostics.Timeout	5000
+InternetGatewayDevice.UDPEchoConfig.BytesReceived	0
+InternetGatewayDevice.UDPEchoConfig.BytesResponded	0
+InternetGatewayDevice.UDPEchoConfig.EchoPlusEnable	0
+InternetGatewayDevice.UDPEchoConfig.EchoPlusSupported	0
+InternetGatewayDevice.UDPEchoConfig.Enable	0
+InternetGatewayDevice.UDPEchoConfig.Interface	
+InternetGatewayDevice.UDPEchoConfig.PacketsReceived	0
+InternetGatewayDevice.UDPEchoConfig.PacketsResponded	0
+InternetGatewayDevice.UDPEchoConfig.SourceIPAddress	
+InternetGatewayDevice.UDPEchoConfig.TimeFirstPacketReceived	0000-00-00T00:00:00
+InternetGatewayDevice.UDPEchoConfig.TimeLastPacketReceived	0000-00-00T00:00:00
+InternetGatewayDevice.UDPEchoConfig.UDPPort	0
+InternetGatewayDevice.UploadDiagnostics.BOMTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.UploadDiagnostics.DSCP	0
+InternetGatewayDevice.UploadDiagnostics.DiagnosticsState	None
+InternetGatewayDevice.UploadDiagnostics.EOMTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.UploadDiagnostics.EthernetPriority	0
+InternetGatewayDevice.UploadDiagnostics.Interface	
+InternetGatewayDevice.UploadDiagnostics.ROMTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.UploadDiagnostics.TCPOpenRequestTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.UploadDiagnostics.TCPOpenResponseTime	0001-01-01T00:00:00Z
+InternetGatewayDevice.UploadDiagnostics.TestFileLength	0
+InternetGatewayDevice.UploadDiagnostics.TotalBytesSent	0
+InternetGatewayDevice.UploadDiagnostics.UploadURL	
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.Connection.1.ActiveConnectionDeviceContainer	
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.Connection.1.ActiveConnectionServiceID	
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.EnabledForInternet	1
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.Layer1DownstreamMaxBitRate	2500000000
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.Layer1UpstreamMaxBitRate	1250000000
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.MaximumActiveConnections	0
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.NumberOfActiveConnections	0
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.PhysicalLinkStatus	RUN
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesReceived	30506231
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesSent	62650528
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalPacketsReceived	252920
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalPacketsSent	48808
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.WANAccessProvider	01
+InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.WANAccessType	GPON
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.AddressingType	DHCP
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.AutoDisconnectTime	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ConnectionStatus	Connected
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ConnectionTrigger	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ConnectionType	IP_Routed
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.DNSEnabled	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.DNSOverrideAllowed	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.DNSServers	10.201.0.1,0.0.0.0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.DefaultGateway	10.201.0.1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Enable	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress	10.201.79.58
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.IdleDisconnectTime	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.LastConnectionError	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.LastConnectionErrorCode	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.MACAddress	88:65:9F:F9:11:99
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.MACAddressOverride	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.MaxMTUSize	1500
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.NATEnabled	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Name	1_TR069_R_VID_4
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.PortMappingNumberOfEntries	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.PossibleConnectionTypes	all
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.RSIPAvailable	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Reset	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.RouteProtocolRx	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ShapingBurstSize	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ShapingRate	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetBroadcastPacketsReceived	157074
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetBroadcastPacketsSent	90
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetBytesReceived	11490964
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetBytesSent	16585181
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetDiscardPacketsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetDiscardPacketsSent	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetErrorsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetErrorsSent	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetMulticastPacketsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetMulticastPacketsSent	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetPacketsReceived	171472
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetPacketsSent	19639
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetUnicastPacketsReceived	7789
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetUnicastPacketsSent	19548
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats.EthernetUnknownProtoPacketsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.SubnetMask	255.255.0.0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Uptime	9645
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.VLANEnable	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.VLANID	4
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.WarnDisconnectDelay	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_802-1pMark	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_Aftr	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_AftrMode	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_DefaultIPv6Gateway	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_Dslite_Enable	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPMode	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6ConnStatus	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6DNSServers	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6DomainName	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6IPAddress	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6IPAddressAlias	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6IPAddressOrigin	DHCPv6
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6Prefix	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6PrefixAlias	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6PrefixDelegationEnabled	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6PrefixOrigin	PrefixDelegation
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6PrefixPltime	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_IPv6PrefixVltime	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_LanInterface	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_MulticastVlan	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_FH_ServiceList	TR069
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnectionNumberOfEntries	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnectionNumberOfEntries	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.X_FH_WANGponLinkConfig.802-1pMark	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.X_FH_WANGponLinkConfig.Enable	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.X_FH_WANGponLinkConfig.Mode	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.X_FH_WANGponLinkConfig.VLANID	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.X_FH_WANGponLinkConfig.VLANIDMark	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANIPConnectionNumberOfEntries	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.AddressingType	PPPoE
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.AutoDisconnectTime	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.ConnectionStatus	Connecting
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.ConnectionTrigger	AlwaysOn
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.ConnectionType	PPPoE_Routed
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.CurrentMRUSize	1492
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.DNSEnabled	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.DNSOverrideAllowed	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.DNSServers	0.0.0.0,0.0.0.0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.DefaultGateway	0.0.0.0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Enable	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.ExternalIPAddress	0.0.0.0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.IdleDisconnectTime	1800
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.LastConnectionError	ERROR_ISP_TIME_OUT
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.LastConnectionErrorCode	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.MACAddress	88:65:9F:F9:11:9B
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.MACAddressOverride	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.MaxMRUSize	1492
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.NATEnabled	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Name	2_INTERNET_R_VID_130
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.PPPAuthenticationProtocol	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.PPPCompressionProtocol	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.PPPEncryptionProtocol	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.PPPLCPEcho	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.PPPLCPEchoRetry	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.PPPoEACName	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.PPPoEServiceName	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.PPPoESessionID	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Password	pass41234567890
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.PortMappingNumberOfEntries	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.PossibleConnectionTypes	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.RSIPAvailable	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.RemoteIPAddress	0.0.0.0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Reset	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.RouteProtocolRx	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.ShapingBurstSize	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.ShapingRate	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetBroadcastPacketsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetBroadcastPacketsSent	111
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetBytesReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetBytesSent	4090
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetDiscardPacketsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetDiscardPacketsSent	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetErrorsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetErrorsSent	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetMulticastPacketsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetMulticastPacketsSent	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetPacketsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetPacketsSent	112
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetUnicastPacketsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetUnicastPacketsSent	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Stats.EthernetUnknownProtoPacketsReceived	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.TransportType	Disabled
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Uptime	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Username	1234567890@fiberstream.net.id
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.VLANEnable	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.VLANID	130
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.WarnDisconnectDelay	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_802-1pMark	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_Aftr	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_AftrMode	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_DefaultIPv6Gateway	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_Dslite_Enable	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPMode	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6ConnStatus	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6DNSServers	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6DomainName	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6IPAddress	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6IPAddressAlias	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6IPAddressOrigin	AutoConfigured
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6Prefix	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6PrefixAlias	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6PrefixDelegationEnabled	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6PrefixOrigin	PrefixDelegation
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6PrefixPltime	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_IPv6PrefixVltime	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_LanInterface	
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_MulticastVlan	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.X_FH_ServiceList	INTERNET
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnectionNumberOfEntries	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.X_FH_WANGponLinkConfig.802-1pMark	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.X_FH_WANGponLinkConfig.Enable	1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.X_FH_WANGponLinkConfig.Mode	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.X_FH_WANGponLinkConfig.VLANID	0
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.X_FH_WANGponLinkConfig.VLANIDMark	0
+InternetGatewayDevice.WANDevice.1.WANConnectionNumberOfEntries	2
+InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.DuplexMode	Full Duplex
+InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.Enable	1
+InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.MACAddress	00:00:00:08:02:03
+InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.MaxBitRate	100MBS
+InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.Stats.BytesReceived	10000
+InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.Stats.BytesSent	10000
+InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.Stats.PacketsReceived	10000
+InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.Stats.PacketsSent	10000
+InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.Status	RUN
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.BiasCurrent	6.57
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.RXPower	-21.37
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.BytesReceived	30507491
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.BytesSent	62650528
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.DropPackets	0
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.FECError	0
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.HECError	0
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.PacketsReceived	252941
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.PacketsSent	48808
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.RBroadcastPackets	174167
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.RMulticastPackets	7341
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.RPausePackets	0
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.RUnicastPackets	64093
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.SBroadcastPackets	360
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.SMulticastPackets	186
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.SPausePackets	0
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Stats.SUnicastPackets	48262
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.Status	Up
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.SupplyVoltage	3.25
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.TXPower	2.15
+InternetGatewayDevice.WANDevice.1.X_FH_GponInterfaceConfig.TransceiverTemperature	41.71
+InternetGatewayDevice.WANDeviceNumberOfEntries	1
+InternetGatewayDevice.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState	None
+InternetGatewayDevice.WiFi.NeighboringWiFiDiagnostic.ResultNumberOfEntries	0
+InternetGatewayDevice.X_FH_ACL.AclMode	0
+InternetGatewayDevice.X_FH_ACL.ApplicationList	HTTP:80,HTTPS:443,Telnet:23,SSH:22,FTP:21,SNMP:161,ICMP
+InternetGatewayDevice.X_FH_ACL.Enable	1
+InternetGatewayDevice.X_FH_ACL.IPV6Enable	0
+InternetGatewayDevice.X_FH_ACL.NumberOfIPV6Rule	0
+InternetGatewayDevice.X_FH_ACL.NumberOfRule	1
+InternetGatewayDevice.X_FH_ACL.Rule.1.Direction	1
+InternetGatewayDevice.X_FH_ACL.Rule.1.Enable	1
+InternetGatewayDevice.X_FH_ACL.Rule.1.EndIp	
+InternetGatewayDevice.X_FH_ACL.Rule.1.Protocol	ALL
+InternetGatewayDevice.X_FH_ACL.Rule.1.StartIp	
+InternetGatewayDevice.X_FH_FireWall.ANTIWANPINGEnable	0
+InternetGatewayDevice.X_FH_FireWall.BADPACETSFEnable	0
+InternetGatewayDevice.X_FH_FireWall.DHCPFEnable	0
+InternetGatewayDevice.X_FH_FireWall.DHCPFMode	black
+InternetGatewayDevice.X_FH_FireWall.DHCPFilterNumberOfEntries	0
+InternetGatewayDevice.X_FH_FireWall.DOSFEnable	0
+InternetGatewayDevice.X_FH_FireWall.DOSFlag	57
+InternetGatewayDevice.X_FH_FireWall.ETHPACETFEnable	0
+InternetGatewayDevice.X_FH_FireWall.IPFilterInNumberOfEntries	0
+InternetGatewayDevice.X_FH_FireWall.IPFilterOutNumberOfEntries	0
+InternetGatewayDevice.X_FH_FireWall.IPV6FilterInNumberOfEntries	0
+InternetGatewayDevice.X_FH_FireWall.IPV6FilterOutNumberOfEntries	0
+InternetGatewayDevice.X_FH_FireWall.IPV6MACFEnable	0
+InternetGatewayDevice.X_FH_FireWall.IPV6MACFMode	black
+InternetGatewayDevice.X_FH_FireWall.IPV6MACFilterNumberOfEntries	0
+InternetGatewayDevice.X_FH_FireWall.LEVEL	1
+InternetGatewayDevice.X_FH_FireWall.LocalACLEnable	0
+InternetGatewayDevice.X_FH_FireWall.MACFEnable	0
+InternetGatewayDevice.X_FH_FireWall.MACFMode	black
+InternetGatewayDevice.X_FH_FireWall.MACFilterNumberOfEntries	0
+InternetGatewayDevice.X_FH_FireWall.NETBIOSFEnable	0
+InternetGatewayDevice.X_FH_FireWall.PORTSCANEnable	0
+InternetGatewayDevice.X_FH_FireWall.ParentCtrlNumberOfEntries	0
+InternetGatewayDevice.X_FH_FireWall.REMOTEACCEnable	1
+InternetGatewayDevice.X_FH_FireWall.URLFEnable	0
+InternetGatewayDevice.X_FH_FireWall.URLFMode	black
+InternetGatewayDevice.X_FH_FireWall.URLFilterNumberOfEntries	0
+InternetGatewayDevice.X_FH_FireWall.VertualhostEnable	0
+InternetGatewayDevice.X_FH_FireWall.X_FH_GRETunnel.1.Enable	0
+InternetGatewayDevice.X_FH_FireWall.X_FH_GRETunnel.1.IPMode	0
+InternetGatewayDevice.X_FH_FireWall.X_FH_GRETunnel.1.RemoteURL	
+InternetGatewayDevice.X_FH_FireWall.X_FH_GRETunnel.1.VLANID	0
+InternetGatewayDevice.X_FH_FireWall.X_FH_GRETunnel.1.WanURL	
+InternetGatewayDevice.X_FH_Mgt.MACBlackListNumberOfEntries	0
+InternetGatewayDevice.X_FH_Mgt.MACWhiteListNumberOfEntries	0
+InternetGatewayDevice.X_FH_Mgt.MainSSIDIndex_58G	5
+InternetGatewayDevice.X_FH_PON_MANAGE.GPON.X_FH_MacLimitNumber	0
+InternetGatewayDevice.X_FH_PORT_MIRROR.direction	0
+InternetGatewayDevice.X_FH_PORT_MIRROR.dst_port	0
+InternetGatewayDevice.X_FH_PORT_MIRROR.enable	0
+InternetGatewayDevice.X_FH_PORT_MIRROR.src_port	0

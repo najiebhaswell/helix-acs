@@ -132,6 +132,17 @@ type Session struct {
 	// the "0 BOOTSTRAP" event (factory reset or first-ever boot).
 	isBootstrap bool
 
+	// pendingProvisionMark is set to true when injectGlobalDefaultParams
+	// enqueues a synthetic SetParameterValues task. The actual
+	// _helix.provisioned flag is written only after the SPV response is
+	// received, preventing false positives when the session drops.
+	pendingProvisionMark bool
+
+	// needsGlobalDefaults is set during handleInform when the session qualifies
+	// for global default injection (bootstrap or first-ever provision). It stays
+	// true so that finishSummon can re-run injection with the full param set.
+	needsGlobalDefaults bool
+
 	// pendingWANCredentials holds PPPoE credentials from a WAN task to be
 	// persisted to PostgreSQL once the task completes successfully.
 	// Keys: "_helix.provision.pppoe_username", "_helix.provision.pppoe_password",
@@ -251,6 +262,7 @@ func (h *Handler) adoptInFlightBySerial(serial string, current *Session) bool {
 	prevTask := prev.currentTask
 	prevWAN := prev.wanProvision
 	prevFollow := prev.addObjFollowUp
+	prevProvisionMark := prev.pendingProvisionMark
 	prevSetParams := make(map[string]string, len(prev.lastSetParams))
 	for k, v := range prev.lastSetParams {
 		prevSetParams[k] = v
@@ -270,6 +282,9 @@ func (h *Handler) adoptInFlightBySerial(serial string, current *Session) bool {
 		current.currentTask = prevTask
 		current.wanProvision = prevWAN
 		current.addObjFollowUp = prevFollow
+		if prevProvisionMark {
+			current.pendingProvisionMark = true
+		}
 		if len(prevSetParams) > 0 {
 			current.lastSetParams = prevSetParams
 		}
@@ -285,6 +300,7 @@ func (h *Handler) adoptInFlightBySerial(serial string, current *Session) bool {
 	prev.wanProvision = nil
 	prev.addObjFollowUp = nil
 	prev.lastSetParams = nil
+	prev.pendingProvisionMark = false
 	prev.pendingWANCredentials = nil
 	prev.mu.Unlock()
 
@@ -693,10 +709,17 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	if lastSummon, ok := h.lastSummonTime.Load(upsertReq.Serial); ok {
 		if time.Since(lastSummon.(time.Time)) < 2*time.Minute {
 			shouldSummon = false
+			h.log.WithField("serial", upsertReq.Serial).
+				WithField("last_summon_ago", time.Since(lastSummon.(time.Time)).String()).
+				Debug("CWMP: targeted summon throttled (within 2min)")
 		}
 	}
 	if shouldSummon {
 		paths := uiSummonPaths(schemaName, driver)
+		h.log.WithField("serial", upsertReq.Serial).
+			WithField("schema", schemaName).
+			WithField("path_count", len(paths)).
+			Debug("CWMP: evaluating targeted UI summon paths")
 		if len(paths) > 0 {
 			session.mu.Lock()
 			session.summonPhase = 3
@@ -763,10 +786,14 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	session.State = StateProcessing
 	session.mu.Unlock()
 
-	// Inject global default params on bootstrap or first-ever provision using
-	// the Inform parameters as the current-value baseline. ManagementServer.*
-	// paths are always present in Inform messages, making this reliable for all
-	// device types (TR-181 and TR-098) regardless of whether a summon fires.
+	// Flag the session as needing global default injection only when the device
+	// qualifies (bootstrap or never provisioned). This avoids blocking every
+	// Inform session with a redundant global_defaults task.
+	if session.isBootstrap {
+		session.mu.Lock()
+		session.needsGlobalDefaults = true
+		session.mu.Unlock()
+	}
 	h.injectGlobalDefaultParams(ctx, session, upsertReq.Serial, upsertReq.Parameters)
 
 	respXML, err := BuildInformResponse(id)
@@ -896,6 +923,8 @@ func (h *Handler) handleSetParamValuesResponse(ctx context.Context, w http.Respo
 	session.lastSetParams = nil
 	wanCreds := session.pendingWANCredentials
 	session.pendingWANCredentials = nil
+	pendingProvision := session.pendingProvisionMark
+	session.pendingProvisionMark = false
 	session.mu.Unlock()
 
 	if len(setParams) > 0 {
@@ -906,6 +935,15 @@ func (h *Handler) handleSetParamValuesResponse(ctx context.Context, w http.Respo
 		if err := h.parameterRepo.UpdateParameters(pgCtx, serial, setParams); err != nil {
 			h.log.WithError(err).WithField("serial", serial).Warn("CWMP: failed to sync task params to PostgreSQL")
 		}
+	}
+
+	// Now that the SPV succeeded, mark the device as provisioned so future
+	// Informs skip global default injection.
+	if pendingProvision && serial != "" {
+		markCtx, markCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer markCancel()
+		_ = h.parameterRepo.UpdateParameters(markCtx, serial, map[string]string{"_helix.provisioned": "true"})
+		h.log.WithField("serial", serial).Info("CWMP: device marked as provisioned after successful SPV")
 	}
 
 	// Persist PPPoE credentials if this was a WAN task (set_params flow).
@@ -1396,10 +1434,13 @@ type virtualParamSpec struct {
 }
 
 // expandVirtualParams resolves any _vp.* virtual-parameter entries in raw into
-// concrete path→value pairs. For each virtual param, only candidate paths that
-// are present in currentParams (i.e. the device actually has that parameter) are
-// included. Regular (non-_vp) entries are passed through unchanged.
-func expandVirtualParams(raw map[string]string, currentParams map[string]string) map[string]string {
+// concrete path→value pairs. For each virtual param, candidate paths are
+// selected by matching the device's detected data-model root (isIGD), rather
+// than requiring the exact path to pre-exist in currentParams. This ensures
+// virtual parameters are applied even during bootstrap when currentParams only
+// contains the limited Inform ParameterList.
+// Regular (non-_vp) entries are passed through unchanged.
+func expandVirtualParams(raw map[string]string, currentParams map[string]string, isIGD bool) map[string]string {
 	out := make(map[string]string, len(raw))
 	for key, val := range raw {
 		if !strings.HasPrefix(key, "_vp.") {
@@ -1411,6 +1452,16 @@ func expandVirtualParams(raw map[string]string, currentParams map[string]string)
 			continue // malformed virtual param — skip silently
 		}
 		for _, candidate := range spec.Candidates {
+			// Select candidate paths that match the device's data model.
+			// TR-098 devices use InternetGatewayDevice.* paths;
+			// TR-181 devices use Device.* paths.
+			if isIGD && strings.HasPrefix(candidate, "InternetGatewayDevice.") {
+				out[candidate] = spec.Value
+			} else if !isIGD && strings.HasPrefix(candidate, "Device.") {
+				out[candidate] = spec.Value
+			}
+			// Also include candidates that already exist in currentParams
+			// (covers edge cases where a device reports both roots).
 			if _, exists := currentParams[candidate]; exists {
 				out[candidate] = spec.Value
 			}
@@ -1424,8 +1475,9 @@ func expandVirtualParams(raw map[string]string, currentParams map[string]string)
 //   - The current Inform carries "0 BOOTSTRAP" (factory reset / first boot), OR
 //   - The device has never been provisioned (_helix.provisioned flag not set).
 //
-// After applying (or confirming all values already match), the device is marked
-// provisioned so subsequent Informs are not re-provisioned.
+// The _helix.provisioned flag is NOT written here; instead a session flag
+// (pendingProvisionMark) is set so that the flag is persisted only after the
+// CPE acknowledges the SetParameterValues with a successful response.
 func (h *Handler) injectGlobalDefaultParams(ctx context.Context, session *Session, serial string, currentParams map[string]string) {
 	if h.parameterRepo == nil || serial == "" {
 		return
@@ -1440,19 +1492,15 @@ func (h *Handler) injectGlobalDefaultParams(ctx context.Context, session *Sessio
 	// Determine whether we should apply.
 	session.mu.Lock()
 	isBootstrap := session.isBootstrap
+	needsDefaults := session.needsGlobalDefaults
 	session.mu.Unlock()
 
-	if !isBootstrap {
+	if !isBootstrap && !needsDefaults {
 		provisioned, _ := h.parameterRepo.GetParameter(ctx, serial, "_helix.provisioned")
 		if provisioned == "true" {
 			return
 		}
 	}
-
-	// Mark device as provisioned so later Informs skip this check.
-	markCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_ = h.parameterRepo.UpdateParameters(markCtx, serial, map[string]string{"_helix.provisioned": "true"})
 
 	// Detect device data model from current params to filter mismatched paths.
 	// TR-098 devices use InternetGatewayDevice.* root; TR-181 use Device.*.
@@ -1464,8 +1512,9 @@ func (h *Handler) injectGlobalDefaultParams(ctx context.Context, session *Sessio
 		}
 	}
 
-	// Expand virtual params (_vp.*) into concrete paths that exist on this device.
-	expanded := expandVirtualParams(globalDefaults, currentParams)
+	// Expand virtual params (_vp.*) into concrete paths matching the device's
+	// data model (TR-098 = IGD, TR-181 = Device.).
+	expanded := expandVirtualParams(globalDefaults, currentParams, isIGD)
 
 	// Build diff: only push params that differ from the device's current value,
 	// and skip paths whose root doesn't match the device's data model.
@@ -1486,6 +1535,13 @@ func (h *Handler) injectGlobalDefaultParams(ctx context.Context, session *Sessio
 	}
 	if len(toSet) == 0 {
 		h.log.WithField("serial", serial).Debug("CWMP: global default params already match CPE; skipping")
+		// Values already match — mark provisioned without needing an SPV round-trip.
+		session.mu.Lock()
+		session.needsGlobalDefaults = false
+		session.mu.Unlock()
+		markCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = h.parameterRepo.UpdateParameters(markCtx, serial, map[string]string{"_helix.provisioned": "true"})
 		return
 	}
 
@@ -1506,6 +1562,8 @@ func (h *Handler) injectGlobalDefaultParams(ctx context.Context, session *Sessio
 		Info("CWMP: injecting global default params via SetParameterValues")
 	session.mu.Lock()
 	session.pendingTasks = append([]*task.Task{synth}, session.pendingTasks...)
+	session.pendingProvisionMark = true
+	session.needsGlobalDefaults = false
 	session.mu.Unlock()
 }
 
@@ -1781,10 +1839,10 @@ func (h *Handler) handleTaskResponse(ctx context.Context, w http.ResponseWriter,
 	session.mu.Unlock()
 
 	if t != nil {
-		// After a successful WAN task, force a fresh full summon on the next Inform
-		// so UI sections (Network / Information) are updated immediately with the
+		// After a successful WAN/WiFi/LAN task, force a fresh summon on the next
+		// Inform so UI sections (Network / WiFi) are updated immediately with the
 		// latest interface state instead of waiting for summon throttle timeout.
-		if t.Type == task.TypeWAN && errMsg == "" {
+		if (t.Type == task.TypeWAN || t.Type == task.TypeWifi || t.Type == task.TypeLAN) && errMsg == "" {
 			h.lastSummonTime.Delete(serial)
 		}
 		h.completeTask(ctx, t, result, errMsg)

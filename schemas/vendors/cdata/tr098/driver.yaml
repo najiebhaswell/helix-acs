@@ -21,8 +21,9 @@ config:
   wan_ip_mode_v6: "3"
 
 security_modes:
-  "WPA2-PSK": "WPA2-PSK"
-  "WPA-WPA2-PSK": "WPA-WPA2-PSK"
+  "WPA2-PSK": "11i"
+  "WPA-WPA2-PSK": "WPAand11i"
+  "WPA-PSK": "WPA"
   "WPA3-SAE": "WPA3-SAE"
   "WPA3-SAE-WPA2-PSK": "WPA3-SAE-WPA2-PSK"
   "None": "None"

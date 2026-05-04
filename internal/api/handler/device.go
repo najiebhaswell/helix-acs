@@ -154,6 +154,13 @@ func (h *DeviceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Also delete all parameters associated with the device from PostgreSQL
+	if err := h.paramRepo.DeleteDeviceParameters(r.Context(), serial); err != nil {
+		// Log the error but don't fail the request since the device was already deleted from MongoDB
+		writeError(w, http.StatusInternalServerError, "failed to delete device parameters")
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 

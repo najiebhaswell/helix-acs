@@ -33,9 +33,8 @@ discovery:
 
   # Huawei GPON optical parameters are under X_GponInterfaceConfig.
   # Also fetch X_HW_PonInterface for redundancy.
-  extra_summon_paths:
-    - "InternetGatewayDevice.WANDevice.1.X_GponInterfaceConfig."
-    - "InternetGatewayDevice.WANDevice.1.X_HW_PonInterface."
+  # extra_summon_paths removed: both X_GponInterfaceConfig and X_HW_PonInterface
+  # cause 9005 faults on some Huawei models, which kills the entire GPV request.
 
   # Huawei uses X_HW_SERVICELIST (uppercase) to identify WAN service type.
   # Values: "INTERNET", "TR069", "VOIP".
