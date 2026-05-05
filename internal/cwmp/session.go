@@ -1986,6 +1986,12 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 			if drv != nil && drv.GetProvisionFlow("wan_pppoe_new") != nil {
 				// Use YAML-driven provisioning flow from device driver.
 				var err error
+				mtuVal := "1492"
+				if p.MTU > 0 {
+					mtuVal = strconv.Itoa(p.MTU)
+				} else if v := drv.Config["default_mtu"]; v != "" {
+					mtuVal = v
+				}
 				newVars := map[string]string{
 					"vlan_id":       strconv.Itoa(p.VLAN),
 					"username":      p.Username,
@@ -1996,6 +2002,7 @@ func (h *Handler) executeTask(ctx context.Context, t *task.Task, mapper datamode
 					"wan_ip_conn":   strconv.Itoa(wanIPConnIdx),
 					"wan_ppp_conn":  strconv.Itoa(wanPPPConnIdx),
 					"ipv6_enabled":  wanIPv6EnabledStr(p),
+					"mtu":           mtuVal,
 				}
 				if v := resolveWANIPMode(p, drv); v != "" {
 					newVars["wan_ip_mode"] = v

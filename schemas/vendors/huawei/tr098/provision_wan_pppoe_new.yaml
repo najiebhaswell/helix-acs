@@ -1,0 +1,35 @@
+id: wan_pppoe_new
+vendor: huawei
+model: tr098
+description: >
+  Huawei TR-098 PPPoE WAN provisioning for devices without an existing
+  WANPPPConnection (fresh ONT or after factory reset).
+  Creates a new WANConnectionDevice + WANPPPConnection, then configures
+  credentials, VLAN (X_HW_VLAN), MTU, service list, and enables the connection.
+  Input vars: wan_dev, username, password, vlan_id, mtu, ipv6_enabled.
+
+steps:
+  # Step 1: Create a new WANConnectionDevice under WANDevice.{wan_dev}
+  - kind: add
+    object: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice."
+    as: wan_conn
+
+  # Step 2: Create a WANPPPConnection under the new WANConnectionDevice
+  - kind: add
+    object: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection."
+    as: wan_ppp_conn
+
+  # Step 3: Configure the PPPoE connection parameters
+  - kind: set
+    params:
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.ConnectionType": "PPP_PPPoE"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Username": "{username}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Password": "{password}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_HW_VLAN": "{vlan_id}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_HW_SERVICELIST": "INTERNET"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_HW_IPv4Enable": "1"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_HW_IPv6Enable": "{ipv6_enabled}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.NATEnabled": "1"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.ConnectionTrigger": "AlwaysOn"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Enable": "1"
+
