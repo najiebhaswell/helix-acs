@@ -1,0 +1,24 @@
+id: wan_pppoe_update
+vendor: ruijie
+model: tr181
+description: >
+  Credentials-only update for an existing PPPoE interface on Ruijie TR-181 devices.
+  Sent as a single atomic SetParameterValues RPC.
+  Empty-value params are omitted automatically by the executor.
+
+  Input variables:
+    ip_iface_idx, ppp_iface_idx,
+    username (optional), password (optional), ipv6_enabled
+
+  Variables from driver config:
+    ppp_auth_protocol
+
+steps:
+  - kind: set
+    params:
+      "Device.PPP.Interface.{ppp_iface_idx}.Username":               "{username}"
+      "Device.PPP.Interface.{ppp_iface_idx}.Password":               "{password}"
+      "Device.PPP.Interface.{ppp_iface_idx}.AuthenticationProtocol": "{ppp_auth_protocol}"
+      "Device.PPP.Interface.{ppp_iface_idx}.Enable":                 "1"
+      "Device.IP.Interface.{ip_iface_idx}.IPv6Enable":               "{ipv6_enabled}"
+      "Device.IP.Interface.{ip_iface_idx}.Enable":                   "1"

@@ -114,4 +114,9 @@ var knownVendors = map[string]string{
 	"c-data": "cdata",
 	"cdata":  "cdata",
 	"cdtc":   "cdata",
+
+	// Ruijie Networks (OUI DC4EF4) — EW3000P and similar GPON ONTs
+	// report manufacturer as "MTN" (OEM branding).
+	"mtn":    "ruijie",
+	"ruijie": "ruijie",
 }

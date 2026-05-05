@@ -1,0 +1,50 @@
+id: ruijie_tr181
+vendor: ruijie
+model: tr181
+description: >
+  Ruijie GPON ONT TR-181 device driver.
+  Covers EW3000P and similar models (reported as manufacturer "MTN").
+  OUI: DC4EF4 (Ruijie Networks Co., Ltd.).
+  Uses standard TR-181 PPP/IP interface stack for WAN provisioning.
+  Optical signal is exposed under Device.Optical.Interface.1.
+
+features:
+  gpon: true
+  band_steering: false
+  ipv6: true
+  nat: true
+
+config:
+  ppp_auth_protocol: "AUTO_AUTH"
+  default_mtu: "1492"
+  optical_interface: "Device.Optical.Interface.1."
+
+# Enforce sensible defaults on every full-summon cycle.
+default_params:
+  "Device.ManagementServer.PeriodicInformInterval": "30"
+
+security_modes:
+  "WPA2-PSK":      "WPA2-Personal"
+  "WPA-WPA2-PSK":  "WPA-WPA2-Personal"
+  "WPA3-SAE":      "WPA3-Personal"
+  "WPA3-SAE-WPA2-PSK": "WPA3-WPA2-Personal"
+  "None":          "None"
+
+wifi:
+  sync_bands_on_steering: false
+
+discovery:
+  # Ruijie TR-181: WAN type detection via standard IP.Interface.Type
+  # No X_* vendor extension for ConnType — use standard Lower/Upper layers.
+  # WAN service type identified by IP.Interface.Name containing "INTERNET"/"TR069".
+  wan_service_type_path: "Device.IP.Interface.{i}.Name"
+
+  # Optical signal available under Device.Optical.Interface.1.
+  # Fetch explicitly since it may not be returned in standard tree walk.
+  extra_summon_paths:
+    - "Device.Optical.Interface."
+
+provisions:
+  wan_pppoe_update:      "provision_wan_pppoe_update.yaml"
+  wan_pppoe_update_vlan: "provision_wan_pppoe_update_vlan.yaml"
+  wifi_update:           "../../common/provision_wifi.yaml"

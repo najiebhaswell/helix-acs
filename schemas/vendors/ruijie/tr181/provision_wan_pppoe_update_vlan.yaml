@@ -1,0 +1,32 @@
+id: wan_pppoe_update_vlan
+vendor: ruijie
+model: tr181
+description: >
+  Non-destructive VLAN change for an existing PPPoE stack on Ruijie TR-181 devices.
+  Step 1: Disable IP interface, apply VLAN + credentials atomically.
+  Step 2: Re-enable the PPP and IP stack with optional IPv6.
+
+  Input variables:
+    ip_iface_idx, ppp_iface_idx, vlan_term_idx, vlan_id,
+    username (optional), password (optional), ipv6_enabled
+
+  Variables from driver config:
+    ppp_auth_protocol
+
+steps:
+  # Step 1: Disable IP interface, update VLAN and credentials atomically.
+  - kind: set
+    params:
+      "Device.IP.Interface.{ip_iface_idx}.Enable":                   "0"
+      "Device.Ethernet.VLANTermination.{vlan_term_idx}.VLANID":      "{vlan_id}"
+      "Device.Ethernet.VLANTermination.{vlan_term_idx}.Enable":      "1"
+      "Device.PPP.Interface.{ppp_iface_idx}.AuthenticationProtocol": "{ppp_auth_protocol}"
+      "Device.PPP.Interface.{ppp_iface_idx}.Username":               "{username}"
+      "Device.PPP.Interface.{ppp_iface_idx}.Password":               "{password}"
+
+  # Step 2: Re-enable the stack.
+  - kind: set
+    params:
+      "Device.PPP.Interface.{ppp_iface_idx}.Enable":   "1"
+      "Device.IP.Interface.{ip_iface_idx}.IPv6Enable": "{ipv6_enabled}"
+      "Device.IP.Interface.{ip_iface_idx}.Enable":     "1"
