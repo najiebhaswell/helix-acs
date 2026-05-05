@@ -108,7 +108,7 @@ type Device struct {
 	UptimeSeconds int64  `bson:"uptime_seconds" json:"uptime_seconds,omitempty"`
 	RAMTotal      int64  `bson:"ram_total"      json:"ram_total,omitempty"`
 	RAMFree       int64  `bson:"ram_free"       json:"ram_free,omitempty"`
-	CPUUsage      int64  `bson:"cpu_usage"      json:"cpu_usage,omitempty"`
+	CPUUsage      *int64 `bson:"cpu_usage"      json:"cpu_usage"`
 	ACSURL        string `bson:"acs_url"        json:"acs_url,omitempty"`
 
 	// Rich sub-documents

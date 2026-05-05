@@ -581,7 +581,7 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 			break
 		}
 	}
-	needBackfill := dev.ModelName == "" || dev.CPUUsage == 0 || wansNeedService
+	needBackfill := dev.ModelName == "" || dev.CPUUsage == nil || wansNeedService
 	if needBackfill {
 		go func() {
 			bfCtx, bfCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -600,7 +600,7 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 					upd.ModelName = &mn
 				}
 			}
-			if dev.CPUUsage == 0 {
+			if dev.CPUUsage == nil {
 				if cpu := extractCPUUsage(storedParams, nil); cpu != nil {
 					upd.CPUUsage = cpu
 				}
