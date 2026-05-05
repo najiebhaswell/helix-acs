@@ -1080,8 +1080,8 @@ func (h *Handler) handleTargetedSummonResponse(ctx context.Context, w http.Respo
 	session.mu.Unlock()
 
 	if mode == "ui_refresh" {
-		if err := h.deviceSvc.UpdateParameters(ctx, serial, params); err != nil {
-			h.log.WithError(err).WithField("serial", serial).Warn("CWMP: save targeted UI params to MongoDB failed")
+		if err := h.deviceSvc.MergeParameters(ctx, serial, params); err != nil {
+			h.log.WithError(err).WithField("serial", serial).Warn("CWMP: merge targeted UI params to MongoDB failed")
 		}
 		{
 			pgCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

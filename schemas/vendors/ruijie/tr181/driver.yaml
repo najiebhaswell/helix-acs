@@ -34,15 +34,30 @@ wifi:
   sync_bands_on_steering: false
 
 discovery:
-  # Ruijie TR-181: WAN type detection via standard IP.Interface.Type
-  # No X_* vendor extension for ConnType — use standard Lower/Upper layers.
-  # WAN service type identified by IP.Interface.Name containing "INTERNET"/"TR069".
-  wan_service_type_path: "Device.IP.Interface.{i}.Name"
+  # Ruijie TR-181: service type stored in X_ServiceType (non-standard extension).
+  # Values: "INTERNET", "TR069", "VOIP", "" (untagged/management).
+  wan_service_type_path: "Device.IP.Interface.{i}.X_ServiceType"
+  wan_type_values:
+    wan:
+      - "INTERNET"
+    lan: []
 
   # Optical signal available under Device.Optical.Interface.1.
   # Fetch explicitly since it may not be returned in standard tree walk.
   extra_summon_paths:
     - "Device.Optical.Interface."
+
+  # Ruijie EW3000P WiFi SSID layout (no LowerLayers populated in firmware):
+  #   SSID 1 → 2.4GHz main       SSID 6  → 5GHz main
+  #   SSID 2 → 2.4GHz backhaul   SSID 7  → 5GHz backhaul
+  #   SSID 3 → 2.4GHz MSSID_1    SSID 8  → 5GHz MSSID_1
+  #   SSID 4 → 2.4GHz Guest      SSID 9  → 5GHz Guest
+  #   SSID 5 → 2.4GHz MSSID_2    SSID 10 → 5GHz MSSID_2
+  wifi_ssid_band_without_lower_layers:
+    strategy: explicit
+    explicit:
+      "0": [1, 2, 3, 4, 5]    # 2.4GHz
+      "1": [6, 7, 8, 9, 10]   # 5GHz
 
 provisions:
   wan_pppoe_update:      "provision_wan_pppoe_update.yaml"

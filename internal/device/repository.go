@@ -58,6 +58,25 @@ func (r *mongoRepository) Upsert(ctx context.Context, req *UpsertRequest) (*Devi
 
 	filter := bson.M{"serial": req.Serial}
 
+	// Read existing parameters so we can merge Inform params without
+	// wiping summon-derived data. On first insert, existing will be nil.
+	var existing struct {
+		Parameters map[string]string `bson:"parameters"`
+	}
+	_ = r.col.FindOne(ctx, filter).Decode(&existing)
+
+	mergedParams := req.Parameters
+	if existing.Parameters != nil && len(existing.Parameters) > len(req.Parameters) {
+		// Existing has more params (from summon); merge Inform on top.
+		mergedParams = make(map[string]string, len(existing.Parameters)+len(req.Parameters))
+		for k, v := range existing.Parameters {
+			mergedParams[k] = v
+		}
+		for k, v := range req.Parameters {
+			mergedParams[k] = v
+		}
+	}
+
 	setFields := bson.M{
 		"serial":        req.Serial,
 		"oui":           req.OUI,
@@ -65,13 +84,20 @@ func (r *mongoRepository) Upsert(ctx context.Context, req *UpsertRequest) (*Devi
 		"product_class": req.ProductClass,
 		"data_model":    req.DataModel,
 		"schema":        req.Schema,
-		"ip_address":    req.IPAddress,
-		"wan_ip":        req.WANIP,
 		"bl_version":    req.BLVersion,
-		"parameters":    req.Parameters,
+		"parameters":    mergedParams,
 		"online":        true,
 		"last_inform":   now,
 		"updated_at":    now,
+	}
+	// Only overwrite ip_address/wan_ip when the Inform provides a non-empty value;
+	// otherwise summon-derived values (from UpdateInfo) would be erased on every Inform
+	// for devices that report minimal params (e.g. Ruijie EW3000P — only 7 Inform params).
+	if req.IPAddress != "" {
+		setFields["ip_address"] = req.IPAddress
+	}
+	if req.WANIP != "" {
+		setFields["wan_ip"] = req.WANIP
 	}
 	// Only overwrite these fields when the Inform provides non-empty values;
 	// otherwise summon-based values (UpdateInfo) would be erased on every Inform.
@@ -313,6 +339,41 @@ func (r *mongoRepository) UpdateParameters(ctx context.Context, serial string, p
 		bson.M{"serial": serial},
 		bson.M{"$set": bson.M{
 			"parameters": params,
+			"updated_at": time.Now().UTC(),
+		}},
+	)
+	return err
+}
+
+// MergeParameters merges the given params into the existing parameters map
+// without removing other keys. Use for targeted/partial summons.
+//
+// TR-069 parameter names contain dots (e.g. "Device.WiFi.SSID.1.SSID"),
+// which MongoDB interprets as nested paths in dot-notation $set. We therefore
+// use a read-merge-write approach: load existing params, overlay new ones,
+// then full-replace the parameters map.
+func (r *mongoRepository) MergeParameters(ctx context.Context, serial string, params map[string]string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var existing struct {
+		Parameters map[string]string `bson:"parameters"`
+	}
+	_ = r.col.FindOne(ctx, bson.M{"serial": serial}).Decode(&existing)
+
+	merged := make(map[string]string, len(existing.Parameters)+len(params))
+	for k, v := range existing.Parameters {
+		merged[k] = v
+	}
+	for k, v := range params {
+		merged[k] = v
+	}
+
+	_, err := r.col.UpdateOne(
+		ctx,
+		bson.M{"serial": serial},
+		bson.M{"$set": bson.M{
+			"parameters": merged,
 			"updated_at": time.Now().UTC(),
 		}},
 	)

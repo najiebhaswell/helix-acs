@@ -192,6 +192,7 @@ type Repository interface {
 	SetOnline(ctx context.Context, serial string, online bool) error
 	MarkStaleOffline(ctx context.Context, olderThan time.Time) (int64, error)
 	UpdateParameters(ctx context.Context, serial string, params map[string]string) error
+	MergeParameters(ctx context.Context, serial string, params map[string]string) error
 	UpdateInfo(ctx context.Context, serial string, upd InfoUpdate) error
 }
 
@@ -205,4 +206,5 @@ type Service interface {
 	MarkStaleOffline(ctx context.Context, olderThan time.Time) (int64, error)
 	UpdateInfo(ctx context.Context, serial string, upd InfoUpdate) error
 	UpdateParameters(ctx context.Context, serial string, params map[string]string) error
+	MergeParameters(ctx context.Context, serial string, params map[string]string) error
 }

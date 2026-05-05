@@ -151,6 +151,16 @@ func (s *service) UpdateParameters(ctx context.Context, serial string, params ma
 	return nil
 }
 
+// MergeParameters merges the given params into the existing parameter map
+// without removing other keys. Use for targeted/partial summons.
+func (s *service) MergeParameters(ctx context.Context, serial string, params map[string]string) error {
+	if err := s.repo.MergeParameters(ctx, serial, params); err != nil {
+		s.logger.WithError(err).WithField("serial", serial).Error("Failed to merge device parameters")
+		return fmt.Errorf("merge parameters for device %s: %w", serial, err)
+	}
+	return nil
+}
+
 // MarkStaleOffline sets online=false for all devices that have not sent an
 // Inform since olderThan. Returns the count of affected devices.
 func (s *service) MarkStaleOffline(ctx context.Context, olderThan time.Time) (int64, error) {
