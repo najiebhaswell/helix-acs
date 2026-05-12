@@ -53,10 +53,6 @@ steps:
       "Device.Ethernet.VLANTermination.{vterm}.Enable": "1"
       "Device.Ethernet.VLANTermination.{vterm}.LowerLayers": "Device.Ethernet.Link.{eth}."
       "Device.Ethernet.VLANTermination.{vterm}.VLANID": "{vlan_id}"
-
-  - kind: set
-    params:
-      "Device.Ethernet.VLANTermination.{vterm}.X_TP_MulticastStatus": "1"
       "Device.Ethernet.VLANTermination.{vterm}.X_TP_VLANEnable": "1"
       "Device.Ethernet.VLANTermination.{vterm}.X_TP_VLANMode": "2"
 
@@ -93,7 +89,7 @@ steps:
       "Device.IP.Interface.{ip}.MaxMTUSize": "{default_mtu}"
       "Device.IP.Interface.{ip}.X_TP_ConnName": "Internet_PPPoE"
       "Device.IP.Interface.{ip}.X_TP_ConnType": "PPPoE"
-      "Device.IP.Interface.{ip}.X_TP_IPv6AddrType": "SLAAC"
+      "Device.IP.Interface.{ip}.X_TP_IPv6AddrType": "DHCPv6"
       "Device.IP.Interface.{ip}.X_TP_ServiceType": "Internet"
 
   # ---- Phase 6: NAT ----
@@ -127,11 +123,11 @@ steps:
   - kind: set
     when: feature_dhcpv6_client
     params:
-      "Device.DHCPv6.Client.{dhcpv6}.RequestAddresses": "0"
+      "Device.DHCPv6.Client.{dhcpv6}.RequestAddresses": "1"
       "Device.DHCPv6.Client.{dhcpv6}.RequestPrefixes": "1"
       "Device.DHCPv6.Client.{dhcpv6}.RequestedOptions": "23"
       "Device.DHCPv6.Client.{dhcpv6}.X_TP_EnableRaRouter": "1"
-      "Device.DHCPv6.Client.{dhcpv6}.X_TP_EnableSLAAC": "1"
+      "Device.DHCPv6.Client.{dhcpv6}.X_TP_EnableSLAAC": "0"
 
   # ---- Phase 9: Default Gateway (TP-Link proprietary) ----
   - kind: set

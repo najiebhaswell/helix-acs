@@ -227,24 +227,37 @@ func (sm *SessionManager) TakeByRPCID(id string) *Session {
 }
 
 // Cleanup removes sessions older than 30 minutes.
+// It collects expired sessions in the first pass and then removes their
+// secondary index entries in O(expired) rather than scanning the full
+// serialSessions/rpcIDSessions maps for every expired session.
 func (sm *SessionManager) Cleanup() {
 	cutoff := time.Now().UTC().Add(-30 * time.Minute)
+
+	// Phase 1: collect expired sessions.
+	expired := make(map[*Session]struct{})
 	sm.sessions.Range(func(key, value any) bool {
 		s := value.(*Session)
 		if s.CreatedAt.Before(cutoff) {
 			sm.sessions.Delete(key)
-			sm.serialSessions.Range(func(serialKey, sessionVal any) bool {
-				if sessionVal == s {
-					sm.serialSessions.Delete(serialKey)
-				}
-				return true
-			})
-			sm.rpcIDSessions.Range(func(idKey, sessionVal any) bool {
-				if sessionVal == s {
-					sm.rpcIDSessions.Delete(idKey)
-				}
-				return true
-			})
+			expired[s] = struct{}{}
+		}
+		return true
+	})
+
+	if len(expired) == 0 {
+		return
+	}
+
+	// Phase 2: single pass over secondary indices to remove stale bindings.
+	sm.serialSessions.Range(func(serialKey, sessionVal any) bool {
+		if _, ok := expired[sessionVal.(*Session)]; ok {
+			sm.serialSessions.Delete(serialKey)
+		}
+		return true
+	})
+	sm.rpcIDSessions.Range(func(idKey, sessionVal any) bool {
+		if _, ok := expired[sessionVal.(*Session)]; ok {
+			sm.rpcIDSessions.Delete(idKey)
 		}
 		return true
 	})
@@ -296,6 +309,7 @@ func (h *Handler) adoptInFlightBySerial(serial string, current *Session) bool {
 
 	// Clear moved state from previous session to avoid double-processing.
 	prev.mu.Lock()
+	prevID := prev.ID
 	prev.currentTask = nil
 	prev.wanProvision = nil
 	prev.addObjFollowUp = nil
@@ -303,6 +317,12 @@ func (h *Handler) adoptInFlightBySerial(serial string, current *Session) bool {
 	prev.pendingProvisionMark = false
 	prev.pendingWANCredentials = nil
 	prev.mu.Unlock()
+
+	// Remove the now-empty previous session from the session map so it does
+	// not hold memory until the 30-minute Cleanup timer fires.
+	if prevID != "" {
+		h.sessionMgr.Delete(prevID)
+	}
 
 	return true
 }
@@ -533,7 +553,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleInform processes the Inform message, upserts the device, loads pending tasks,
 func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *http.Request, env *Envelope, session *Session) {
-	id := headerID(env)
+	id := responseID(env)
 	upsertReq := h.extractInformParams(env)
 
 	session.mu.Lock()
@@ -786,13 +806,21 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 	session.State = StateProcessing
 	session.mu.Unlock()
 
-	// Flag the session as needing global default injection only when the device
-	// qualifies (bootstrap or never provisioned). This avoids blocking every
-	// Inform session with a redundant global_defaults task.
+	// Flag the session as needing global default injection when the device
+	// qualifies: bootstrap event OR never provisioned (first-ever connection).
+	// Checking the flag here avoids a redundant DB query on every Inform for
+	// already-provisioned devices.
 	if session.isBootstrap {
 		session.mu.Lock()
 		session.needsGlobalDefaults = true
 		session.mu.Unlock()
+	} else if h.parameterRepo != nil {
+		provisioned, _ := h.parameterRepo.GetParameter(ctx, upsertReq.Serial, "_helix.provisioned")
+		if provisioned != "true" {
+			session.mu.Lock()
+			session.needsGlobalDefaults = true
+			session.mu.Unlock()
+		}
 	}
 	h.injectGlobalDefaultParams(ctx, session, upsertReq.Serial, upsertReq.Parameters)
 
@@ -808,7 +836,7 @@ func (h *Handler) handleInform(ctx context.Context, w http.ResponseWriter, _ *ht
 // handleTransferComplete processes the TransferComplete message, marking the related task done or failed.
 func (h *Handler) handleTransferComplete(ctx context.Context, env *Envelope) ([]byte, error) {
 	tc := env.Body.TransferComplete
-	id := headerID(env)
+	id := responseID(env)
 
 	h.log.
 		WithField("command_key", tc.CommandKey).
@@ -832,12 +860,12 @@ func (h *Handler) handleTransferComplete(ctx context.Context, env *Envelope) ([]
 		}
 	}
 
-	return BuildEnvelope(id, Body{TransferComplete: nil})
+	return BuildEnvelope(id, Body{TransferCompleteResponse: &TransferCompleteResponse{}})
 }
 
 // handleGetRPCMethods returns the list of supported RPC methods.
 func (h *Handler) handleGetRPCMethods(_ context.Context, env *Envelope) ([]byte, error) {
-	id := headerID(env)
+	id := responseID(env)
 	methods := []string{
 		"GetRPCMethods", "SetParameterValues", "GetParameterValues",
 		"GetParameterNames", "AddObject", "DeleteObject",
@@ -931,18 +959,18 @@ func (h *Handler) handleSetParamValuesResponse(ctx context.Context, w http.Respo
 		// Sync synchronously so the task is only marked done AFTER PostgreSQL is updated.
 		// This prevents a race where the user saves a snapshot before params are persisted.
 		pgCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		defer cancel()
 		if err := h.parameterRepo.UpdateParameters(pgCtx, serial, setParams); err != nil {
 			h.log.WithError(err).WithField("serial", serial).Warn("CWMP: failed to sync task params to PostgreSQL")
 		}
+		cancel()
 	}
 
 	// Now that the SPV succeeded, mark the device as provisioned so future
 	// Informs skip global default injection.
 	if pendingProvision && serial != "" {
 		markCtx, markCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer markCancel()
 		_ = h.parameterRepo.UpdateParameters(markCtx, serial, map[string]string{"_helix.provisioned": "true"})
+		markCancel()
 		h.log.WithField("serial", serial).Info("CWMP: device marked as provisioned after successful SPV")
 	}
 
@@ -2525,6 +2553,13 @@ func (h *Handler) extractInformParams(env *Envelope) *device.UpsertRequest {
 		req.DataModel = "tr181"
 	}
 
+	// Fallback: some CPEs (e.g. certain ZTE F670L units) do not include
+	// ModelName in the Inform ParameterList but always report ProductClass
+	// in the DeviceId SOAP header. Use it as the model name when missing.
+	if req.ModelName == "" && req.ProductClass != "" {
+		req.ModelName = req.ProductClass
+	}
+
 	return req
 }
 
@@ -2547,7 +2582,7 @@ func (h *Handler) getSessionID(r *http.Request) string {
 	if c, err := r.Cookie("cwmp-session"); err == nil && c.Value != "" {
 		return c.Value
 	}
-	if body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)); err == nil && len(body) > 0 {
+	if body, err := io.ReadAll(io.LimitReader(r.Body, 16<<20)); err == nil && len(body) > 0 {
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		var env Envelope
 		if xmlErr := xml.NewDecoder(bytes.NewReader(body)).Decode(&env); xmlErr == nil {
@@ -2611,9 +2646,21 @@ func (h *Handler) bindOutboundRPCID(xmlBytes []byte, session *Session) {
 	}
 }
 
+// headerID extracts the cwmp:ID from the SOAP envelope header.
+// Returns empty string when the header has no ID (used for session routing).
 func headerID(env *Envelope) string {
 	if env != nil && env.Header.ID != nil {
 		return env.Header.ID.Value
+	}
+	return ""
+}
+
+// responseID extracts the cwmp:ID from the SOAP envelope header, falling back
+// to a new UUID when absent. Used for building SOAP response envelopes where
+// a non-empty ID is required.
+func responseID(env *Envelope) string {
+	if id := headerID(env); id != "" {
+		return id
 	}
 	return uuid.NewString()
 }
@@ -2967,10 +3014,11 @@ func (h *Handler) detectAndHandleReset(ctx context.Context, serial string, inf *
 	h.log.WithField("serial", serial).
 		WithField("reason", reason).
 		WithField("snapshot_params", len(lastKnownGood)).
-		Info("CWMP: Factory reset detected, queuing WiFi restore from last_known_good")
+		Info("CWMP: Factory reset detected, queuing WiFi+WAN restore from last_known_good")
 	// Clear stored parameters so the next Inform triggers a fresh summon.
 	_ = h.parameterRepo.DeleteDeviceParameters(ctx, serial)
 	h.restoreWiFiConfig(ctx, serial, lastKnownGood, mapper)
+	h.restoreWANConfig(ctx, serial, lastKnownGood)
 }
 
 // informParamValue returns the value of a named parameter from the Inform
@@ -3053,11 +3101,27 @@ func (h *Handler) restoreWiFiConfig(ctx context.Context, serial string, snapshot
 	// Bootstrap Inform carries only a few params and defaults to SSID.1/SSID.2,
 	// but the device may use SSID.3 (or higher) for 5GHz.
 	modelType := datamodel.DetectFromRootObject(firstRootObject(snapshot))
+	isTR098 := firstRootObject(snapshot) == "InternetGatewayDevice."
+
+	// Resolve Manufacturer/ProductClass from the correct data-model root.
+	// TR-098 devices store them under InternetGatewayDevice.DeviceInfo.*;
+	// TR-181 devices under Device.DeviceInfo.*.
+	manufacturer := snapshot["Device.DeviceInfo.Manufacturer"]
+	productClass := snapshot["Device.DeviceInfo.ProductClass"]
+	if isTR098 {
+		if v := snapshot["InternetGatewayDevice.DeviceInfo.Manufacturer"]; v != "" {
+			manufacturer = v
+		}
+		if v := snapshot["InternetGatewayDevice.DeviceInfo.ProductClass"]; v != "" {
+			productClass = v
+		}
+	}
+
 	var discoveryHints *datamodel.DiscoveryHints
 	if h.driverRegistry != nil {
 		drv := h.driverRegistry.Resolve(
-			snapshot["Device.DeviceInfo.Manufacturer"],
-			snapshot["Device.DeviceInfo.ProductClass"],
+			manufacturer,
+			productClass,
 			string(modelType),
 		)
 		discoveryHints = discoveryHintsFromDriver(drv)
@@ -3105,6 +3169,19 @@ func (h *Handler) restoreWiFiConfig(ctx context.Context, serial string, snapshot
 		password := snapshot[b.passPath]
 		security := deviceSecToPayloadSec(snapshot[b.secPath])
 
+		// If the snapshot has a password but security resolved to "None" or
+		// empty, the device was clearly using WPA — override to WPA2-PSK so
+		// the password and security mode are actually pushed to the CPE.
+		// Without this, buildWiFiParamsFromDriverFlow treats security="None"
+		// as an open-network request and clears the password.
+		if password != "" && (security == "" || security == "None") {
+			h.log.WithField("serial", serial).
+				WithField("band", b.band).
+				WithField("snapshot_security", snapshot[b.secPath]).
+				Warn("CWMP: snapshot has password but security=None; overriding to WPA2-PSK")
+			security = "WPA2-PSK"
+		}
+
 		wifiPayload := task.WiFiPayload{
 			Band:     b.band,
 			SSID:     ssid,
@@ -3140,9 +3217,14 @@ func (h *Handler) restoreWiFiConfig(ctx context.Context, serial string, snapshot
 	}
 
 	// Also restore ProvisioningCode as a single-param task to stop re-detection loop.
-	if provCode := snapshot["Device.DeviceInfo.ProvisioningCode"]; provCode != "" {
+	// Use the correct data-model root: TR-098 stores it under InternetGatewayDevice.*.
+	provCodePath := "Device.DeviceInfo.ProvisioningCode"
+	if isTR098 {
+		provCodePath = "InternetGatewayDevice.DeviceInfo.ProvisioningCode"
+	}
+	if provCode := snapshot[provCodePath]; provCode != "" {
 		payload, err := json.Marshal(task.SetParamsPayload{
-			Parameters: map[string]string{"Device.DeviceInfo.ProvisioningCode": provCode},
+			Parameters: map[string]string{provCodePath: provCode},
 		})
 		if err == nil {
 			provTask := &task.Task{
@@ -3161,6 +3243,178 @@ func (h *Handler) restoreWiFiConfig(ctx context.Context, serial string, snapshot
 	h.log.WithField("serial", serial).
 		WithField("tasks_queued", queued).
 		Info("CWMP: WiFi restore tasks queued after factory reset")
+}
+
+// restoreWANConfig creates a TypeWAN task from the snapshot to restore the
+// PPPoE WAN connection (username, password, VLAN) after a factory reset.
+//
+// VLAN correlation: simply picking the first .VLANID from the snapshot is wrong
+// because the snapshot may contain multiple VLANTerminations (TR069, IPoE, PPPoE).
+// Instead we trace the PPP.Interface → LowerLayers → VLANTermination chain to
+// find the exact VLAN that belongs to the PPPoE connection.
+//
+// Chain (TR-181):
+//   PPP.Interface.{i}.LowerLayers = "Device.Ethernet.VLANTermination.{j}."
+//   Ethernet.VLANTermination.{j}.VLANID = "110"
+//
+// Chain (TR-098):
+//   WANDevice.{i}.WANConnectionDevice.{j}.WANPPPConnection.{k} → VLANID from
+//   X_CT-COM_VLANIDMark or the connection-device index itself.
+func (h *Handler) restoreWANConfig(ctx context.Context, serial string, snapshot map[string]string) {
+	var pppLowerLayers string
+
+	// Step 1: Find PPP credentials and LowerLayers reference.
+	// Always prioritize the stored _helix.provision.* credentials because
+	// TR-181 devices (like TP-Link) redact passwords in GetParameterValues.
+	username := snapshot["_helix.provision.pppoe_username"]
+	password := snapshot["_helix.provision.pppoe_password"]
+
+	for key, val := range snapshot {
+		lower := strings.ToLower(key)
+		switch {
+		case strings.HasSuffix(lower, ".username") && strings.Contains(lower, "ppp"):
+			if val != "" && username == "" {
+				username = val
+			}
+		case strings.HasSuffix(lower, ".password") && strings.Contains(lower, "ppp"):
+			if val != "" && password == "" {
+				password = val
+			}
+		case strings.HasSuffix(lower, ".lowerlayers") && strings.Contains(lower, "ppp"):
+			// e.g. Device.PPP.Interface.1.LowerLayers = "Device.Ethernet.VLANTermination.6."
+			if val != "" {
+				pppLowerLayers = val
+			}
+		}
+	}
+
+	if username == "" {
+		h.log.WithField("serial", serial).
+			Debug("CWMP: no PPPoE username found in snapshot, skipping WAN restore")
+		return
+	}
+
+	// Step 2: Follow the LowerLayers chain to find the PPPoE-associated VLAN.
+	// PPP.Interface.LowerLayers may point directly to a VLANTermination or
+	// indirectly through an IP Interface / Ethernet Link.
+	vlanID := resolveVLANFromChain(snapshot, pppLowerLayers)
+
+	// Fallback: if chain resolution failed but there's only ONE VLANTermination
+	// with a non-zero VLANID, use it (single-WAN device scenario).
+	if vlanID == 0 {
+		var candidates []int
+		for key, val := range snapshot {
+			lower := strings.ToLower(key)
+			if strings.HasSuffix(lower, ".vlanid") && strings.Contains(lower, "vlantermination") {
+				if v, err := strconv.Atoi(val); err == nil && v > 0 {
+					candidates = append(candidates, v)
+				}
+			}
+		}
+		if len(candidates) == 1 {
+			vlanID = candidates[0]
+		}
+		// When multiple VLANTerminations exist we cannot guess — log a warning.
+		if len(candidates) > 1 {
+			h.log.WithField("serial", serial).
+				WithField("candidates", candidates).
+				Warn("CWMP: multiple VLANTerminations in snapshot; could not determine PPPoE VLAN from LowerLayers chain")
+		}
+	}
+
+	h.log.WithField("serial", serial).
+		WithField("username", username).
+		WithField("vlan", vlanID).
+		WithField("ppp_lower_layers", pppLowerLayers).
+		Debug("CWMP: restoreWANConfig resolved PPPoE parameters")
+
+	ipv6 := true
+	wanPayload := task.WANPayload{
+		ConnectionType: "pppoe",
+		Username:       username,
+		Password:       password,
+		VLAN:           vlanID,
+		IPv6Enabled:    &ipv6,
+	}
+
+	payload, err := json.Marshal(wanPayload)
+	if err != nil {
+		h.log.WithError(err).WithField("serial", serial).Error("CWMP: Failed to marshal WAN restore payload")
+		return
+	}
+
+	t := &task.Task{
+		ID:      fmt.Sprintf("restore_wan_%d", time.Now().UnixNano()),
+		Serial:  serial,
+		Type:    task.TypeWAN,
+		Status:  task.StatusPending,
+		Payload: payload,
+	}
+	if err := h.taskQueue.Enqueue(ctx, t); err != nil {
+		h.log.WithError(err).WithField("serial", serial).Error("CWMP: Failed to queue WAN restore task")
+		return
+	}
+
+	h.log.WithField("serial", serial).
+		WithField("task_id", t.ID).
+		WithField("username", username).
+		WithField("vlan", vlanID).
+		Info("CWMP: WAN PPPoE restore task queued")
+}
+
+// resolveVLANFromChain follows the TR-181 LowerLayers chain from a PPP Interface
+// down to the VLANTermination to extract the VLANID. It handles both direct and
+// indirect references:
+//
+//	Direct:   PPP.Interface → VLANTermination (has .VLANID)
+//	Indirect: PPP.Interface → IP.Interface → VLANTermination (has .VLANID)
+//
+// The chain is followed up to 4 hops to avoid infinite loops.
+func resolveVLANFromChain(snapshot map[string]string, lowerLayers string) int {
+	visited := make(map[string]bool)
+	current := strings.TrimSpace(lowerLayers)
+
+	for i := 0; i < 4 && current != ""; i++ {
+		// Normalize: remove trailing dot for matching, add it back for prefix searches.
+		current = strings.TrimSuffix(current, ".")
+
+		if visited[current] {
+			break
+		}
+		visited[current] = true
+
+		lower := strings.ToLower(current)
+
+		// Check if current object is a VLANTermination — read its .VLANID.
+		if strings.Contains(lower, "vlantermination") {
+			vlanKey := current + ".VLANID"
+			if val, ok := snapshot[vlanKey]; ok {
+				if v, err := strconv.Atoi(val); err == nil && v > 0 {
+					return v
+				}
+			}
+			// Try case-insensitive match (some snapshots may differ in casing).
+			for k, v := range snapshot {
+				if strings.EqualFold(k, vlanKey) {
+					if vid, err := strconv.Atoi(v); err == nil && vid > 0 {
+						return vid
+					}
+				}
+			}
+			break // VLANTermination found but no VLANID — stop.
+		}
+
+		// Not a VLANTermination — follow its own LowerLayers.
+		nextLower := snapshot[current+".LowerLayers"]
+		if nextLower == "" {
+			break
+		}
+		// LowerLayers can be comma-separated; take the first non-empty entry.
+		parts := strings.Split(nextLower, ",")
+		current = strings.TrimSpace(parts[0])
+	}
+
+	return 0
 }
 
 // deviceSecToPayloadSec converts a device-native TR-181 security mode string
@@ -3197,6 +3451,7 @@ func filterCriticalParameters(params map[string]string) map[string]string {
 		"ProvisioningCode", // Device.DeviceInfo.ProvisioningCode — restored to stop re-detection loop
 	}
 
+nextKey:
 	for key, value := range params {
 		for _, pattern := range criticalPatterns {
 			if strings.Contains(key, pattern) {
@@ -3223,12 +3478,12 @@ func filterCriticalParameters(params map[string]string) map[string]string {
 							!strings.Contains(key, "WiFi.SSID.2.") &&
 							!strings.Contains(key, "WiFi.AccessPoint.1.") &&
 							!strings.Contains(key, "WiFi.AccessPoint.2.") {
-							break
+							continue nextKey
 						}
 					}
 					critical[key] = value
-					break
 				}
+				break // pattern matched — stop checking other patterns for this key
 			}
 		}
 	}
