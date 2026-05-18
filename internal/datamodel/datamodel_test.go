@@ -35,8 +35,9 @@ func TestTR181Mapper(t *testing.T) {
 	assert.Equal(t, "Device.WiFi.SSID.2.Enable", m.WiFiEnabledPath(1))
 	assert.Equal(t, "Device.WiFi.Radio.2.Channel", m.WiFiChannelPath(1))
 
-	// WAN
-	assert.Equal(t, "Device.IP.Interface.1.X_TP_ConnType", m.WANConnectionTypePath())
+	// WAN — generic TR-181 has no standard connection type path;
+	// vendor-specific paths are resolved via driver YAML / SchemaMapper.
+	assert.Equal(t, "", m.WANConnectionTypePath())
 	assert.Equal(t, "Device.PPP.Interface.1.Username", m.WANPPPoEUserPath())
 	assert.Equal(t, "Device.PPP.Interface.1.Password", m.WANPPPoEPassPath())
 	assert.Equal(t, "Device.IP.Interface.1.IPv4Address.1.IPAddress", m.WANIPAddressPath())

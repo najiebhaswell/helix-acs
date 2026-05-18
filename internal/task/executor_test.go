@@ -107,7 +107,12 @@ func TestBuildSetParamsWAN(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, params)
 
-	assert.Equal(t, "pppoe", params[mapper.WANConnectionTypePath()])
+	// Generic TR-181 mapper returns empty WANConnectionTypePath; connection
+	// type is only set when a vendor driver provides the path.
+	assert.Equal(t, "", mapper.WANConnectionTypePath())
+	_, hasEmpty := params[""]
+	assert.False(t, hasEmpty, "empty-key should not be inserted when path is empty")
+
 	assert.Equal(t, "ppp_user", params["Device.PPP.Interface.1.Username"])
 	assert.Equal(t, "ppp_pass", params["Device.PPP.Interface.1.Password"])
 }
@@ -128,7 +133,7 @@ func TestBuildSetParamsWANWithIP(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, params)
 
-	assert.Equal(t, "static", params[mapper.WANConnectionTypePath()])
+	// ConnectionType not inserted (no vendor path on generic mapper)
 	assert.Equal(t, "203.0.113.5", params["Device.IP.Interface.1.IPv4Address.1.IPAddress"])
 }
 

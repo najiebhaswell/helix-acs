@@ -72,6 +72,7 @@ type Body struct {
 	RebootResponse             *RebootResponse             `xml:"cwmp:RebootResponse,omitempty"`
 	FactoryReset               *FactoryReset               `xml:"cwmp:FactoryReset,omitempty"`
 	FactoryResetResponse       *FactoryResetResponse       `xml:"cwmp:FactoryResetResponse,omitempty"`
+	TransferCompleteResponse   *TransferCompleteResponse   `xml:"cwmp:TransferCompleteResponse,omitempty"`
 	Fault                      *SOAPFault                  `xml:"soap:Fault,omitempty"`
 }
 
@@ -269,6 +270,10 @@ type FaultStruct struct {
 	FaultString string `xml:"FaultString"`
 }
 
+// TransferCompleteResponse is the ACS acknowledgement of a TransferComplete
+// message. Per TR-069 §A.3.2.2 it is an empty element.
+type TransferCompleteResponse struct{}
+
 // Reboot / FactoryReset (ACS → CPE)
 
 // Reboot instructs the CPE to reboot.
@@ -459,8 +464,8 @@ func BuildSetParameterValues(id string, params map[string]string) ([]byte, error
 }
 
 // inferXSDType returns the appropriate XSD type for a CWMP parameter based on
-// the parameter name and value. TP-Link devices reject SetParameterValues when
-// the xsi:type does not match their internal schema.
+// the parameter name and value. Some CPEs reject SetParameterValues when the
+// xsi:type does not match their internal schema, so accurate typing matters.
 func inferXSDType(paramName, value string) string {
 	// Last segment of the dotted path (e.g. "Enable", "VLANID").
 	parts := strings.Split(paramName, ".")
@@ -478,22 +483,38 @@ func inferXSDType(paramName, value string) string {
 		return "xsd:boolean"
 	}
 
-	// Known unsigned integer fields
+	// Known unsigned integer fields (standard TR-181/TR-098 parameters)
 	switch leaf {
 	case "VLANID", "MaxMTUSize", "NumberOfRepetitions", "PeriodicInformInterval",
-		"MaxMTU", "Status", "X_TP_VLANMode", "Port", "Channel", "TransmitPower",
-		"OperatingChannelBandwidth", "MaxBitRate", "RSSI", "X_TP_TxPower",
+		"MaxMTU", "Status", "Port", "Channel", "TransmitPower",
+		"OperatingChannelBandwidth", "MaxBitRate", "RSSI",
 		"AssociatedDeviceNumberOfEntries":
 		return "xsd:unsignedInt"
 	}
 
-	// Known signed integer fields (default value can be negative, e.g. -1)
-	switch leaf {
-	case "X_TP_MulticastStatus":
-		return "xsd:int"
+	// Vendor extension parameters (X_ prefix): infer numeric type from value.
+	// This handles X_TP_VLANMode, X_HW_VLANID, X_CT-COM_VLANIDMark, etc.
+	// without hardcoding any vendor prefix.
+	if strings.HasPrefix(leaf, "X_") {
+		if isNumericValue(value) {
+			return "xsd:unsignedInt"
+		}
 	}
 
 	return "xsd:string"
+}
+
+// isNumericValue returns true if value is a non-negative integer string.
+func isNumericValue(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // BuildReboot constructs a Reboot request envelope.

@@ -1,0 +1,45 @@
+id: wan_pppoe_new
+vendor: zte
+model: tr098
+description: >
+  ZTE TR-098 PPPoE WAN provisioning. Follows the exact same sequence
+  as SmartOLT: AddObject, then configure type/service/VLAN, then
+  credentials, then IPMode + IPv6, then enable + set as default route.
+
+steps:
+  # Step 1: Create a new WANPPPConnection
+  - kind: add
+    object: "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection."
+    as: wan_ppp_conn
+
+  # Step 2: Set ConnectionType + ServiceList + VLAN
+  - kind: set
+    params:
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.ConnectionType": "IP_Routed"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_ZTE-COM_ServiceList": "INTERNET"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_ZTE-COM_VLANEnable": "1"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_ZTE-COM_VLANID": "{vlan_id}"
+
+  # Step 3: Set PPPoE credentials
+  - kind: set
+    params:
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Username": "{username}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Password": "{password}"
+
+  # Step 4: Set IP mode + IPv6 parameters
+  - kind: set
+    params:
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_ZTE-COM_IPMode": "{wan_ip_mode}"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_ZTE-COM_Dhcpv6IANAEnable": "1"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_ZTE-COM_Dhcpv6IAPDEnable": "1"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.X_ZTE-COM_IsGUAFromPD": "1"
+
+  # Step 5: Enable interface + set as default route (IPv4 + IPv6)
+  # Harus TERAKHIR setelah semua parameter selesai dikonfigurasi
+  - kind: set
+    params:
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.NATEnabled": "1"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Enable": "1"
+      "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}.Name": "Internet_PPPoE"
+      "InternetGatewayDevice.Layer3Forwarding.DefaultConnectionService": "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}"
+      "InternetGatewayDevice.Layer3Forwarding.X_ZTE-COM_IPv6DefaultConnectionService": "InternetGatewayDevice.WANDevice.{wan_dev}.WANConnectionDevice.{wan_conn}.WANPPPConnection.{wan_ppp_conn}"

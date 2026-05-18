@@ -155,7 +155,10 @@ func (m *TR181Mapper) WiFiErrorsReceivedPath(bandIdx int) string {
 // WAN
 
 func (m *TR181Mapper) WANConnectionTypePath() string {
-	return fmt.Sprintf("Device.IP.Interface.%d.X_TP_ConnType", m.wanIface())
+	// No standard TR-181 parameter exists for WAN connection type; vendor
+	// extensions (e.g. X_TP_ConnType, X_HW_ConnMode) are resolved via the
+	// driver YAML and SchemaMapper override. Return empty as a safe default.
+	return ""
 }
 func (m *TR181Mapper) WANPPPoEUserPath() string {
 	return fmt.Sprintf("Device.PPP.Interface.%d.Username", m.pppIface())
@@ -301,7 +304,8 @@ func (m *TR181Mapper) SupportsWiFiAccessPoint() bool {
 	return true
 }
 
-// WANServiceTypePath returns "" for generic TR-181; vendor schemas override this.
+// WANServiceTypePath returns "" for generic TR-181; vendor schemas override this
+// with vendor-specific paths (e.g. X_TP_ServiceType, X_HW_ServiceList).
 func (m *TR181Mapper) WANServiceTypePath() string { return "" }
 
 // BandSteeringPath returns "" for generic TR-181; vendor schemas override this.

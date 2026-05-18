@@ -84,7 +84,7 @@ type WiFiPayload struct {
 	Security             string `json:"security"` // "None", "WPA2-PSK", etc.
 	Channel              int    `json:"channel,omitempty"`
 	Enabled              *bool  `json:"enabled,omitempty"`
-	BandSteeringEnabled  *bool  `json:"band_steering_enabled,omitempty"` // Enable/disable Band Steering (TP-Link specific)
+	BandSteeringEnabled  *bool  `json:"band_steering_enabled,omitempty"` // Enable/disable Band Steering (vendor-specific, supported by some CPEs)
 }
 
 type WANPayload struct {

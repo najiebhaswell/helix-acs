@@ -1086,6 +1086,17 @@ func (h *Handler) handleTargetedSummonResponse(ctx context.Context, w http.Respo
 	session.mu.Unlock()
 
 	discoveryHints := discoveryHintsFromDriver(drv)
+
+	// DEBUG: log PPP-related params from targeted summon response
+	for name, val := range params {
+		if strings.Contains(name, "WANPPPConnection") && (strings.HasSuffix(name, ".ConnectionStatus") || strings.HasSuffix(name, ".ConnectionType") || strings.HasSuffix(name, ".ExternalIPAddress") || strings.HasSuffix(name, ".Username")) {
+			h.log.WithField("serial", serial).
+				WithField("param", name).
+				WithField("value", val).
+				Info("CWMP: targeted summon PPP param")
+		}
+	}
+
 	instanceMap := datamodel.DiscoverInstancesWithHints(params, discoveryHints)
 
 	h.log.WithField("serial", serial).

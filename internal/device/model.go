@@ -63,7 +63,7 @@ type WiFiInfo struct {
 	SecurityMode        string `bson:"security_mode"         json:"security_mode"`
 	TXPower             int    `bson:"tx_power"              json:"tx_power"`
 	ConnectedClients    int    `bson:"connected_clients"     json:"connected_clients"`
-	BandSteeringEnabled *bool  `bson:"band_steering_enabled" json:"band_steering_enabled,omitempty"` // TP-Link specific
+	BandSteeringEnabled *bool  `bson:"band_steering_enabled" json:"band_steering_enabled,omitempty"` // optional; supported by some CPEs
 
 	// Traffic counters
 	BytesSent       int64 `bson:"bytes_sent"        json:"bytes_sent"`

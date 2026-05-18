@@ -392,7 +392,7 @@ func TestExecuteTask_WANNonPPPoE_DHCP(t *testing.T) {
 	// Either way, we're verifying the non-PPPoE path is taken.
 	if err != nil {
 		// Expected: executor has no DHCP params defined
-		assert.Contains(t, err.Error(), "no parameters")
+		assert.Contains(t, err.Error(), "no settable fields")
 	}
 }
 

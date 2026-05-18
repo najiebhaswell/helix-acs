@@ -35,4 +35,5 @@ steps:
     params:
       "Device.PPP.Interface.{ppp_iface_idx}.Enable": "1"
       "Device.IP.Interface.{ip_iface_idx}.IPv6Enable": "{ipv6_enabled}"
+      "Device.IP.Interface.{ip_iface_idx}.X_TP_IPv6AddrType": "DHCPv6"
       "Device.IP.Interface.{ip_iface_idx}.Enable": "1"

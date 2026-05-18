@@ -57,7 +57,9 @@ func (e *Executor) BuildSetParams(ctx context.Context, t *Task, mapper datamodel
 		}
 		params := make(map[string]string)
 		if p.ConnectionType != "" {
-			params[mapper.WANConnectionTypePath()] = p.ConnectionType
+			if ctPath := mapper.WANConnectionTypePath(); ctPath != "" {
+				params[ctPath] = p.ConnectionType
+			}
 		}
 		if p.Username != "" {
 			params[mapper.WANPPPoEUserPath()] = p.Username

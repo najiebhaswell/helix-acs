@@ -4,7 +4,7 @@ model: tr181
 description: >
   TP-Link GPON ONT TR-181 device driver.
   Handles vendor-specific X_TP_* parameter extensions including:
-  GPON link management, VLAN mode, PPP domain, DHCPv6 SLAAC,
+  GPON link management, VLAN mode, PPP domain, stateful DHCPv6,
   default gateway, band steering, and connected host type detection.
 
 features:

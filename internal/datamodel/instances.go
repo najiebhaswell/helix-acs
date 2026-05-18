@@ -34,7 +34,7 @@ type DiscoveryHints struct {
 	WANTR098VLANPathSuffix string
 
 	// WiFiSSIDBandWithoutLowerLayers selects SSID index → band when TR-181
-	// SSID.LowerLayers is absent (from driver YAML). Nil = legacy TP-Link heuristic.
+	// SSID.LowerLayers is absent (from driver YAML). Nil = legacy heuristic.
 	WiFiSSIDBandWithoutLowerLayers *WiFiSSIDBandWithoutLowerLayersHints
 }
 
@@ -54,7 +54,8 @@ type InstanceMap struct {
 	WANEthLinkIdx int
 	// TR-181: Current VLAN ID value on WANVLANTermination (for change detection)
 	WANCurrentVLAN int
-	// TR-181: First unused (disabled) Device.X_TP_GPON.Link.{i} slot.
+	// TR-181: First unused (disabled) GPON link slot; index path is provided
+	// by the driver YAML (e.g. Device.X_TP_GPON.Link.{i}.Enable).
 	FreeGPONLinkIdx int
 
 	// TR-181 WiFi instances indexed by band (0=2.4GHz, 1=5GHz, 2=6GHz).
@@ -283,7 +284,9 @@ func tr181ConnTypeValue(params map[string]string, idx int, hints *DiscoveryHints
 			return params[key]
 		}
 	}
-	return params[fmt.Sprintf("Device.IP.Interface.%d.X_TP_ConnType", idx)]
+	// No standard TR-181 connection type parameter exists; vendor-specific
+	// paths (X_TP_ConnType, X_HW_ConnMode, etc.) must be provided via driver YAML.
+	return ""
 }
 
 func indexedPath(pathTemplate string, idx int) string {
@@ -764,11 +767,12 @@ func discoverTR098(params map[string]string, im *InstanceMap, hints *DiscoveryHi
 
 // tr098PPPCandidate represents a discovered WANPPPConnection for scoring.
 type tr098PPPCandidate struct {
-	wanDev  int
-	wanConn int
-	wanPPP  int
-	hasIP   bool // ExternalIPAddress is non-empty
-	pubIP   bool // ExternalIPAddress is a public IP
+	wanDev       int
+	wanConn      int
+	wanPPP       int
+	hasIP        bool // ExternalIPAddress is non-empty
+	pubIP        bool // ExternalIPAddress is a public IP
+	unconfigured bool // ConnectionStatus == "Unconfigured" (ZTE phantom slot)
 }
 
 func discoverTR098WAN(params map[string]string, im *InstanceMap, hints *DiscoveryHints) {
@@ -793,8 +797,8 @@ func discoverTR098WAN(params map[string]string, im *InstanceMap, hints *Discover
 		}
 	}
 
-	// Collect all PPP candidates keyed by (wanDev, wanConn).
-	type connKey struct{ dev, conn int }
+	// Collect all PPP candidates keyed by (wanDev, wanConn, wanPPP).
+	type connKey struct{ dev, conn, ppp int }
 	candidates := map[connKey]*tr098PPPCandidate{}
 	for name, val := range params {
 		m := reWANPPPConn.FindStringSubmatch(name)
@@ -804,17 +808,38 @@ func discoverTR098WAN(params map[string]string, im *InstanceMap, hints *Discover
 		wanDev, _ := strconv.Atoi(m[1])
 		wanConn, _ := strconv.Atoi(m[2])
 		wanPPP, _ := strconv.Atoi(m[3])
-		key := connKey{wanDev, wanConn}
+		key := connKey{wanDev, wanConn, wanPPP}
 		if _, ok := candidates[key]; !ok {
 			candidates[key] = &tr098PPPCandidate{
 				wanDev: wanDev, wanConn: wanConn, wanPPP: wanPPP,
+				unconfigured: true, // assume unconfigured until proven otherwise
 			}
 		}
 		// Detect external IP to score active connections higher.
-		if strings.HasSuffix(name, ".ExternalIPAddress") && val != "" {
+		if strings.HasSuffix(name, ".ExternalIPAddress") && val != "" && val != "0.0.0.0" {
 			c := candidates[key]
 			c.hasIP = true
 			c.pubIP = isPublicIP(val)
+			c.unconfigured = false
+		}
+		// Mark as configured if ConnectionStatus is anything other than Unconfigured.
+		if strings.HasSuffix(name, ".ConnectionStatus") {
+			if val != "" && !strings.EqualFold(val, "Unconfigured") {
+				candidates[key].unconfigured = false
+			}
+		}
+		// Mark as configured if ConnectionType is set to a real value.
+		if strings.HasSuffix(name, ".ConnectionType") {
+			if val != "" && !strings.EqualFold(val, "Unconfigured") {
+				candidates[key].unconfigured = false
+			}
+		}
+	}
+
+	// Remove candidates that are entirely unconfigured (ZTE phantom slots).
+	for k, c := range candidates {
+		if c.unconfigured {
+			delete(candidates, k)
 		}
 	}
 
